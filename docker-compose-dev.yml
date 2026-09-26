@@ -1,0 +1,66 @@
+# Local dev. Not used in production — see docker-compose.yml. Same service
+# names, network and Postgres version as production; differences are no
+# Traefik (ports published directly) and Dockerfile-dev with hot reload.
+#
+# Host ports 3002/5435 so it can run alongside other local dev servers (3000, 3001, 5434).
+# Test publicom VMs in UTM reach it at http://10.0.2.2:3002.
+#
+# Usage: docker compose -f docker-compose-dev.yml up -d
+
+services:
+  publicomtools-db:
+    container_name: publicomtools-db
+    image: postgres:16.14-alpine
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_DATABASE}
+    ports:
+      - "5435:5432"
+    volumes:
+      - persistent-publicomtools-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+    networks:
+      - "apps-net"
+
+  # Source is bind-mounted for hot reload; node_modules is a named volume
+  # seeded from the image, so changing package.json needs
+  # `docker compose -f docker-compose-dev.yml up -d --build`.
+  publicomtools:
+    container_name: publicomtools
+    build:
+      context: .
+      dockerfile: Dockerfile-dev
+    restart: always
+    environment:
+      TZ: ${TZ}
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@publicomtools-db:5432/${DB_DATABASE}
+      # Bind mounts on Docker Desktop for Mac don't reliably deliver inotify
+      # events — polling is slower but reliable.
+      WATCHPACK_POLLING: "true"
+    env_file:
+      - publicomtools.env
+    ports:
+      - "3002:3000"
+    volumes:
+      - .:/app
+      - publicomtools-node-modules:/app/node_modules
+    depends_on:
+      publicomtools-db:
+        condition: service_healthy
+    networks:
+      - "apps-net"
+
+volumes:
+  persistent-publicomtools-db:
+  publicomtools-node-modules:
+
+networks:
+  apps-net:
+    external: true

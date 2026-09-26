@@ -1,0 +1,61 @@
+# Production deployment, same pattern as bookingtools: image built and pushed
+# to ghcr.io by CI, run on the shared apps-net network behind Traefik. Not
+# used for local dev — see docker-compose-dev.yml.
+#
+# Deploy prerequisites on the server:
+#   - the external "apps-net" network exists (docker network create apps-net)
+#   - a .env file next to this one (copy .env.example) — read by Compose for
+#     the ${VAR} substitution below
+#   - a publicomtools.env file next to this one (copy
+#     publicomtools.env.example) — injected into the app container
+#
+# First deploy / after pulling a new image:
+#   docker compose up -d
+# (prisma migrate deploy runs on container start — see docker-entrypoint.sh)
+
+services:
+  publicomtools:
+    container_name: publicomtools
+    image: ghcr.io/kth-biblioteket/publicomtools:${REPO_TYPE}
+    depends_on:
+      - publicomtools-db
+    restart: always
+    environment:
+      TZ: ${TZ}
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@publicomtools-db:5432/${DB_DATABASE}
+      # Must match both the Traefik PathPrefix below AND the BASE_PATH the
+      # image was built with (see Dockerfile).
+      BASE_PATH: ${PATHPREFIX}
+    env_file:
+      - publicomtools.env
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.publicomtools.rule=Host(`${DOMAIN_NAME}`) && PathPrefix(`${PATHPREFIX}`)"
+      - "traefik.http.routers.publicomtools.entrypoints=websecure"
+      - "traefik.http.routers.publicomtools.tls=true"
+      - "traefik.http.routers.publicomtools.tls.certresolver=myresolver"
+    networks:
+      - "apps-net"
+
+  publicomtools-db:
+    container_name: publicomtools-db
+    # Same exact patch version as docker-compose-dev.yml.
+    image: postgres:16.14-alpine
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ}
+      POSTGRES_DB: ${DB_DATABASE}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - persistent-publicomtools-db:/var/lib/postgresql/data
+    networks:
+      - "apps-net"
+
+volumes:
+  persistent-publicomtools-db:
+    name: persistent-publicomtools-db
+
+networks:
+  apps-net:
+    external: true

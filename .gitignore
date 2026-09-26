@@ -1,0 +1,30 @@
+# dependencies
+/node_modules
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+
+# env files: only the templates are committed
+.env*
+!.env.example
+
+# production secrets (real values live only on the deploy server) — the
+# committed publicomtools.env.example is the template, never this file
+publicomtools.env
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+/src/generated/prisma

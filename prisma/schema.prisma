@@ -1,0 +1,36 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// One row per public computer, created on its first heartbeat.
+model Computer {
+  /// The publicom config name (config/hosts/<host>.env), e.g. "gc1".
+  host         String      @id
+  hostname     String
+  profile      String?
+  computerType String?
+  computerName String?
+  firstSeenAt  DateTime    @default(now())
+  lastSeenAt   DateTime
+  lastIp       String?
+  /// The latest heartbeat payload as sent by the computer.
+  status       Json
+  heartbeats   Heartbeat[]
+}
+
+/// Heartbeat history, pruned after HEARTBEAT_RETENTION_DAYS (src/lib/heartbeat.ts).
+model Heartbeat {
+  id         BigInt   @id @default(autoincrement())
+  host       String
+  computer   Computer @relation(fields: [host], references: [host], onDelete: Cascade)
+  receivedAt DateTime @default(now())
+  status     Json
+
+  @@index([host, receivedAt])
+}

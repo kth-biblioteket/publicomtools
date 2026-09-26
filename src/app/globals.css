@@ -1,0 +1,12 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-figtree);
+
+  /* KTH's official brand palette (KTH grafisk manual). */
+  --color-kth-blue: #004791;
+  --color-kth-navy: #000061;
+  --color-kth-sky: #6298d2;
+  --color-kth-light-blue: #def0ff;
+  --color-kth-sand: #ebe5e0;
+}
