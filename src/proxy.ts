@@ -74,12 +74,14 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
+  // Only the staff pages use KTH login; the device API and the guest
+  // computers' login screen (/guest) never carry the identity cookie.
   matcher: [
     // Under a basePath the app root itself (/publicomtools) isn't matched by
     // the catch-all below.
     { source: "/", has: [{ type: "cookie", key: "kth_identity" }] },
     {
-      source: "/((?!_next/static|_next/image|favicon.ico|api/).*)",
+      source: "/((?!_next/static|_next/image|favicon.ico|api/|guest).*)",
       has: [{ type: "cookie", key: "kth_identity" }],
     },
   ],

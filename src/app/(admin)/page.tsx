@@ -34,7 +34,7 @@ export default async function StatusPage() {
       {computers.length === 0 ? (
         <p className="mt-6 text-gray-600">
           Inga datorer har rapporterat än. En dator dyker upp här efter sin första heartbeat, alltså när{" "}
-          <code>HEARTBEAT_TOKEN</code> finns i dess <code>.secrets</code>.
+          <code>PUBLICOM_DEVICE_TOKEN</code> finns i dess <code>.secrets</code>.
         </p>
       ) : (
         <div className="mt-4 overflow-x-auto">

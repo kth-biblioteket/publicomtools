@@ -34,3 +34,29 @@ model Heartbeat {
 
   @@index([host, receivedAt])
 }
+
+/// One login screen on a guest computer: created when the session starts
+/// (login ticket), activated when someone logs in, ended at logout.
+/// Only the SHA-256 of the ticket is stored. See src/lib/guest-login.ts.
+model GuestLogin {
+  id           String    @id
+  host         String
+  resourceId   String
+  computerName String?
+  defaultHours Int
+  loginType    String
+  bookingType  String
+  /// pending | working | active | ended | superseded
+  status       String
+  createdAt    DateTime  @default(now())
+  expiresAt    DateTime
+  activatedAt  DateTime?
+  endedAt      DateTime?
+  bookingId    String?
+  userLabel    String?
+  startTime    Int?
+  endTime      Int?
+
+  @@index([host, status])
+  @@index([createdAt])
+}
