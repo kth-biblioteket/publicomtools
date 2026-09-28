@@ -108,9 +108,14 @@ async function main() {
     console.log(`profil ${name}: ${Object.keys(values).length} nycklar`);
   }
 
-  // hosts -> Computer.profile + overrides
+  // hosts -> Computer.profile + overrides. test-* är VM-/hårdvarutestkonfigar (t.ex.
+  // test-ref med 10.0.2.2 mot UTM-värden), inte riktiga flottdatorer — hoppa över dem.
   for (const f of readdirSync(join(dir, "hosts")).filter((f) => f.endsWith(".env"))) {
     const host = basename(f, ".env");
+    if (host.startsWith("test-")) {
+      console.log(`host ${host}: hoppas över (testkonfig)`);
+      continue;
+    }
     const all = parseEnv(readFileSync(join(dir, "hosts", f), "utf8"));
     const profile = all.PROFILE ?? null;
     const overrides = { ...all };
