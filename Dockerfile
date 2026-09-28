@@ -30,18 +30,27 @@ RUN npm run build
 FROM node:22.23.2-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+# Next's standalone server listens on this host/port. HOSTNAME must be 0.0.0.0
+# so Traefik on apps-net can reach it (default would bind localhost only).
+ENV HOSTNAME=0.0.0.0
+ENV PORT=3000
 RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
 
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/next.config.ts ./next.config.ts
+# Next standalone: server.js + a traced, minimal node_modules (incl. @prisma/client
+# and the query engine via the generated client in src/), package.json and .next.
+# This is what shrinks the image from ~2 GB to a few hundred MB.
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next ./.next
-# Schema/migrations for `prisma migrate deploy` at startup, and the
-# generated client (schema.prisma outputs it to src/generated/prisma).
+
+# `prisma migrate deploy` at startup needs the CLI, engines, config and dotenv.
+# These are only used at container start, so standalone doesn't trace them —
+# copy them in on top of the standalone node_modules.
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
-COPY --from=builder /app/src/generated ./src/generated
+COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/node_modules/dotenv ./node_modules/dotenv
 
 COPY docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh && chown -R nextjs:nodejs /app
