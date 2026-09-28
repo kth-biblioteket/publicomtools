@@ -22,6 +22,51 @@ model Computer {
   /// The latest heartbeat payload as sent by the computer.
   status       Json
   heartbeats   Heartbeat[]
+
+  /// Host-specific config overrides ({ KEY: "value" }), on top of base + profile.
+  /// See docs/config-via-publicomtools.md in the publicom repo. Config only, never secrets.
+  overrides       Json      @default("{}")
+  configUpdatedAt DateTime?
+  configUpdatedBy String?
+}
+
+/// A config layer: the shared base (kind="base", name="") or a profile
+/// (kind="profile", name="signage"/"search"/…). `values` is { KEY: "value" }.
+/// The effective config for a computer is base ⊕ profile ⊕ Computer.overrides.
+model ConfigLayer {
+  id        String   @id @default(cuid())
+  kind      String
+  name      String
+  values    Json
+  updatedAt DateTime @updatedAt
+
+  @@unique([kind, name])
+}
+
+/// Catalog of known config keys — metadata for the admin UI and validation.
+/// Not the values themselves (those live in ConfigLayer/Computer.overrides).
+model ConfigKey {
+  key        String  @id
+  /// int | bool | string | csv | url | enum
+  type       String
+  /// comma-separated options when type = enum
+  enumValues String?
+  help       String?
+  example    String?
+}
+
+/// Audit/history: one row per saved config change, with the full layer snapshot
+/// after the change (enables diff and rollback).
+model ConfigChange {
+  id        String   @id @default(cuid())
+  /// "base" | "profile:<name>" | "host:<host>"
+  target    String
+  snapshot  Json
+  changedBy String
+  changedAt DateTime @default(now())
+  note      String?
+
+  @@index([target, changedAt])
 }
 
 /// Heartbeat history, pruned after HEARTBEAT_RETENTION_DAYS (src/lib/heartbeat.ts).
