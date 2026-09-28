@@ -42,18 +42,17 @@ RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
-
-# `prisma migrate deploy` at startup needs the CLI, engines, config and dotenv.
-# These are only used at container start, so standalone doesn't trace them —
-# copy them in on top of the standalone node_modules.
+# Schema + migrations for `prisma migrate deploy` at startup.
 COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder /app/node_modules/dotenv ./node_modules/dotenv
+
+# The prisma CLI (for migrate deploy at startup) with its full, npm-resolved
+# dependency tree, in a separate dir so it stays out of the app's minimal
+# node_modules. Keep this version in sync with "prisma" in package.json.
+RUN mkdir /migrator && cd /migrator && npm init -y > /dev/null \
+    && npm install --omit=dev prisma@6.19.3 && npm cache clean --force
 
 COPY docker-entrypoint.sh ./
-RUN chmod +x docker-entrypoint.sh && chown -R nextjs:nodejs /app
+RUN chmod +x docker-entrypoint.sh && chown -R nextjs:nodejs /app /migrator
 
 USER nextjs
 EXPOSE 3000
