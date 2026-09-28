@@ -43,6 +43,9 @@ export async function getEffectiveConfig(
     ...asValues(profile?.values),
     ...asValues(computer.overrides),
     PUBLICOM_HOST: host,
+    // heartbeat.sh skickar PUBLICOM_PROFILE tillbaka; utan den skulle profilen nollställas
+    // vid heartbeat och nästa config-hämtning tappa profil-lagret.
+    ...(computer.profile ? { PUBLICOM_PROFILE: computer.profile } : {}),
     REMOTE_CONFIG_URL: `${origin}${withBasePath(`/api/device/config?host=${encodeURIComponent(host)}`)}`,
   };
 }
