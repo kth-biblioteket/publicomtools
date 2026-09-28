@@ -99,3 +99,94 @@ export async function validateLayer(values: ConfigValues): Promise<ValidationIss
   }
   return issues;
 }
+
+// --- Admin reads/writes (see the (admin)/config pages) ---
+
+export type Catalog = Awaited<ReturnType<typeof listCatalog>>;
+
+/** Parse KEY="value" lines (as edited in the admin UI) the same way the computers do. */
+export function parseConfigText(text: string): ConfigValues {
+  const out: ConfigValues = {};
+  for (let line of text.split("\n")) {
+    line = line.replace(/\r$/, "").trim();
+    if (!line || line.startsWith("#") || !line.includes("=")) continue;
+    const key = line.slice(0, line.indexOf("="));
+    let val = line.slice(line.indexOf("=") + 1);
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) continue;
+    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'")))
+      val = val.slice(1, -1);
+    out[key] = val;
+  }
+  return out;
+}
+
+export function listCatalog() {
+  return db.configKey.findMany({ orderBy: { key: "asc" } });
+}
+
+export async function listProfiles(): Promise<string[]> {
+  const rows = await db.configLayer.findMany({ where: { kind: "profile" }, select: { name: true }, orderBy: { name: "asc" } });
+  return rows.map((r) => r.name);
+}
+
+export async function getLayerValues(kind: "base" | "profile", name: string): Promise<ConfigValues> {
+  const row = await db.configLayer.findUnique({ where: { kind_name: { kind, name } } });
+  return asValues(row?.values);
+}
+
+export async function getComputerConfig(host: string) {
+  const c = await db.computer.findUnique({
+    where: { host },
+    select: { host: true, computerName: true, profile: true, overrides: true },
+  });
+  if (!c) return null;
+  return { host: c.host, computerName: c.computerName, profile: c.profile, overrides: asValues(c.overrides) };
+}
+
+/** target: "base" | "profile:<name>" | "host:<host>" */
+function layerTarget(kind: string, name: string) {
+  return kind === "base" ? "base" : `${kind}:${name}`;
+}
+
+export async function saveLayer(kind: "base" | "profile", name: string, values: ConfigValues, changedBy: string) {
+  await db.$transaction([
+    db.configLayer.upsert({
+      where: { kind_name: { kind, name } },
+      create: { kind, name, values },
+      update: { values },
+    }),
+    db.configChange.create({ data: { target: layerTarget(kind, name), snapshot: values, changedBy } }),
+  ]);
+}
+
+export async function saveComputerConfig(host: string, profile: string | null, overrides: ConfigValues, changedBy: string) {
+  await db.$transaction([
+    db.computer.update({
+      where: { host },
+      data: { profile, overrides, configUpdatedAt: new Date(), configUpdatedBy: changedBy },
+    }),
+    db.configChange.create({
+      data: { target: `host:${host}`, snapshot: { profile, overrides }, changedBy },
+    }),
+  ]);
+}
+
+export function getHistory(target: string) {
+  return db.configChange.findMany({ where: { target }, orderBy: { changedAt: "desc" }, take: 50 });
+}
+
+/** Restore a previous snapshot back onto its target. */
+export async function restoreSnapshot(changeId: string, changedBy: string) {
+  const change = await db.configChange.findUnique({ where: { id: changeId } });
+  if (!change) throw new Error("Ändringen finns inte.");
+  const [kind, name] = change.target.includes(":") ? change.target.split(":", 2) : ["base", ""];
+  const snap = change.snapshot as Record<string, unknown>;
+
+  if (kind === "host") {
+    const overrides = asValues(snap.overrides);
+    const profile = snap.profile == null ? null : String(snap.profile);
+    await saveComputerConfig(name, profile, overrides, changedBy);
+  } else {
+    await saveLayer(kind as "base" | "profile", name, asValues(snap), changedBy);
+  }
+}
