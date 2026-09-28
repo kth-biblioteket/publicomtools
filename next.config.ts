@@ -1,10 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Trace only the files the running server needs into .next/standalone, so the
-  // production image ships a minimal node_modules instead of the full install
-  // (dev tooling, next build machinery, …). See Dockerfile's runner stage.
-  output: "standalone",
   // The dev server blocks its dev-only assets for other origins than
   // localhost, which leaves every page without client JavaScript. The test
   // VMs in UTM reach the dev server on the Mac at 10.0.2.2. Dev only.
