@@ -68,7 +68,6 @@ const CATALOG: Array<[string, string, string?]> = [
   ["HEARTBEAT_URL", "url"],
   ["COMPUTER_NAME", "string"],
   ["SCREEN_ROTATION", "enum", "normal,left,right,inverted"],
-  ["SIGNAGE", "bool"],
   ["WEBSITES", "csv"],
   ["BG_LANDSCAPE", "string"],
   ["BG_PORTRAIT", "string"],
