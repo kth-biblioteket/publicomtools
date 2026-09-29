@@ -102,8 +102,6 @@ export function serializeEnv(values: ConfigValues): string {
   );
 }
 
-export type ValidationIssue = { key: string; problem: string };
-
 export type EnumOption = { value: string; label: string };
 
 /** ConfigKey.options (Json) as a typed list; tolerates a missing or malformed value. */
@@ -114,72 +112,11 @@ export function enumOptions(json: unknown): EnumOption[] {
     .map((o) => ({ value: String(o.value), label: String(o.label ?? o.value) }));
 }
 
-/** Validate a layer's values against the ConfigKey catalog. Used by the admin UI. */
-export async function validateLayer(values: ConfigValues): Promise<ValidationIssue[]> {
-  const issues: ValidationIssue[] = [];
-  const catalog = new Map((await db.configKey.findMany()).map((k) => [k.key, k]));
-
-  for (const [key, raw] of Object.entries(values)) {
-    if (raw.includes('"')) issues.push({ key, problem: 'värdet får inte innehålla dubbelcitattecken (")' });
-
-    const meta = catalog.get(key);
-    if (!meta) {
-      issues.push({ key, problem: "okänd nyckel (finns inte i katalogen)" });
-      continue;
-    }
-    switch (meta.type) {
-      case "int":
-        if (!/^-?\d+$/.test(raw)) issues.push({ key, problem: "måste vara ett heltal" });
-        break;
-      case "bool":
-        if (raw !== "true" && raw !== "false") issues.push({ key, problem: 'måste vara "true" eller "false"' });
-        break;
-      case "url":
-        if (raw && !/^https?:\/\//.test(raw)) issues.push({ key, problem: "måste börja med http:// eller https://" });
-        break;
-      case "enum": {
-        const allowed = enumOptions(meta.options).map((o) => o.value);
-        if (raw && !allowed.includes(raw))
-          issues.push({ key, problem: `måste vara ett av: ${allowed.join(", ")}` });
-        break;
-      }
-    }
-  }
-  return issues;
-}
-
 // --- Admin reads/writes (see the (admin)/config pages) ---
-
-export type Catalog = Awaited<ReturnType<typeof listCatalog>>;
-
-/** Parse KEY="value" lines (as edited in the admin UI) the same way the computers do. */
-export function parseConfigText(text: string): ConfigValues {
-  const out: ConfigValues = {};
-  for (let line of text.split("\n")) {
-    line = line.replace(/\r$/, "").trim();
-    if (!line || line.startsWith("#") || !line.includes("=")) continue;
-    const key = line.slice(0, line.indexOf("="));
-    let val = line.slice(line.indexOf("=") + 1);
-    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) continue;
-    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'")))
-      val = val.slice(1, -1);
-    out[key] = val;
-  }
-  return out;
-}
-
-export function listCatalog() {
-  return db.configKey.findMany({ orderBy: [{ sortOrder: "asc" }, { key: "asc" }] });
-}
 
 export async function listProfiles(): Promise<string[]> {
   const rows = await db.configLayer.findMany({ where: { kind: "profile" }, select: { name: true }, orderBy: { name: "asc" } });
   return rows.map((r) => r.name);
-}
-
-export async function getLayerValues(kind: "base" | "profile", name: string): Promise<ConfigValues> {
-  const row = await db.configLayer.findUnique({ where: { kind_name: { kind, name } } });
-  return asValues(row?.values);
 }
 
 export async function getComputerConfig(host: string) {

@@ -1,29 +1,29 @@
-import Link from "next/link";
+import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
-import { getLayerValues, listCatalog, serializeEnv } from "@/lib/config";
-import { saveLayerAction } from "../actions";
-import { ConfigEditor } from "../config-editor";
+import { getSettingsData } from "@/lib/settings";
+import { SettingsEditor } from "@/components/settings/settings-editor";
+import { Tabs } from "@/components/ui/tabs";
 
 export const dynamic = "force-dynamic";
 
-export default async function EditBasePage() {
+export default async function BaseSettingsPage() {
   await requireAdmin();
-  const [values, catalog] = await Promise.all([getLayerValues("base", ""), listCatalog()]);
+  const data = await getSettingsData("base");
+  if (!data) notFound();
 
   return (
-    <div>
-      <div className="flex items-baseline justify-between">
-        <h1 className="text-2xl font-semibold text-kth-navy">base</h1>
-        <Link href="/config/history/base" className="text-sm text-kth-blue hover:underline">
-          Historik
-        </Link>
+    <div className="flex flex-col gap-5">
+      <div>
+        <h1 className="text-[26px] font-extrabold tracking-tight">Grundinställningar</h1>
+        <p className="mt-1 max-w-[640px] text-sm text-muted">
+          Gäller alla {data.computers.length} datorer. Profiler och enskilda datorer kan ändra dem.
+        </p>
       </div>
-      <p className="mt-1 text-sm text-gray-600">Gemensamma standardvärden för alla datorer.</p>
-      <ConfigEditor
-        action={saveLayerAction.bind(null, "base", "")}
-        initialConfig={serializeEnv(values)}
-        catalog={catalog}
-      />
+      <div className="rounded-[10px] bg-warn-bg px-4 py-2.5 text-sm text-warn-ink">
+        Ändringar här påverkar alla datorer. Granskningen visar exakt vilka som får nya värden.
+      </div>
+      <Tabs label="Grundinställningar" tabs={[{ href: "/config/base", label: "Inställningar" }, { href: "/config/history/base", label: "Historik" }]} />
+      <SettingsEditor key={JSON.stringify(data.own)} data={data} title="Grundinställningar" />
     </div>
   );
 }

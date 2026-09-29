@@ -95,6 +95,9 @@ model ConfigChange {
   changedBy String
   changedAt DateTime @default(now())
   note      String?
+  /// What this save changed: [{ key, before, after }] (null = not set). key "__profile"
+  /// is a computer's profile. Null on rows from before the settings form.
+  changes   Json?
 
   @@index([target, changedAt])
 }
