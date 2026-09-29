@@ -1,20 +1,31 @@
+import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
-import { ConfigHistory } from "@/components/config-history";
+import { ChangeLog } from "@/components/log/change-log";
+import { ChevronLeftIcon } from "@/components/ui/icons";
+import { Tabs } from "@/components/ui/tabs";
 
 export const dynamic = "force-dynamic";
 
-export default async function ConfigHistoryPage({ params }: { params: Promise<{ target: string }> }) {
+/** Historik-fliken för grundinställningarna och profilerna. */
+export default async function LayerHistoryPage({ params }: PageProps<"/config/history/[target]">) {
   await requireAdmin();
-  const { target } = await params;
-  const decoded = decodeURIComponent(target);
+  const target = decodeURIComponent((await params).target);
+  const profile = target.startsWith("profile:") ? target.slice(8) : null;
+  const settingsHref = profile ? `/config/profiles/${profile}` : "/config/base";
 
   return (
-    <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-[26px] font-extrabold tracking-tight">Historik: {decoded}</h1>
-        <p className="mt-1 text-sm text-muted">Senaste 50 ändringarna, nyast först. Återställ skriver tillbaka en tidigare version som en ny ändring.</p>
+    <div className="flex max-w-[980px] flex-col gap-5">
+      <div className="flex flex-col gap-2">
+        {profile && (
+          <Link href="/config" className="inline-flex w-fit items-center gap-1 text-[13.5px] font-semibold text-kth-blue">
+            <ChevronLeftIcon />
+            Profiler
+          </Link>
+        )}
+        <h1 className="text-[26px] font-extrabold tracking-tight">{profile ?? "Grundinställningar"}</h1>
       </div>
-      <ConfigHistory target={decoded} />
+      <Tabs label="Historik" tabs={[{ href: settingsHref, label: "Inställningar" }, { href: `/config/history/${target}`, label: "Historik" }]} />
+      <ChangeLog targets={[target]} showTarget={false} />
     </div>
   );
 }

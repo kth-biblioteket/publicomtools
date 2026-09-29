@@ -10,7 +10,7 @@ type NavItem = { href: string; label: string; icon: React.ReactNode; match: (pat
 const MAIN: NavItem[] = [
   { href: "/", label: "Datorer", icon: <MonitorIcon />, match: (p) => p === "/" || p.startsWith("/computers") },
   { href: "/config", label: "Profiler", icon: <LayersIcon />, match: (p) => p === "/config" || p.startsWith("/config/profiles") },
-  { href: "/config/history/base", label: "Ändringslogg", icon: <HistoryIcon />, match: (p) => p.startsWith("/config/history") },
+  { href: "/log", label: "Ändringslogg", icon: <HistoryIcon />, match: (p) => p.startsWith("/log") },
 ];
 const IT: NavItem[] = [
   { href: "/config/base", label: "Grundinställningar", icon: <SlidersIcon />, match: (p) => p.startsWith("/config/base") },
