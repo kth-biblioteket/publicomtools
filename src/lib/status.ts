@@ -6,27 +6,55 @@ const LOW_DISK_PERCENT = 10;
 
 export type Health = "ok" | "warning" | "offline";
 
-export type Evaluation = { health: Health; problems: string[] };
+/** A problem in plain Swedish, what to do about it, and the technical detail for IT. */
+export type Problem = { text: string; hint: string; detail?: string };
+
+export type Evaluation = { health: Health; problems: Problem[] };
 
 /** Decides the colour shown on the status page, with the reasons in Swedish. */
 export function evaluate(lastSeenAt: Date, status: HeartbeatStatus, now = new Date()): Evaluation {
   const sinceMs = now.getTime() - lastSeenAt.getTime();
   if (sinceMs > OFFLINE_AFTER_MS) {
-    return { health: "offline", problems: [`Ingen kontakt på ${formatDuration(sinceMs / 1000)}`] };
+    return {
+      health: "offline",
+      problems: [
+        {
+          text: `Ingen kontakt sedan ${formatWhen(lastSeenAt, now)}`,
+          hint: "Kontrollera att datorn är påslagen och att nätverkskabeln sitter i.",
+          detail: `senaste heartbeat ${formatTime(lastSeenAt)}`,
+        },
+      ],
+    };
   }
 
-  const problems: string[] = [];
+  const problems: Problem[] = [];
   if (status.guestService !== "active") {
-    problems.push(`Sessionen (guest.service) är ${status.guestService}`);
+    problems.push({
+      text: "Gästprogrammet är inte igång",
+      hint: "Vänta några minuter. Starta om datorn om det inte löser sig.",
+      detail: `guest.service: ${status.guestService}`,
+    });
   }
   if (status.failedUnits.length > 0) {
-    problems.push(`Kraschade tjänster: ${status.failedUnits.join(", ")}`);
+    problems.push({
+      text: status.failedUnits.length === 1 ? "En tjänst på datorn har kraschat" : `${status.failedUnits.length} tjänster på datorn har kraschat`,
+      hint: "Starta om datorn. Kontakta IT om det kommer tillbaka.",
+      detail: status.failedUnits.join(", "),
+    });
   }
   if (status.diskFreePercent !== undefined && status.diskFreePercent < LOW_DISK_PERCENT) {
-    problems.push(`Bara ${status.diskFreePercent} % ledigt diskutrymme`);
+    problems.push({
+      text: `Disken är nästan full (${100 - status.diskFreePercent} %)`,
+      hint: "Loggar rensas vid omstart. Kontakta IT om det kommer tillbaka.",
+      detail: `${status.diskFreePercent} % ledigt`,
+    });
   }
   if (status.rebootRequired) {
-    problems.push("Väntar på omstart efter uppdatering");
+    problems.push({
+      text: "Behöver startas om efter en systemuppdatering",
+      hint: "Starta om datorn när ingen använder den.",
+      detail: "reboot-required",
+    });
   }
   return { health: problems.length > 0 ? "warning" : "ok", problems };
 }
@@ -48,4 +76,31 @@ export function formatTime(value: Date | string | undefined): string {
   const date = typeof value === "string" ? new Date(value) : value;
   if (Number.isNaN(date.getTime())) return String(value);
   return date.toLocaleString("sv-SE", { timeZone: "Europe/Stockholm" });
+}
+
+/** "nyss", "för 12 min sedan", "för 3 tim sedan", "för 2 dagar sedan" */
+export function formatAgo(date: Date, now = new Date()): string {
+  const s = Math.max(0, (now.getTime() - date.getTime()) / 1000);
+  if (s < 60) return "nyss";
+  if (s < 3600) return `för ${Math.floor(s / 60)} min sedan`;
+  if (s < 86400) return `för ${Math.floor(s / 3600)} tim sedan`;
+  const d = Math.floor(s / 86400);
+  return `för ${d} ${d === 1 ? "dag" : "dagar"} sedan`;
+}
+
+const TZ = "Europe/Stockholm";
+const WEEKDAYS = ["söndags", "måndags", "tisdags", "onsdags", "torsdags", "fredags", "lördags"];
+
+/** "kl 11.32", "igår kl 11.32", "i fredags kl 11.32", "12 sep kl 11.32" */
+export function formatWhen(date: Date, now = new Date()): string {
+  const day = (d: Date) => d.toLocaleDateString("sv-SE", { timeZone: TZ });
+  const time = date.toLocaleTimeString("sv-SE", { timeZone: TZ, hour: "2-digit", minute: "2-digit" }).replace(":", ".");
+  const daysAgo = Math.round((new Date(day(now)).getTime() - new Date(day(date)).getTime()) / 86400000);
+  if (daysAgo === 0) return `kl ${time}`;
+  if (daysAgo === 1) return `igår kl ${time}`;
+  if (daysAgo < 7) {
+    const wd = new Date(date.toLocaleString("en-US", { timeZone: TZ })).getDay();
+    return `i ${WEEKDAYS[wd]} kl ${time}`;
+  }
+  return `${date.toLocaleDateString("sv-SE", { timeZone: TZ, day: "numeric", month: "short" })} kl ${time}`;
 }

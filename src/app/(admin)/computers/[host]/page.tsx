@@ -1,135 +1,118 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { toView } from "@/lib/computers";
-import { heartbeatSchema } from "@/lib/heartbeat";
-import { formatDuration, formatTime } from "@/lib/status";
-import { HealthBadge } from "@/components/health-badge";
+import { getComputerView } from "@/lib/computers";
+import { getComputerConfig } from "@/lib/config";
+import { formatAgo, formatDuration, formatWhen } from "@/lib/status";
 import { AutoRefresh } from "@/components/auto-refresh";
-import { deleteComputer } from "@/app/actions";
+import { AlertIcon } from "@/components/ui/icons";
 
 export const dynamic = "force-dynamic";
 
-const HISTORY_LIMIT = 100;
+const CARD = "rounded-xl border border-line bg-white px-6 py-5 shadow-sm";
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="grid grid-cols-3 gap-4 py-2">
-      <dt className="text-gray-500">{label}</dt>
-      <dd className="col-span-2">{children}</dd>
-    </div>
-  );
+function targetLabel(target: string) {
+  if (target === "base") return "Grundinställningar";
+  if (target.startsWith("profile:")) return `Profil ${target.slice(8)}`;
+  return "Den här datorn";
 }
 
-export default async function ComputerPage({ params }: PageProps<"/computers/[host]">) {
-  await requireAdmin();
+export default async function ComputerOverviewPage({ params }: PageProps<"/computers/[host]">) {
   const { host } = await params;
-  const computer = await db.computer.findUnique({ where: { host } });
-  if (!computer) notFound();
+  const [c, config] = await Promise.all([getComputerView(host), getComputerConfig(host)]);
+  if (!c || !config) notFound();
 
-  const view = toView(computer);
-  const s = view.status;
-  const history = await db.heartbeat.findMany({
-    where: { host },
-    orderBy: { receivedAt: "desc" },
-    take: HISTORY_LIMIT,
+  const now = new Date();
+  const s = c.status;
+  const ownCount = Object.keys(config.overrides).length;
+  const changes = await db.configChange.findMany({
+    where: { target: { in: ["base", `host:${host}`, ...(c.profile ? [`profile:${c.profile}`] : [])] } },
+    orderBy: { changedAt: "desc" },
+    take: 3,
+    select: { id: true, target: true, changedAt: true, changedBy: true },
   });
 
   return (
-    <div>
+    <div className="flex flex-col gap-5">
       <AutoRefresh />
-      <Link href="/" className="text-sm text-kth-blue hover:underline">
-        ← Alla datorer
-      </Link>
-      <div className="mt-2 flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold text-kth-navy">{view.host}</h1>
-        <HealthBadge health={view.evaluation.health} />
-      </div>
-      {view.computerName && <p className="text-gray-600">{view.computerName}</p>}
-
-      {view.evaluation.problems.length > 0 && (
-        <ul className="mt-4 list-disc rounded-md bg-yellow-50 py-3 pl-8 pr-4 text-sm text-yellow-900">
-          {view.evaluation.problems.map((p) => (
-            <li key={p}>{p}</li>
-          ))}
-        </ul>
-      )}
-
-      <dl className="mt-6 max-w-3xl divide-y divide-gray-100 text-sm">
-        <Row label="Värdnamn">{view.hostname}</Row>
-        <Row label="IP-adress">{view.lastIp ?? "–"}</Row>
-        <Row label="Senast sedd">{formatTime(view.lastSeenAt)}</Row>
-        <Row label="Profil">
-          {view.profile ?? "–"} {s?.computerType && <span className="text-gray-500">({s.computerType})</span>}
-        </Row>
-        <Row label="Igång sedan omstart">{s ? formatDuration(s.uptimeSeconds) : "–"}</Row>
-        <Row label="Deploy">
-          {s?.branch ?? "–"}, {formatTime(s?.deployedAt)}
-          {s?.deployFilesChanged !== undefined && (
-            <span className="text-gray-500"> ({s.deployFilesChanged} filer ändrade)</span>
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+        <section className={CARD}>
+          <h2 className="text-[17px] font-extrabold">{c.evaluation.problems.length ? "Att göra" : "Allt ser bra ut"}</h2>
+          {c.evaluation.problems.length === 0 ? (
+            <p className="mt-2 text-sm text-muted">Datorn rapporterar inga problem.</p>
+          ) : (
+            <ul className="mt-1">
+              {c.evaluation.problems.map((p) => (
+                <li key={p.text} className="flex gap-3.5 border-t border-line-soft py-4 first:border-0 first:pt-3">
+                  <span
+                    className={`flex size-8 shrink-0 items-center justify-center rounded-full ${
+                      c.evaluation.health === "offline" ? "bg-bad-bg text-bad-ink" : "bg-warn-bg text-warn-ink"
+                    }`}
+                  >
+                    <AlertIcon />
+                  </span>
+                  <div>
+                    <div className="text-[15px] font-bold">{p.text}</div>
+                    <p className="mt-1 text-sm leading-relaxed text-muted">{p.hint}</p>
+                    {p.detail && <div className="mt-1.5 font-mono text-xs text-faint">{p.detail}</div>}
+                  </div>
+                </li>
+              ))}
+            </ul>
           )}
-        </Row>
-        <Row label="Session (guest.service)">
-          {s?.guestService ?? "–"}
-          {s?.sessionStartedAt && <span className="text-gray-500">, startad {formatTime(s.sessionStartedAt)}</span>}
-          {s?.guestRestarts !== undefined && (
-            <span className="text-gray-500">, {s.guestRestarts} sessioner sedan omstart</span>
-          )}
-        </Row>
-        <Row label="Kraschade tjänster">{s && s.failedUnits.length > 0 ? s.failedUnits.join(", ") : "–"}</Row>
-        <Row label="Ledigt diskutrymme">{s?.diskFreePercent !== undefined ? `${s.diskFreePercent} %` : "–"}</Row>
-        <Row label="Väntar på omstart">{s?.rebootRequired ? "Ja" : "Nej"}</Row>
-        <Row label="System">
-          {s?.os ?? "–"} {s?.kernel && <span className="text-gray-500">({s.kernel})</span>}
-        </Row>
-        <Row label="Först sedd">{formatTime(computer.firstSeenAt)}</Row>
-      </dl>
+        </section>
 
-      <h2 className="mt-8 text-lg font-semibold text-kth-navy">Senaste {HISTORY_LIMIT} rapporterna</h2>
-      <div className="mt-2 overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200 text-sm">
-          <thead className="bg-kth-light-blue text-left text-kth-navy">
-            <tr>
-              <th className="px-3 py-2 font-medium">Tid</th>
-              <th className="px-3 py-2 font-medium">Igång</th>
-              <th className="px-3 py-2 font-medium">Session</th>
-              <th className="px-3 py-2 font-medium">Kraschade tjänster</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {history.map((h) => {
-              const hs = heartbeatSchema.safeParse(h.status);
-              return (
-                <tr key={h.id.toString()}>
-                  <td className="px-3 py-1.5 whitespace-nowrap">{formatTime(h.receivedAt)}</td>
-                  <td className="px-3 py-1.5 whitespace-nowrap">
-                    {hs.success ? formatDuration(hs.data.uptimeSeconds) : "–"}
-                  </td>
-                  <td className="px-3 py-1.5">{hs.success ? hs.data.guestService : "–"}</td>
-                  <td className="px-3 py-1.5">
-                    {hs.success && hs.data.failedUnits.length > 0 ? hs.data.failedUnits.join(", ") : "–"}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <section className={CARD}>
+          <h2 className="text-[17px] font-extrabold">Just nu</h2>
+          <dl className="mt-3.5 grid grid-cols-[150px_minmax(0,1fr)] gap-x-4 gap-y-2.5 text-sm">
+            <dt className="text-muted">Senast kontakt</dt>
+            <dd>{s ? `${formatAgo(c.lastSeenAt, now)} (${formatWhen(c.lastSeenAt, now)})` : "aldrig"}</dd>
+            <dt className="text-muted">Igång sedan</dt>
+            <dd>{s ? formatDuration(s.uptimeSeconds) : "–"}</dd>
+            <dt className="text-muted">Gästprogrammet</dt>
+            <dd>{s ? (s.guestService === "active" ? "Igång" : s.guestService) : "–"}</dd>
+            <dt className="text-muted">Profil</dt>
+            <dd>
+              {c.profile ? (
+                <Link href={`/config/profiles/${c.profile}`} className="text-kth-blue">{c.profile}</Link>
+              ) : (
+                "ingen"
+              )}
+            </dd>
+            <dt className="text-muted">Egna inställningar</dt>
+            <dd>
+              {ownCount} st ·{" "}
+              <Link href={`/computers/${host}/settings`} className="text-kth-blue">Visa</Link>
+            </dd>
+            <dt className="text-muted">Inställningar</dt>
+            <dd>
+              {c.configState === "legacy"
+                ? "Hämtas från de gamla configfilerna på GitHub"
+                : `Hämtade ${formatWhen(c.configFetchedAt!, now)}${c.configState === "pending" ? ", ändrade efter det" : ""}`}
+            </dd>
+          </dl>
+        </section>
       </div>
 
-      <form action={deleteComputer} className="mt-10 border-t border-gray-200 pt-4">
-        <input type="hidden" name="host" value={view.host} />
-        <p className="text-sm text-gray-600">
-          Ta bort en dator som inte längre används. Den kommer tillbaka vid nästa heartbeat om den fortfarande är
-          igång.
-        </p>
-        <button
-          type="submit"
-          className="mt-2 rounded-md border border-red-300 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50"
-        >
-          Ta bort {view.host} och dess historik
-        </button>
-      </form>
+      <section className={CARD}>
+        <div className="flex items-baseline justify-between gap-4">
+          <h2 className="text-[17px] font-extrabold">Senaste ändringar som påverkar datorn</h2>
+          <Link href={`/computers/${host}/history`} className="text-[13.5px] font-semibold text-kth-blue">Visa historik</Link>
+        </div>
+        {changes.length === 0 ? (
+          <p className="mt-2 text-sm text-muted">Inga ändringar än.</p>
+        ) : (
+          <ul className="mt-2 text-sm">
+            {changes.map((ch) => (
+              <li key={ch.id} className="grid grid-cols-[140px_200px_minmax(0,1fr)] gap-4 border-t border-line-soft py-2.5">
+                <span className="text-muted">{formatWhen(ch.changedAt, now)}</span>
+                <span>{targetLabel(ch.target)}</span>
+                <span className="truncate text-muted">{ch.changedBy}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

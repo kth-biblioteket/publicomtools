@@ -9,4 +9,22 @@
   --color-kth-sky: #6298d2;
   --color-kth-light-blue: #def0ff;
   --color-kth-sand: #ebe5e0;
+
+  /* Admin UI neutrals and states — same as the Formtools admin, so the tools feel related. */
+  --color-ink: #1c1f24;
+  --color-muted: #5c6470;
+  --color-faint: #8a929c;
+  --color-page: #f5f6f7;
+  --color-line: #e6e6e6;
+  --color-line-soft: #eef0f2;
+  --color-field: #c9ced5;
+  --color-select: #eaf1f8;
+  --color-select-ink: #003a75;
+  --color-ok-bg: #c7ebba;
+  --color-ok-ink: #0d4a21;
+  --color-warn-bg: #fff0b0;
+  --color-warn-ink: #6e3b00;
+  --color-bad-bg: #fde2e1;
+  --color-bad-ink: #78001a;
+  --color-draft: #fffbea;
 }
