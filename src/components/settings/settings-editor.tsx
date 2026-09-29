@@ -8,6 +8,8 @@ import { formatValue, PROFILE_KEY, validateValue, type CatalogEntry } from "@/li
 import { Chip } from "@/components/ui/chip";
 import { SearchIcon } from "@/components/ui/icons";
 import { FieldControl } from "./field-control";
+import { KeyPicker } from "./key-picker";
+import { PasteImport } from "./paste-import";
 
 type Kind = "base" | "profile" | "host";
 type Source = "base" | "profile";
@@ -31,6 +33,8 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
   const [q, setQ] = useState("");
   const [onlyOwn, setOnlyOwn] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  /** Keys brought into view with "Ändra en inställning…" */
+  const [pinned, setPinned] = useState<string[]>([]);
   const [mode, setMode] = useState<"form" | "text">("form");
   const [review, setReview] = useState(false);
   const [note, setNote] = useState("");
@@ -96,8 +100,8 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
   const needle = q.trim().toLowerCase();
   const isOwn = (key: string) => ownNow(key) !== null;
   const visible = (k: CatalogEntry) =>
-    (showAdvanced || !k.advanced || isOwn(k.key) || k.key in drafts) &&
-    (!onlyOwn || isOwn(k.key) || k.key in drafts) &&
+    (showAdvanced || !k.advanced || isOwn(k.key) || k.key in drafts || pinned.includes(k.key)) &&
+    (!onlyOwn || isOwn(k.key) || k.key in drafts || pinned.includes(k.key)) &&
     (!needle || `${k.label} ${k.key} ${k.help ?? ""}`.toLowerCase().includes(needle));
   const hiddenAdvanced = data.catalog.filter((k) => k.advanced && !isOwn(k.key) && !(k.key in drafts)).length;
   const groups = data.groups
@@ -316,7 +320,34 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
           <input type="checkbox" checked={showAdvanced} onChange={(e) => setShowAdvanced(e.target.checked)} />
           Visa tekniska inställningar{!showAdvanced && hiddenAdvanced ? ` (${hiddenAdvanced})` : ""}
         </label>
-        <div className="inline-flex gap-0.5 rounded-[9px] bg-[#eceef1] p-[3px] lg:ml-auto" role="group" aria-label="Visning">
+        <div className="flex flex-wrap items-center gap-3 lg:ml-auto">
+        {mode === "form" ? (
+          <KeyPicker
+            catalog={data.catalog}
+            groups={data.groups}
+            label={kind === "host" ? "Ändra en inställning för datorn" : "Ändra en inställning"}
+            isOwn={(key) => isOwn(key)}
+            describe={(key) => {
+              const inh = inherited[key];
+              const m = meta.get(key);
+              return inh
+                ? { now: formatValue(m, inh.value), source: `Från ${sourceText(inh.source)}` }
+                : { now: m?.defaultValue != null ? formatValue(m, m.defaultValue) : "inte satt", source: "Programmets standard" };
+            }}
+            onPick={(key) => {
+              setPinned((p) => (p.includes(key) ? p : [...p, key]));
+              setQ("");
+              setTimeout(() => {
+                const el = document.getElementById(`f-${key}`);
+                el?.scrollIntoView({ behavior: "smooth", block: "center" });
+                el?.focus({ preventScroll: true });
+              }, 50);
+            }}
+          />
+        ) : (
+          <PasteImport catalog={data.catalog} current={shown} onApply={(entries) => entries.forEach((e) => setValue(e.key, e.value))} />
+        )}
+        <div className="inline-flex gap-0.5 rounded-[9px] bg-[#eceef1] p-[3px]" role="group" aria-label="Visning">
           {(["form", "text"] as const).map((m) => (
             <button
               key={m}
@@ -328,6 +359,7 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
               {m === "form" ? "Formulär" : "Textläge"}
             </button>
           ))}
+        </div>
         </div>
       </div>
 
