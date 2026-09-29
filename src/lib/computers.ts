@@ -2,6 +2,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { heartbeatSchema, type HeartbeatStatus } from "@/lib/heartbeat";
 import { evaluate, type Evaluation } from "@/lib/status";
+import { getProfileLabels } from "@/lib/profiles";
 
 /**
  * Whether the computer runs the settings in this admin:
@@ -15,6 +16,8 @@ export type ComputerView = {
   host: string;
   hostname: string;
   profile: string | null;
+  /** Display name of the profile */
+  profileLabel: string | null;
   computerName: string | null;
   lastSeenAt: Date;
   lastIp: string | null;
@@ -37,16 +40,22 @@ type ComputerRow = {
   configUpdatedAt?: Date | null;
 };
 
-/** When each layer last changed: base, and every profile by name. */
-export type LayerTimes = { base: Date | null; profiles: Map<string, Date> };
+/** When each layer last had a saved change: base, and every profile by name. */
+export type LayerTimes = { base: Date | null; profiles: Map<string, Date>; labels?: Map<string, string> };
 
 const SEVERITY = { offline: 0, warning: 1, ok: 2 } as const;
 
 export async function getLayerTimes(): Promise<LayerTimes> {
-  const layers = await db.configLayer.findMany({ select: { kind: true, name: true, updatedAt: true } });
-  const base = layers.find((l) => l.kind === "base")?.updatedAt ?? null;
-  const profiles = new Map(layers.filter((l) => l.kind === "profile").map((l) => [l.name, l.updatedAt]));
-  return { base, profiles };
+  // The last saved change per layer (not ConfigLayer.updatedAt, which also moves on a rename).
+  const [latest, labels] = await Promise.all([
+    db.configChange.groupBy({ by: ["target"], where: { NOT: { target: { startsWith: "host:" } } }, _max: { changedAt: true } }),
+    getProfileLabels(),
+  ]);
+  const base = latest.find((l) => l.target === "base")?._max.changedAt ?? null;
+  const profiles = new Map(
+    latest.filter((l) => l.target.startsWith("profile:") && l._max.changedAt).map((l) => [l.target.slice(8), l._max.changedAt!])
+  );
+  return { base, profiles, labels };
 }
 
 function configState(c: ComputerRow, times?: LayerTimes): ConfigState {
@@ -74,6 +83,7 @@ export function toView(computer: ComputerRow, times?: LayerTimes, now = new Date
     host: computer.host,
     hostname: computer.hostname,
     profile: computer.profile,
+    profileLabel: computer.profile ? times?.labels?.get(computer.profile) ?? computer.profile : null,
     computerName: computer.computerName,
     lastSeenAt: computer.lastSeenAt,
     lastIp: computer.lastIp,

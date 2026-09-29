@@ -13,7 +13,7 @@ const CARD = "rounded-xl border border-line bg-white px-6 py-5 shadow-sm";
 
 function targetLabel(target: string) {
   if (target === "base") return "Grundinställningar";
-  if (target.startsWith("profile:")) return `Profil ${target.slice(8)}`;
+  if (target.startsWith("profile:")) return "Profilen";
   return "Den här datorn";
 }
 
@@ -74,7 +74,7 @@ export default async function ComputerOverviewPage({ params }: PageProps<"/compu
             <dt className="text-muted">Profil</dt>
             <dd>
               {c.profile ? (
-                <Link href={`/config/profiles/${c.profile}`} className="text-kth-blue">{c.profile}</Link>
+                <Link href={`/config/profiles/${c.profile}`} className="text-kth-blue">{c.profileLabel}</Link>
               ) : (
                 "ingen"
               )}

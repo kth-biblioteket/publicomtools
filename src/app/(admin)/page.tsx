@@ -13,7 +13,7 @@ export default async function ComputersPage() {
   const rows: ComputerRow[] = computers.map((c) => ({
     host: c.host,
     name: c.computerName || c.host,
-    profile: c.profile,
+    profile: c.profileLabel,
     health: c.evaluation.health,
     // Offline shows the exact time ("i fredags kl 11.32"); otherwise "för 2 min sedan".
     seen: c.status ? (c.evaluation.health === "offline" ? formatWhen(c.lastSeenAt, now) : formatAgo(c.lastSeenAt, now)) : "aldrig",

@@ -28,7 +28,7 @@ export default async function ComputerLayout({ params, children }: LayoutProps<"
           <span>
             Profil:{" "}
             {c.profile ? (
-              <Link href={`/config/profiles/${c.profile}`} className="font-semibold text-kth-blue">{c.profile}</Link>
+              <Link href={`/config/profiles/${c.profile}`} className="font-semibold text-kth-blue">{c.profileLabel}</Link>
             ) : (
               "ingen"
             )}

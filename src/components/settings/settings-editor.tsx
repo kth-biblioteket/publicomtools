@@ -90,7 +90,7 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
     });
   const undo = (key: string) => update((d) => delete d[key]);
 
-  const sourceText = (s: Source) => (s === "base" ? "grundinställningarna" : `profilen ${profileName}`);
+  const sourceText = (s: Source) => (s === "base" ? "grundinställningarna" : `profilen ${data.profileLabels[profileName ?? ""] ?? profileName}`);
 
   // --- which rows to show ---
   const needle = q.trim().toLowerCase();
@@ -286,9 +286,11 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
             className="h-[38px] w-56 rounded-lg border border-field bg-white px-2.5 text-sm"
           >
             <option value="">Ingen profil</option>
-            {Object.keys(data.profiles).sort().map((p) => (
-              <option key={p} value={p}>{p}</option>
-            ))}
+            {Object.keys(data.profiles)
+              .sort((a, b) => data.profileLabels[a].localeCompare(data.profileLabels[b], "sv"))
+              .map((p) => (
+                <option key={p} value={p}>{data.profileLabels[p]}</option>
+              ))}
           </select>
         </section>
       )}
@@ -424,8 +426,8 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
               <div className="rounded-[10px] border border-line-soft px-3.5 py-3 text-sm">
                 <div className="font-bold">Profil</div>
                 <dl className="mt-1.5 grid grid-cols-[52px_minmax(0,1fr)] gap-x-2.5 gap-y-1 text-[13.5px]">
-                  <dt className="text-muted">Före</dt><dd>{data.profile ?? "ingen"}</dd>
-                  <dt className="text-muted">Efter</dt><dd>{profileDraft ?? "ingen"}</dd>
+                  <dt className="text-muted">Före</dt><dd>{data.profile ? data.profileLabels[data.profile] ?? data.profile : "ingen"}</dd>
+                  <dt className="text-muted">Efter</dt><dd>{profileDraft ? data.profileLabels[profileDraft] ?? profileDraft : "ingen"}</dd>
                 </dl>
               </div>
             )}

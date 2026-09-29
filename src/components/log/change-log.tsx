@@ -2,6 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { listChanges, type LogFilter } from "@/lib/changelog";
 import { getCatalog } from "@/lib/settings";
+import { getProfileLabels } from "@/lib/profiles";
 import { formatValue, PROFILE_KEY, splitList, type CatalogEntry, type Change, type Target } from "@/lib/settings-shared";
 import { formatWhen } from "@/lib/status";
 import { Chip } from "@/components/ui/chip";
@@ -42,10 +43,11 @@ function dayLabel(d: Date, now: Date) {
 /** Change entries, newest first, grouped by day, each with "Ångra den här ändringen". */
 export async function ChangeLog({ targets, filter, showTarget = true }: { targets?: Target[]; filter?: LogFilter; showTarget?: boolean }) {
   const now = new Date();
-  const [entries, { catalog }, computers] = await Promise.all([
+  const [entries, { catalog }, computers, profileLabels] = await Promise.all([
     listChanges({ targets, filter }),
     getCatalog(),
     db.computer.findMany({ select: { host: true, computerName: true } }),
+    getProfileLabels(),
   ]);
   const meta = new Map(catalog.map((k) => [k.key, k]));
   const names = new Map(computers.map((c) => [c.host, c.computerName || c.host]));
@@ -53,7 +55,7 @@ export async function ChangeLog({ targets, filter, showTarget = true }: { target
 
   const targetLink = (t: Target) => {
     if (t === "base") return { href: "/config/base", label: "Grundinställningar" };
-    if (t.startsWith("profile:")) return { href: `/config/profiles/${t.slice(8)}`, label: `Profil ${t.slice(8)}` };
+    if (t.startsWith("profile:")) return { href: `/config/profiles/${t.slice(8)}`, label: `Profil ${profileLabels.get(t.slice(8)) ?? t.slice(8)}` };
     const host = t.slice(5);
     return { href: `/computers/${host}/settings`, label: names.get(host) ?? host };
   };
@@ -69,7 +71,7 @@ export async function ChangeLog({ targets, filter, showTarget = true }: { target
         const lines = e.changes.map((c) => ({
           key: c.key,
           label: c.key === PROFILE_KEY ? "Profil" : meta.get(c.key)?.label ?? c.key,
-          becomes: c.key === PROFILE_KEY ? c.before ?? "ingen profil" : c.before === null ? "inte satt (ärvs)" : formatValue(meta.get(c.key), c.before),
+          becomes: c.key === PROFILE_KEY ? (c.before ? profileLabels.get(c.before) ?? c.before : "ingen profil") : c.before === null ? "inte satt (ärvs)" : formatValue(meta.get(c.key), c.before),
         }));
         return (
           <div key={e.id} className="contents">

@@ -50,10 +50,13 @@ async function main() {
   // profiles
   for (const f of readdirSync(join(dir, "profiles")).filter((f) => f.endsWith(".env"))) {
     const name = basename(f, ".env");
-    const values = parseEnv(readFileSync(join(dir, "profiles", f), "utf8"));
+    const text = readFileSync(join(dir, "profiles", f), "utf8");
+    const values = parseEnv(text);
+    // The file's first comment line describes the profile, e.g. "# Sökdator (Primo och Libris)".
+    const description = text.match(/^#\s*(.+)$/m)?.[1]?.trim() ?? null;
     await db.configLayer.upsert({
       where: { kind_name: { kind: "profile", name } },
-      create: { kind: "profile", name, values },
+      create: { kind: "profile", name, values, description },
       update: { values },
     });
     console.log(`profil ${name}: ${Object.keys(values).length} nycklar`);

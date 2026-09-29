@@ -107,7 +107,7 @@ export default async function ComputerTechPage({ params }: PageProps<"/computers
             return (
               <div key={k}>
                 <span className="font-semibold text-select-ink">{k}</span>{`="${e.value}"`}
-                <span className="text-faint">{" ".repeat(Math.max(2, Math.min(keyWidth, 60) - line.length + 2))}# {SOURCE_LABEL[e.source](c.profile)}</span>
+                <span className="text-faint">{" ".repeat(Math.max(2, Math.min(keyWidth, 60) - line.length + 2))}# {SOURCE_LABEL[e.source](c.profileLabel)}</span>
               </div>
             );
           })}

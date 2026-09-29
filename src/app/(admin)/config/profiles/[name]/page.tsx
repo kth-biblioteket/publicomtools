@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
+import { db } from "@/lib/db";
 import { getSettingsData } from "@/lib/settings";
+import { ProfileMeta } from "@/components/profiles/profile-meta";
 import { SettingsEditor } from "@/components/settings/settings-editor";
 import { ChevronLeftIcon } from "@/components/ui/icons";
 import { Tabs } from "@/components/ui/tabs";
@@ -14,6 +16,8 @@ export default async function ProfileSettingsPage({ params }: PageProps<"/config
   const data = await getSettingsData(`profile:${name}`);
   if (!data) notFound();
   const users = data.computers.filter((c) => c.profile === name);
+  const layer = await db.configLayer.findUnique({ where: { kind_name: { kind: "profile", name } }, select: { label: true, description: true } });
+  const label = layer?.label || name;
 
   return (
     <div className="flex flex-col gap-5">
@@ -22,7 +26,11 @@ export default async function ProfileSettingsPage({ params }: PageProps<"/config
           <ChevronLeftIcon />
           Profiler
         </Link>
-        <h1 className="text-[26px] font-extrabold tracking-tight">{name}</h1>
+        <h1 className="flex flex-wrap items-baseline gap-3 text-[26px] font-extrabold tracking-tight">
+          {label}
+          <span className="font-mono text-sm font-medium text-faint">{name}</span>
+        </h1>
+        {layer?.description && <p className="text-sm text-muted">{layer.description}</p>}
         <div className="flex flex-wrap items-center gap-2 text-sm text-muted">
           <span>
             Används av {users.length} {users.length === 1 ? "dator" : "datorer"}
@@ -35,6 +43,7 @@ export default async function ProfileSettingsPage({ params }: PageProps<"/config
           ))}
         </div>
       </div>
+      <ProfileMeta name={name} label={label} description={layer?.description ?? null} used={users.length} />
       <Tabs
         label="Profil"
         tabs={[
@@ -42,7 +51,7 @@ export default async function ProfileSettingsPage({ params }: PageProps<"/config
           { href: `/config/history/profile:${name}`, label: "Historik" },
         ]}
       />
-      <SettingsEditor key={JSON.stringify(data.own)} data={data} title={`Profil ${name}`} />
+      <SettingsEditor key={JSON.stringify(data.own)} data={data} title={`Profil ${label}`} />
     </div>
   );
 }

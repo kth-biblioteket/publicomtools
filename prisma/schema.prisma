@@ -39,7 +39,11 @@ model Computer {
 model ConfigLayer {
   id        String   @id @default(cuid())
   kind      String
+  /// Profile id used by the computers (PUBLICOM_PROFILE); fixed once created
   name      String
+  /// Display name in the admin UI, e.g. "Sökdator"
+  label       String?
+  description String?
   values    Json
   updatedAt DateTime @updatedAt
 

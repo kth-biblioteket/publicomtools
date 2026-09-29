@@ -58,6 +58,8 @@ export type SettingsData = {
   base: ConfigValues;
   /** Every profile's values, so a computer's editor can switch profile without a round trip */
   profiles: Record<string, ConfigValues>;
+  /** Display names of the profiles */
+  profileLabels: Record<string, string>;
   /** host target only */
   profile: string | null;
   /** Computers the layer reaches, for "påverkar N datorer" */
@@ -71,7 +73,9 @@ export async function getSettingsData(target: Target): Promise<SettingsData | nu
     db.computer.findMany({ select: { host: true, computerName: true, profile: true, overrides: true }, orderBy: { host: "asc" } }),
   ]);
   const base = asValues(layers.find((l) => l.kind === "base")?.values);
-  const profiles = Object.fromEntries(layers.filter((l) => l.kind === "profile").map((l) => [l.name, asValues(l.values)]));
+  const profileLayers = layers.filter((l) => l.kind === "profile");
+  const profiles = Object.fromEntries(profileLayers.map((l) => [l.name, asValues(l.values)]));
+  const profileLabels = Object.fromEntries(profileLayers.map((l) => [l.name, l.label || l.name]));
   const scope: ScopeComputer[] = computers.map((c) => ({
     host: c.host,
     name: c.computerName || c.host,
@@ -92,7 +96,7 @@ export async function getSettingsData(target: Target): Promise<SettingsData | nu
     own = asValues(c.overrides);
     profile = c.profile;
   }
-  return { target, catalog, groups, own, base, profiles, profile, computers: scope };
+  return { target, catalog, groups, own, base, profiles, profileLabels, profile, computers: scope };
 }
 
 export type SaveInput = {
