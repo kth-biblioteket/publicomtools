@@ -12,6 +12,8 @@ import { PauseIcon, PlayIcon, SearchIcon } from "@/components/ui/icons";
 export type ComputerRow = {
   host: string;
   name: string;
+  /** The computer's own name, when the admin list shows another one */
+  panelName: string | null;
   profile: string | null;
   health: Health;
   seen: string;
@@ -69,7 +71,7 @@ export function ComputerList({ rows, renderedAt }: { rows: ComputerRow[]; render
         (filter === "pending" && r.configState === "pending") ||
         r.health === filter) &&
       (!profile || r.profile === profile) &&
-      (!needle || `${r.name} ${r.host} ${r.profile ?? ""}`.toLowerCase().includes(needle))
+      (!needle || `${r.name} ${r.panelName ?? ""} ${r.host} ${r.profile ?? ""}`.toLowerCase().includes(needle))
   );
 
   const filters: { id: Filter; label: string }[] = [
@@ -192,7 +194,10 @@ export function ComputerList({ rows, renderedAt }: { rows: ComputerRow[]; render
                       <Link href={`/computers/${r.host}`} className="font-bold text-ink hover:text-kth-blue hover:underline">
                         {r.name}
                       </Link>
-                      <div className="mt-0.5 font-mono text-[12.5px] text-muted">{r.host}</div>
+                      <div className="mt-0.5 font-mono text-[12.5px] text-muted">
+                        {r.host}
+                        {r.panelName && <span className="font-sans"> · i panelen: {r.panelName}</span>}
+                      </div>
                     </td>
                     <td className="px-4 py-3"><HealthBadge health={r.health} /></td>
                     <td className="px-4 py-3">{r.profile ?? "–"}</td>

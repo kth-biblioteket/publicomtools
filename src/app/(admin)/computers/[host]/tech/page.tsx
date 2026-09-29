@@ -114,7 +114,7 @@ export default async function ComputerTechPage({ params }: PageProps<"/computers
         </pre>
       </section>
 
-      <DeleteComputer host={c.host} name={c.computerName || c.host} />
+      <DeleteComputer host={c.host} name={c.name} />
     </div>
   );
 }

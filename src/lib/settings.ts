@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { displayName } from "@/lib/names";
 import { enumOptions, type ConfigValues } from "@/lib/config";
 import {
   PROFILE_KEY,
@@ -70,7 +71,7 @@ export async function getSettingsData(target: Target): Promise<SettingsData | nu
   const [{ catalog, groups }, layers, computers] = await Promise.all([
     getCatalog(),
     db.configLayer.findMany(),
-    db.computer.findMany({ select: { host: true, computerName: true, profile: true, overrides: true }, orderBy: { host: "asc" } }),
+    db.computer.findMany({ select: { host: true, computerName: true, label: true, profile: true, overrides: true }, orderBy: { host: "asc" } }),
   ]);
   const base = asValues(layers.find((l) => l.kind === "base")?.values);
   const profileLayers = layers.filter((l) => l.kind === "profile");
@@ -78,7 +79,7 @@ export async function getSettingsData(target: Target): Promise<SettingsData | nu
   const profileLabels = Object.fromEntries(profileLayers.map((l) => [l.name, l.label || l.name]));
   const scope: ScopeComputer[] = computers.map((c) => ({
     host: c.host,
-    name: c.computerName || c.host,
+    name: displayName(c),
     profile: c.profile,
     ownKeys: Object.keys(asValues(c.overrides)),
   }));

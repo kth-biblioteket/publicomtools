@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { formatDuration } from "@/lib/status";
+import { displayName } from "@/lib/names";
 
 export const dynamic = "force-dynamic";
 
@@ -28,9 +29,9 @@ export default async function GuestsPage({ searchParams }: PageProps<"/guests">)
 
   const [logins, computers] = await Promise.all([
     db.guestLogin.findMany({ where: { createdAt: { gte: since } }, orderBy: { createdAt: "desc" }, take: 300 }),
-    db.computer.findMany({ select: { host: true, computerName: true } }),
+    db.computer.findMany({ select: { host: true, computerName: true, label: true } }),
   ]);
-  const names = new Map(computers.map((c) => [c.host, c.computerName || c.host]));
+  const names = new Map(computers.map((c) => [c.host, displayName(c)]));
   const now = today.getTime();
 
   return (

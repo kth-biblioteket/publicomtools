@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { heartbeatSchema, type HeartbeatStatus } from "@/lib/heartbeat";
 import { evaluate, type Evaluation } from "@/lib/status";
 import { getProfileLabels } from "@/lib/profiles";
+import { displayName } from "@/lib/names";
 
 /**
  * Whether the computer runs the settings in this admin:
@@ -19,6 +20,10 @@ export type ComputerView = {
   /** Display name of the profile */
   profileLabel: string | null;
   computerName: string | null;
+  /** Admin-only name */
+  label: string | null;
+  /** label, else computerName, else host */
+  name: string;
   lastSeenAt: Date;
   lastIp: string | null;
   status: HeartbeatStatus | null;
@@ -33,6 +38,7 @@ type ComputerRow = {
   hostname: string;
   profile: string | null;
   computerName: string | null;
+  label?: string | null;
   lastSeenAt: Date;
   lastIp: string | null;
   status: unknown;
@@ -85,6 +91,8 @@ export function toView(computer: ComputerRow, times?: LayerTimes, now = new Date
     profile: computer.profile,
     profileLabel: computer.profile ? times?.labels?.get(computer.profile) ?? computer.profile : null,
     computerName: computer.computerName,
+    label: computer.label ?? null,
+    name: displayName(computer),
     lastSeenAt: computer.lastSeenAt,
     lastIp: computer.lastIp,
     status,

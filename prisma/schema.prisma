@@ -15,7 +15,10 @@ model Computer {
   hostname     String
   profile      String?
   computerType String?
+  /// COMPUTER_NAME as the computer reports it (shown in its panel)
   computerName String?
+  /// Name in the admin list only; never sent to the computer
+  label        String?
   firstSeenAt  DateTime    @default(now())
   lastSeenAt   DateTime
   lastIp       String?

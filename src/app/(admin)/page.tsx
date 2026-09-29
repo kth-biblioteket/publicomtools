@@ -12,7 +12,8 @@ export default async function ComputersPage() {
 
   const rows: ComputerRow[] = computers.map((c) => ({
     host: c.host,
-    name: c.computerName || c.host,
+    panelName: c.label && c.computerName && c.computerName !== c.label ? c.computerName : null,
+    name: c.name,
     profile: c.profileLabel,
     health: c.evaluation.health,
     // Offline shows the exact time ("i fredags kl 11.32"); otherwise "för 2 min sedan".

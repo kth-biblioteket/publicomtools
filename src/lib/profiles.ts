@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { displayName } from "@/lib/names";
 
 /**
  * Profiles: a named set of settings for one kind of computer. `name` is the id the
@@ -22,7 +23,7 @@ export async function getProfileLabels(): Promise<Map<string, string>> {
 export async function listProfileSummaries(): Promise<ProfileSummary[]> {
   const [layers, computers] = await Promise.all([
     db.configLayer.findMany({ where: { kind: "profile" } }),
-    db.computer.findMany({ select: { host: true, computerName: true, profile: true }, orderBy: { host: "asc" } }),
+    db.computer.findMany({ select: { host: true, computerName: true, label: true, profile: true }, orderBy: { host: "asc" } }),
   ]);
   return layers
     .map((l) => ({
@@ -30,7 +31,7 @@ export async function listProfileSummaries(): Promise<ProfileSummary[]> {
       label: l.label || l.name,
       description: l.description,
       keyCount: Object.keys((l.values ?? {}) as object).length,
-      computers: computers.filter((c) => c.profile === l.name).map((c) => ({ host: c.host, name: c.computerName || c.host })),
+      computers: computers.filter((c) => c.profile === l.name).map((c) => ({ host: c.host, name: displayName(c) })),
     }))
     .sort((a, b) => a.label.localeCompare(b.label, "sv"));
 }

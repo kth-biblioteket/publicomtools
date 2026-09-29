@@ -5,6 +5,7 @@ import { getCatalog } from "@/lib/settings";
 import { getProfileLabels } from "@/lib/profiles";
 import { formatValue, PROFILE_KEY, splitList, type CatalogEntry, type Change, type Target } from "@/lib/settings-shared";
 import { formatWhen } from "@/lib/status";
+import { displayName } from "@/lib/names";
 import { Chip } from "@/components/ui/chip";
 import { RevertButton } from "./revert-button";
 
@@ -46,11 +47,11 @@ export async function ChangeLog({ targets, filter, showTarget = true }: { target
   const [entries, { catalog }, computers, profileLabels] = await Promise.all([
     listChanges({ targets, filter }),
     getCatalog(),
-    db.computer.findMany({ select: { host: true, computerName: true } }),
+    db.computer.findMany({ select: { host: true, computerName: true, label: true } }),
     getProfileLabels(),
   ]);
   const meta = new Map(catalog.map((k) => [k.key, k]));
-  const names = new Map(computers.map((c) => [c.host, c.computerName || c.host]));
+  const names = new Map(computers.map((c) => [c.host, displayName(c)]));
   const visible = entries.filter((e) => e.changes.length);
 
   const targetLink = (t: Target) => {

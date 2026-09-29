@@ -6,6 +6,7 @@ import { HealthBadge } from "@/components/health-badge";
 import { Chip } from "@/components/ui/chip";
 import { ChevronLeftIcon } from "@/components/ui/icons";
 import { Tabs } from "@/components/ui/tabs";
+import { RenameComputer } from "./rename-computer";
 
 export default async function ComputerLayout({ params, children }: LayoutProps<"/computers/[host]">) {
   await requireAdmin();
@@ -21,9 +22,10 @@ export default async function ComputerLayout({ params, children }: LayoutProps<"
           <ChevronLeftIcon />
           Datorer
         </Link>
-        <h1 className="text-[26px] font-extrabold tracking-tight">{c.computerName || c.host}</h1>
+        <RenameComputer host={c.host} name={c.name} label={c.label} panelName={c.computerName} />
         <div className="flex flex-wrap items-center gap-3 text-sm text-muted">
           <span className="font-mono text-[13px]">{c.host}</span>
+          {c.label && c.computerName && c.computerName !== c.label && <span>I panelen: {c.computerName}</span>}
           <HealthBadge health={c.evaluation.health} />
           <span>
             Profil:{" "}
