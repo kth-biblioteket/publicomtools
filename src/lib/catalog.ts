@@ -1,6 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
-import { applyCatalog, diffCatalog, fetchCatalogSource, parseCatalog, type CatalogDiff } from "@/lib/catalog-core";
+import { applyCatalog, contentHash, diffCatalog, fetchCatalogSource, parseCatalog, type CatalogDiff, type CatalogSource } from "@/lib/catalog-core";
 
 /** The Inställningskatalog page: preview and apply updates of the ConfigKey cache. */
 
@@ -10,9 +10,14 @@ export function getCatalogMeta() {
 
 export type CatalogPreview = { source: string; version: string; upToDate: boolean; diff: CatalogDiff };
 
-/** What an update would change, without changing anything. */
-export async function previewCatalogUpdate(): Promise<CatalogPreview> {
-  const src = await fetchCatalogSource();
+/** An uploaded catalog.json (from a local publicom checkout), so the catalog can be loaded without pushing publicom. */
+export function uploadedSource(fileName: string, text: string): CatalogSource {
+  return { text, source: `uppladdad fil: ${fileName.slice(0, 100)}`, version: contentHash(text) };
+}
+
+/** What an update would change, without changing anything. Fetches from GitHub unless `src` is given. */
+export async function previewCatalogUpdate(src?: CatalogSource): Promise<CatalogPreview> {
+  src ??= await fetchCatalogSource();
   const catalog = parseCatalog(src.text);
   const [stored, meta] = await Promise.all([db.configKey.findMany(), getCatalogMeta()]);
   const diff = diffCatalog(stored, catalog);
@@ -21,8 +26,8 @@ export async function previewCatalogUpdate(): Promise<CatalogPreview> {
 }
 
 /** Fetch and apply. `expectedVersion` guards against applying something other than what was previewed. */
-export async function updateCatalog(fetchedBy: string, expectedVersion?: string) {
-  const src = await fetchCatalogSource();
+export async function updateCatalog(fetchedBy: string, expectedVersion?: string, src?: CatalogSource) {
+  src ??= await fetchCatalogSource();
   if (expectedVersion && src.version !== expectedVersion)
     throw new Error("Katalogen har ändrats sedan du tittade. Hämta igen och granska ändringarna.");
   const catalog = parseCatalog(src.text);

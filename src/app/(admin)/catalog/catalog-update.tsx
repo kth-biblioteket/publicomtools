@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import type { CatalogPreview } from "@/lib/catalog";
-import { previewCatalogAction, updateCatalogAction } from "./actions";
+import { previewCatalogAction, updateCatalogAction, type Upload } from "./actions";
 
 const TAG = "inline-flex h-[22px] items-center rounded-md px-2 text-xs font-bold";
 
@@ -11,22 +11,29 @@ const TAG = "inline-flex h-[22px] items-center rounded-md px-2 text-xs font-bold
 export function CatalogUpdate({ refLabel, keysInUse }: { refLabel: string; keysInUse: string[] }) {
   const router = useRouter();
   const [preview, setPreview] = useState<CatalogPreview | null>(null);
+  /** Set when the preview came from a file instead of GitHub; applied with the same text. */
+  const [upload, setUpload] = useState<Upload | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
-  const fetchPreview = () =>
+  const fetchPreview = (from?: Upload) =>
     start(async () => {
       setError(null);
       setDone(null);
-      const res = await previewCatalogAction();
+      setUpload(from);
+      const res = await previewCatalogAction(from);
       if (!res.ok) return setError(res.error);
       setPreview(res.preview);
     });
+  const readFile = async (file: File | undefined) => {
+    if (!file) return;
+    fetchPreview({ name: file.name, text: await file.text() });
+  };
   const apply = () =>
     start(async () => {
       if (!preview) return;
-      const res = await updateCatalogAction(preview.version);
+      const res = await updateCatalogAction(preview.version, upload);
       if (!res.ok) return setError(res.error);
       setPreview(null);
       setDone(`Katalogen är uppdaterad: ${res.keys} inställningar.`);
@@ -37,9 +44,23 @@ export function CatalogUpdate({ refLabel, keysInUse }: { refLabel: string; keysI
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" onClick={fetchPreview} disabled={pending} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#d7dbe0] bg-white px-3.5 text-[13.5px] font-semibold hover:border-kth-blue disabled:opacity-60">
-          {pending && !preview ? "Hämtar…" : `Hämta från ${refLabel}`}
+        <button type="button" onClick={() => fetchPreview()} disabled={pending} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#d7dbe0] bg-white px-3.5 text-[13.5px] font-semibold hover:border-kth-blue disabled:opacity-60">
+          {pending && !preview && !upload ? "Hämtar…" : `Hämta från ${refLabel}`}
         </button>
+        <label className="inline-flex h-9 cursor-pointer items-center rounded-lg border border-[#d7dbe0] bg-white px-3.5 text-[13.5px] font-semibold hover:border-kth-blue has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-kth-sky">
+          Läs in från fil…
+          <input
+            type="file"
+            accept=".json,application/json"
+            className="sr-only"
+            disabled={pending}
+            onChange={(e) => {
+              readFile(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
+        </label>
+        <span className="text-[13px] text-muted">till exempel <span className="font-mono">publicom/config/catalog.json</span></span>
         {done && <span role="status" className="text-sm font-semibold text-ok-ink">{done}</span>}
         {error && <span role="alert" className="text-sm font-semibold text-bad-ink">{error}</span>}
       </div>
@@ -56,7 +77,7 @@ export function CatalogUpdate({ refLabel, keysInUse }: { refLabel: string; keysI
               <div className="flex flex-wrap items-center gap-3">
                 <div className="flex-1">
                   <div className="text-base font-extrabold">
-                    Ny version: <span className="font-mono text-sm">{preview.version}</span>
+                    {upload ? "Från filen" : "Ny version"}: <span className="font-mono text-sm">{upload ? upload.name : preview.version}</span>
                   </div>
                   <div className="text-[13px] text-muted">
                     {d.added.length} nya, {d.changed.length} ändrade, {d.removed.length} borttagna · {preview.source}

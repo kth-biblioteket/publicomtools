@@ -103,7 +103,10 @@ function comparable(k: StoredKey | CatalogKey) {
     label: k.label,
     group: k.group,
     type: k.type,
-    options: JSON.stringify((k.options as unknown) ?? null),
+    // Postgres jsonb reorders object keys, so compare options as [value, label] pairs.
+    options: JSON.stringify(
+      Array.isArray(k.options) ? (k.options as { value: unknown; label: unknown }[]).map((o) => [o.value, o.label]) : null
+    ),
     unit: k.unit ?? null,
     separator: k.separator ?? ",",
     default: (isStored ? (k as StoredKey).defaultValue : (k as CatalogKey).default) ?? null,
