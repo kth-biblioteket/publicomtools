@@ -1,4 +1,5 @@
 import { checkDeviceAuth } from "@/lib/device-auth";
+import { db } from "@/lib/db";
 import { getEffectiveConfig, serializeEnv } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +26,9 @@ export async function GET(request: Request) {
 
   const values = await getEffectiveConfig(host, origin);
   if (!values) return Response.json({ error: "unknown host" }, { status: 404 });
+
+  // Admin jämför med senaste ändring för att visa "väntar på omstart".
+  await db.computer.update({ where: { host }, data: { configFetchedAt: new Date() } });
 
   return new Response(serializeEnv(values), {
     headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },

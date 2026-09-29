@@ -28,6 +28,9 @@ model Computer {
   overrides       Json      @default("{}")
   configUpdatedAt DateTime?
   configUpdatedBy String?
+  /// When the computer last fetched its config (GET /api/device/config).
+  /// configUpdatedAt/effective changes after this → "väntar på omstart".
+  configFetchedAt DateTime?
 }
 
 /// A config layer: the shared base (kind="base", name="") or a profile
@@ -45,14 +48,41 @@ model ConfigLayer {
 
 /// Catalog of known config keys — metadata for the admin UI and validation.
 /// Not the values themselves (those live in ConfigLayer/Computer.overrides).
+/// A cache of config/catalog.json in the publicom repo (the source of truth,
+/// written next to the code that reads each key); refreshed by src/lib/catalog.ts.
 model ConfigKey {
-  key        String  @id
+  key          String  @id
+  label        String
+  /// Group id from the catalog's `groups` (ConfigCatalog.groups)
+  group        String
   /// int | bool | string | csv | url | enum
-  type       String
-  /// comma-separated options when type = enum
-  enumValues String?
-  help       String?
-  example    String?
+  type         String
+  /// [{ value, label }] when type = enum
+  options      Json?
+  /// Unit for int keys, e.g. "sekunder", "millisekunder"
+  unit         String?
+  /// csv only: "," or " " (WEBSITES is space-separated)
+  separator    String  @default(",")
+  /// What the computer uses when the key is not set anywhere
+  defaultValue String?
+  help         String?
+  example      String?
+  /// Technical (URLs, branches, SSH …): hidden by default in the admin UI
+  advanced     Boolean @default(false)
+  sortOrder    Int     @default(0)
+}
+
+/// Where the ConfigKey cache came from. A single row (id = 1).
+model ConfigCatalog {
+  id        Int      @id @default(1)
+  /// e.g. "kth-biblioteket/publicom@stable:config/catalog.json" or "file:/path"
+  source    String
+  /// Git blob sha (or content hash for a local file)
+  version   String
+  /// [{ id, label }] in display order
+  groups    Json
+  fetchedAt DateTime
+  fetchedBy String
 }
 
 /// Audit/history: one row per saved config change, with the full layer snapshot

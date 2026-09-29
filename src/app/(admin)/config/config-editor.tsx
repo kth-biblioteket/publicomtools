@@ -3,7 +3,11 @@
 import { useActionState } from "react";
 import type { SaveState } from "./actions";
 
-type CatalogEntry = { key: string; type: string; enumValues: string | null; help: string | null };
+type CatalogEntry = { key: string; type: string; options: unknown; help: string | null };
+
+function optionList(options: unknown): string {
+  return Array.isArray(options) ? options.map((o) => (o && typeof o === "object" && "value" in o ? String(o.value) : "")).join(",") : "";
+}
 
 type Props = {
   action: (prev: SaveState, formData: FormData) => Promise<SaveState>;
@@ -84,7 +88,7 @@ export function ConfigEditor({ action, initialConfig, profiles, currentProfile, 
                   <td className="py-1 pr-3 font-mono text-xs">{k.key}</td>
                   <td className="py-1 pr-3 text-xs text-gray-500">
                     {k.type}
-                    {k.enumValues ? ` (${k.enumValues})` : ""}
+                    {optionList(k.options) ? ` (${optionList(k.options)})` : ""}
                   </td>
                   <td className="py-1 text-xs">{k.help}</td>
                 </tr>

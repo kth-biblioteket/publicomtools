@@ -6,8 +6,9 @@
  *   npx tsx scripts/seed-config.ts
  *
  * Reads config/base.env -> ConfigLayer(base), config/profiles/*.env ->
- * ConfigLayer(profile, name), config/hosts/*.env -> Computer.profile + overrides,
- * and seeds the ConfigKey catalog. Idempotent (upserts). Config only, no secrets.
+ * ConfigLayer(profile, name), config/hosts/*.env -> Computer.profile + overrides.
+ * Idempotent (upserts). Config only, no secrets. The key catalog is loaded
+ * separately by scripts/sync-catalog.ts (from config/catalog.json).
  * See docs/config-via-publicomtools.md in the publicom repo.
  */
 import "dotenv/config";
@@ -33,58 +34,9 @@ function parseEnv(text: string): Record<string, string> {
   return out;
 }
 
-// The known config keys and their types, driving admin-UI validation.
-const CATALOG: Array<[string, string, string?]> = [
-  ["PUBLICOM_BRANCH", "string"],
-  ["RESOURCE_ID", "string"],
-  ["LOGINTYPE", "enum", "password,pin"],
-  ["API_URL", "url"],
-  ["RESERVATION_API_UPDATE_URL", "url"],
-  ["RESERVATION_API_CREATE_URL", "url"],
-  ["RESERVATION_API_URL", "url"],
-  ["RESERVATION_API_CURRENT_RES_URL", "url"],
-  ["BOOKING_SYSTEM_URL", "url"],
-  ["BOOKING_TYPE", "enum", "dropin"],
-  ["DEFAULT_BOOKING_TIME", "int"],
-  ["REGISTER_ACCOUNT_URL", "url"],
-  ["EXTERNAL_URL_TIMEOUT", "int"],
-  ["CLEAR_FIELDS_TIMEOUT", "int"],
-  ["ELECTRON_DEV_TOOLS", "bool"],
-  ["ALMA_LOGIN", "bool"],
-  ["PRINTER", "bool"],
-  ["PRINT_JOB_SHEETS", "string"],
-  ["FILE_DIALOGS", "bool"],
-  ["COMPUTER_TYPE", "enum", "searchcomputer,signage,guestcomputer,grouproom"],
-  ["SESSION_IDLE", "int"],
-  ["SCREENSAVER", "bool"],
-  ["SCREENSAVER_IDLE", "string"],
-  ["SCREENSAVER_FILES", "csv"],
-  ["POLICY_FILE", "string"],
-  ["BLACK_LIST", "csv"],
-  ["WHITE_LIST", "csv"],
-  ["SSH_ALLOW_FROM", "string"],
-  ["LOGIN_UI", "enum", "electron,web"],
-  ["PUBLICOMTOOLS_URL", "url"],
-  ["HEARTBEAT_URL", "url"],
-  ["COMPUTER_NAME", "string"],
-  ["SCREEN_ROTATION", "enum", "normal,left,right,inverted"],
-  ["WEBSITES", "csv"],
-  ["BG_LANDSCAPE", "string"],
-  ["BG_PORTRAIT", "string"],
-];
-
 async function main() {
   const dir = process.env.PUBLICOM_CONFIG_DIR;
   if (!dir) throw new Error("Set PUBLICOM_CONFIG_DIR to the publicom repo's config/ directory.");
-
-  // Catalog
-  for (const [key, type, enumValues] of CATALOG) {
-    await db.configKey.upsert({
-      where: { key },
-      create: { key, type, enumValues: enumValues ?? null },
-      update: { type, enumValues: enumValues ?? null },
-    });
-  }
 
   // base
   const base = parseEnv(readFileSync(join(dir, "base.env"), "utf8"));

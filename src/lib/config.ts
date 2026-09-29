@@ -23,12 +23,49 @@ function asValues(json: unknown): ConfigValues {
   return out;
 }
 
-/** base ⊕ profile ⊕ host overrides, plus the identity keys the computer needs. */
-export async function getEffectiveConfig(
-  host: string,
-  origin: string
-): Promise<ConfigValues | null> {
-  const computer = await db.computer.findUnique({ where: { host } });
+/** Where a key's effective value comes from. "auto" = identity keys added by the server. */
+export type ConfigSource = "base" | "profile" | "host" | "auto";
+export type EffectiveEntry = { value: string; source: ConfigSource };
+export type EffectiveConfig = Record<string, EffectiveEntry>;
+
+export type Layers = {
+  base: ConfigValues;
+  profile: { name: string; values: ConfigValues } | null;
+  host: { host: string; overrides: ConfigValues };
+};
+
+/**
+ * base ⊕ profile ⊕ host overrides, with the source of each value. Pure, so the admin
+ * UI can run it on unsaved layers too (review before save).
+ */
+export function mergeLayers(layers: Layers, origin?: string): EffectiveConfig {
+  const out: EffectiveConfig = {};
+  const put = (values: ConfigValues, source: ConfigSource) => {
+    for (const [k, value] of Object.entries(values)) out[k] = { value, source };
+  };
+  put(layers.base, "base");
+  if (layers.profile) put(layers.profile.values, "profile");
+  put(layers.host.overrides, "host");
+
+  const { host } = layers.host;
+  out.PUBLICOM_HOST = { value: host, source: "auto" };
+  // heartbeat.sh skickar PUBLICOM_PROFILE tillbaka, så nya datorer får sin profil ifylld.
+  if (layers.profile) out.PUBLICOM_PROFILE = { value: layers.profile.name, source: "auto" };
+  if (origin)
+    out.REMOTE_CONFIG_URL = {
+      value: `${origin}${withBasePath(`/api/device/config?host=${encodeURIComponent(host)}`)}`,
+      source: "auto",
+    };
+  return out;
+}
+
+export function entryValues(entries: EffectiveConfig): ConfigValues {
+  return Object.fromEntries(Object.entries(entries).map(([k, e]) => [k, e.value]));
+}
+
+/** The saved layers for one computer, or null for an unknown host. */
+export async function loadLayers(host: string): Promise<Layers | null> {
+  const computer = await db.computer.findUnique({ where: { host }, select: { profile: true, overrides: true } });
   if (!computer) return null;
 
   const [base, profile] = await Promise.all([
@@ -39,15 +76,16 @@ export async function getEffectiveConfig(
   ]);
 
   return {
-    ...asValues(base?.values),
-    ...asValues(profile?.values),
-    ...asValues(computer.overrides),
-    PUBLICOM_HOST: host,
-    // heartbeat.sh skickar PUBLICOM_PROFILE tillbaka; utan den skulle profilen nollställas
-    // vid heartbeat och nästa config-hämtning tappa profil-lagret.
-    ...(computer.profile ? { PUBLICOM_PROFILE: computer.profile } : {}),
-    REMOTE_CONFIG_URL: `${origin}${withBasePath(`/api/device/config?host=${encodeURIComponent(host)}`)}`,
+    base: asValues(base?.values),
+    profile: computer.profile ? { name: computer.profile, values: asValues(profile?.values) } : null,
+    host: { host, overrides: asValues(computer.overrides) },
   };
+}
+
+/** base ⊕ profile ⊕ host overrides, plus the identity keys the computer needs. */
+export async function getEffectiveConfig(host: string, origin: string): Promise<ConfigValues | null> {
+  const layers = await loadLayers(host);
+  return layers ? entryValues(mergeLayers(layers, origin)) : null;
 }
 
 /**
@@ -65,6 +103,16 @@ export function serializeEnv(values: ConfigValues): string {
 }
 
 export type ValidationIssue = { key: string; problem: string };
+
+export type EnumOption = { value: string; label: string };
+
+/** ConfigKey.options (Json) as a typed list; tolerates a missing or malformed value. */
+export function enumOptions(json: unknown): EnumOption[] {
+  if (!Array.isArray(json)) return [];
+  return json
+    .filter((o): o is { value: unknown; label?: unknown } => !!o && typeof o === "object" && "value" in o)
+    .map((o) => ({ value: String(o.value), label: String(o.label ?? o.value) }));
+}
 
 /** Validate a layer's values against the ConfigKey catalog. Used by the admin UI. */
 export async function validateLayer(values: ConfigValues): Promise<ValidationIssue[]> {
@@ -90,7 +138,7 @@ export async function validateLayer(values: ConfigValues): Promise<ValidationIss
         if (raw && !/^https?:\/\//.test(raw)) issues.push({ key, problem: "måste börja med http:// eller https://" });
         break;
       case "enum": {
-        const allowed = (meta.enumValues ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+        const allowed = enumOptions(meta.options).map((o) => o.value);
         if (raw && !allowed.includes(raw))
           issues.push({ key, problem: `måste vara ett av: ${allowed.join(", ")}` });
         break;
@@ -121,7 +169,7 @@ export function parseConfigText(text: string): ConfigValues {
 }
 
 export function listCatalog() {
-  return db.configKey.findMany({ orderBy: { key: "asc" } });
+  return db.configKey.findMany({ orderBy: [{ sortOrder: "asc" }, { key: "asc" }] });
 }
 
 export async function listProfiles(): Promise<string[]> {

@@ -31,7 +31,6 @@ export async function POST(request: Request) {
   const now = new Date();
   const fields = {
     hostname: status.hostname,
-    profile: status.profile ?? null,
     computerType: status.computerType ?? null,
     computerName: status.computerName ?? null,
     lastSeenAt: now,
@@ -39,11 +38,17 @@ export async function POST(request: Request) {
     status,
   };
 
+  // Profilen ägs av admin. Datorn rapporterar den profil den startade med (status.profile),
+  // vilket släpar efter ett byte i admin tills nästa omstart. Därför fylls Computer.profile
+  // från heartbeat bara när den saknas (ny dator, eller en dator som inte migrerats än).
+  const existing = await db.computer.findUnique({ where: { host: status.host }, select: { profile: true } });
+  const profile = existing?.profile ?? status.profile ?? null;
+
   await db.$transaction([
     db.computer.upsert({
       where: { host: status.host },
-      create: { host: status.host, ...fields },
-      update: fields,
+      create: { host: status.host, ...fields, profile },
+      update: { ...fields, profile },
     }),
     db.heartbeat.create({ data: { host: status.host, receivedAt: now, status } }),
   ]);
