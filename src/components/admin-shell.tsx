@@ -3,17 +3,19 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { HistoryIcon, LayersIcon, MenuIcon, MonitorIcon, SlidersIcon, XIcon } from "@/components/ui/icons";
+import { BookIcon, HistoryIcon, LayersIcon, MenuIcon, MonitorIcon, SlidersIcon, UsersIcon, XIcon } from "@/components/ui/icons";
 
 type NavItem = { href: string; label: string; icon: React.ReactNode; match: (path: string) => boolean };
 
 const MAIN: NavItem[] = [
   { href: "/", label: "Datorer", icon: <MonitorIcon />, match: (p) => p === "/" || p.startsWith("/computers") },
-  { href: "/config", label: "Profiler", icon: <LayersIcon />, match: (p) => p === "/config" || p.startsWith("/config/profiles") },
+  { href: "/config", label: "Profiler", icon: <LayersIcon />, match: (p) => p === "/config" || p.startsWith("/config/profiles") || p.startsWith("/config/history/profile") },
   { href: "/log", label: "Ändringslogg", icon: <HistoryIcon />, match: (p) => p.startsWith("/log") },
 ];
 const IT: NavItem[] = [
-  { href: "/config/base", label: "Grundinställningar", icon: <SlidersIcon />, match: (p) => p.startsWith("/config/base") },
+  { href: "/config/base", label: "Grundinställningar", icon: <SlidersIcon />, match: (p) => p.startsWith("/config/base") || p === "/config/history/base" },
+  { href: "/catalog", label: "Inställningskatalog", icon: <BookIcon />, match: (p) => p.startsWith("/catalog") },
+  { href: "/guests", label: "Gästsessioner", icon: <UsersIcon />, match: (p) => p.startsWith("/guests") },
 ];
 
 function NavLink({ item, path, onNavigate }: { item: NavItem; path: string; onNavigate: () => void }) {
