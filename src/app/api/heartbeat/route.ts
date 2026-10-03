@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { checkDeviceAuth } from "@/lib/device-auth";
 import { heartbeatSchema, HEARTBEAT_RETENTION_DAYS } from "@/lib/heartbeat";
+import { reloadPending } from "@/lib/reload";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +43,10 @@ export async function POST(request: Request) {
   // vilket släpar efter ett byte i admin tills nästa omstart. Därför fylls Computer.profile
   // från heartbeat bara för en dator som aldrig ställts in i admin (configUpdatedAt saknas) och
   // saknar profil. Har admin valt "Ingen profil" är det också ett val som ska stå kvar.
-  const existing = await db.computer.findUnique({ where: { host: status.host }, select: { profile: true, configUpdatedAt: true } });
+  const existing = await db.computer.findUnique({
+    where: { host: status.host },
+    select: { profile: true, configUpdatedAt: true, reloadRequestedAt: true, configFetchedAt: true },
+  });
   const profile = existing?.configUpdatedAt ? existing.profile : (existing?.profile ?? status.profile ?? null);
 
   await db.$transaction([
@@ -60,5 +64,6 @@ export async function POST(request: Request) {
     await db.heartbeat.deleteMany({ where: { receivedAt: { lt: cutoff } } });
   }
 
-  return Response.json({ ok: true });
+  // reload: admin asked for "Hämta nya inställningar nu" (heartbeat.sh starts publicom-reload.service)
+  return Response.json({ ok: true, reload: existing ? reloadPending(existing, now) : false });
 }

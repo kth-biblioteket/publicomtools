@@ -13,3 +13,15 @@ export async function renameComputerAction(host: string, label: string): Promise
   revalidatePath("/", "layout");
   return { ok: true };
 }
+
+/** "Hämta nya inställningar nu": the computer's next heartbeat tells it to fetch its config. */
+export async function requestReloadAction(host: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireAdmin();
+  const updated = await db.computer.updateMany({
+    where: { host },
+    data: { reloadRequestedAt: new Date(), reloadRequestedBy: user.email },
+  });
+  if (!updated.count) return { ok: false, error: "Datorn finns inte längre." };
+  revalidatePath("/", "layout");
+  return { ok: true };
+}

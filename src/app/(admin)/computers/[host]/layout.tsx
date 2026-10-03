@@ -7,6 +7,7 @@ import { Chip } from "@/components/ui/chip";
 import { ChevronLeftIcon } from "@/components/ui/icons";
 import { Tabs } from "@/components/ui/tabs";
 import { RenameComputer } from "./rename-computer";
+import { ReloadButton } from "./reload-button";
 
 export default async function ComputerLayout({ params, children }: LayoutProps<"/computers/[host]">) {
   await requireAdmin();
@@ -35,7 +36,19 @@ export default async function ComputerLayout({ params, children }: LayoutProps<"
               "ingen"
             )}
           </span>
-          {c.configState === "pending" && <Chip tone="draft">Väntar på omstart</Chip>}
+          {c.configState === "pending" && (
+            <>
+              <Chip tone="draft">Väntar på omstart</Chip>
+              <ReloadButton
+                host={c.host}
+                requestedAt={
+                  c.reloadRequestedAt
+                    ? c.reloadRequestedAt.toLocaleTimeString("sv-SE", { timeZone: "Europe/Stockholm", hour: "2-digit", minute: "2-digit" }).replace(":", ".")
+                    : null
+                }
+              />
+            </>
+          )}
           {c.configState === "legacy" && <Chip>Gamla configfiler</Chip>}
           {c.configState === "new" && <Chip tone="draft">Väntar på installation</Chip>}
         </div>
