@@ -85,3 +85,26 @@ export function targetLabel(target: Target, names?: { host?: string | null }): s
   if (target.startsWith("profile:")) return `Profil ${target.slice(8)}`;
   return names?.host || target.slice(5);
 }
+
+export type SettingWarning = { key: string; message: string };
+
+/**
+ * Combinations that are allowed but probably not what you want. Shown as warnings in the
+ * form and the review; they never block saving. `value` is the effective value of a key
+ * as the editor shows it (own, drafted or inherited; null = not set anywhere).
+ */
+export function settingWarnings(value: (key: string) => string | null, catalog: Map<string, CatalogEntry>): SettingWarning[] {
+  const warnings: SettingWarning[] = [];
+  const saver = catalog.get("SCREENSAVER");
+  const files = catalog.get("SCREENSAVER_FILES");
+  if (saver && files) {
+    const on = (value("SCREENSAVER") ?? saver.defaultValue) === "true";
+    const list = splitList(value("SCREENSAVER_FILES") ?? "", files.separator);
+    if (on && list.length === 0)
+      warnings.push({
+        key: "SCREENSAVER_FILES",
+        message: "Skärmsläckaren är på men inga bilder är valda. Datorn visar då bara KTH-bakgrunden.",
+      });
+  }
+  return warnings;
+}

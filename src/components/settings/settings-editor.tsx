@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import type { SettingsData } from "@/lib/settings";
 import { saveSettingsAction } from "@/app/(admin)/settings-actions";
-import { formatValue, PROFILE_KEY, validateValue, type CatalogEntry } from "@/lib/settings-shared";
+import { formatValue, PROFILE_KEY, settingWarnings, validateValue, type CatalogEntry } from "@/lib/settings-shared";
 import { Chip } from "@/components/ui/chip";
 import { SearchIcon } from "@/components/ui/icons";
 import { FieldControl } from "./field-control";
@@ -129,6 +129,8 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
       .filter(([, p]) => p)
   ) as Record<string, string>;
   const issues = { ...serverIssues, ...clientIssues };
+  const warnings = settingWarnings(shown, meta);
+  const warningFor = (key: string) => warnings.find((w) => w.key === key)?.message;
 
   const save = () => {
     const set: Record<string, string> = {};
@@ -199,6 +201,9 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
             onClear={() => reset(k.key)}
           />
           {problem && <p className="text-[12.5px] font-semibold text-bad-ink">{problem}</p>}
+          {!problem && warningFor(k.key) && (
+            <p className="rounded-md bg-warn-bg px-2.5 py-1.5 text-[12.5px] font-semibold text-warn-ink">{warningFor(k.key)}</p>
+          )}
           <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-muted">
             {drafted && <Chip tone="draft">Osparad</Chip>}
             {own !== null ? (
@@ -481,6 +486,14 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
                 </div>
               );
             })}
+
+            {warnings.length > 0 && (
+              <div className="rounded-[10px] bg-warn-bg px-3 py-2.5 text-[13.5px] text-warn-ink">
+                {warnings.map((w) => (
+                  <p key={w.key}>{w.message}</p>
+                ))}
+              </div>
+            )}
 
             {kind !== "host" && (
               <div className="flex flex-col gap-2">
