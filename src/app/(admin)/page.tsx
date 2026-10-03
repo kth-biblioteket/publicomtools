@@ -2,13 +2,16 @@ import { requireAdmin } from "@/lib/auth";
 import { listComputers } from "@/lib/computers";
 import { formatAgo, formatWhen } from "@/lib/status";
 import { ComputerList, type ComputerRow } from "./computer-list";
+import { AddComputer } from "./add-computer";
+import { getProfileLabels } from "@/lib/profiles";
 
 export const dynamic = "force-dynamic";
 
 export default async function ComputersPage() {
   await requireAdmin();
   const now = new Date();
-  const computers = await listComputers();
+  const [computers, profileLabels] = await Promise.all([listComputers(), getProfileLabels()]);
+  const profiles = [...profileLabels].map(([name, label]) => ({ name, label })).sort((a, b) => a.label.localeCompare(b.label, "sv"));
 
   const rows: ComputerRow[] = computers.map((c) => ({
     host: c.host,
@@ -26,11 +29,14 @@ export default async function ComputersPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div>
-        <h1 className="text-[26px] font-extrabold tracking-tight">Datorer</h1>
-        <p className="mt-1 text-sm text-muted">
-          {rows.length} datorer och skyltar. De som behöver åtgärdas visas först.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-[26px] font-extrabold tracking-tight">Datorer</h1>
+          <p className="mt-1 text-sm text-muted">
+            {rows.length} datorer och skyltar. De som behöver åtgärdas visas först.
+          </p>
+        </div>
+        <AddComputer profiles={profiles} />
       </div>
       <ComputerList rows={rows} renderedAt={renderedAt} />
     </div>

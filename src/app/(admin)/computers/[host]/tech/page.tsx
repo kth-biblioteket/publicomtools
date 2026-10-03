@@ -41,7 +41,7 @@ export default async function ComputerTechPage({ params }: PageProps<"/computers
     ["guest.service", s ? `${s.guestService}${s.guestRestarts !== undefined ? `, ${s.guestRestarts} sessioner sedan start` : ""}` : "–"],
     ["Kraschade tjänster", s && s.failedUnits.length ? s.failedUnits.join(", ") : "–"],
     ["Ledig disk", s?.diskFreePercent !== undefined ? `${s.diskFreePercent} %` : "–"],
-    ["Config hämtad", c.configFetchedAt ? formatTime(c.configFetchedAt) : "aldrig (gamla configfiler)"],
+    ["Config hämtad", c.configFetchedAt ? formatTime(c.configFetchedAt) : c.configState === "new" ? "aldrig (inte installerad)" : "aldrig (gamla configfiler)"],
     ["Config ändrad", formatTime(row.configUpdatedAt ?? undefined)],
     ["Först sedd", formatTime(row.firstSeenAt)],
   ];

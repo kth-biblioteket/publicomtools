@@ -27,6 +27,7 @@ const REFRESH_MS = 30_000;
 
 function ConfigChip({ state }: { state: ConfigState }) {
   if (state === "pending") return <Chip tone="draft" title="Inställningar har ändrats efter att datorn senast startade">Väntar på omstart</Chip>;
+  if (state === "new") return <Chip tone="draft" title="Tillagd i admin, men datorn har inte installerats och hämtat sina inställningar än">Väntar på installation</Chip>;
   if (state === "legacy") return <Chip title="Datorn hämtar fortfarande sina inställningar från de gamla configfilerna på GitHub">Gamla configfiler</Chip>;
   return null;
 }

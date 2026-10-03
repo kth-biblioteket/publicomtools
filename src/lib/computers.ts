@@ -7,11 +7,12 @@ import { displayName } from "@/lib/names";
 
 /**
  * Whether the computer runs the settings in this admin:
+ * - new:     added in the admin and not installed yet (never fetched its config)
  * - legacy:  it has never fetched config from here (still on the GitHub .config files)
  * - pending: settings affecting it changed after it last fetched them (at boot)
  * - current: it runs what the admin shows
  */
-export type ConfigState = "legacy" | "pending" | "current";
+export type ConfigState = "new" | "legacy" | "pending" | "current";
 
 export type ComputerView = {
   host: string;
@@ -44,6 +45,7 @@ type ComputerRow = {
   status: unknown;
   configFetchedAt?: Date | null;
   configUpdatedAt?: Date | null;
+  addedBy?: string | null;
 };
 
 /** When each layer last had a saved change: base, and every profile by name. */
@@ -65,7 +67,7 @@ export async function getLayerTimes(): Promise<LayerTimes> {
 }
 
 function configState(c: ComputerRow, times?: LayerTimes): ConfigState {
-  if (!c.configFetchedAt) return "legacy";
+  if (!c.configFetchedAt) return c.addedBy ? "new" : "legacy";
   if (!times) return "current";
   const changed = [times.base, c.profile ? times.profiles.get(c.profile) : null, c.configUpdatedAt]
     .filter((d): d is Date => !!d)
@@ -82,7 +84,11 @@ export function toView(computer: ComputerRow, times?: LayerTimes, now = new Date
     ? evaluate(computer.lastSeenAt, status, now)
     : {
         health: "warning",
-        problems: [{ text: "Datorn har inte rapporterat någon status än", hint: "Den visas när den skickat sin första statusrapport." }],
+        problems: [
+          computer.addedBy
+            ? { text: "Väntar på installation", hint: "Installera datorn enligt docs/installera.md i publicom. Den hämtar sina inställningar härifrån och syns som OK efter första statusrapporten." }
+            : { text: "Datorn har inte rapporterat någon status än", hint: "Den visas när den skickat sin första statusrapport." },
+        ],
       };
   const secondsSinceSeen = (now.getTime() - computer.lastSeenAt.getTime()) / 1000;
   return {

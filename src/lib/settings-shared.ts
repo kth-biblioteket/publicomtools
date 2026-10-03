@@ -106,5 +106,12 @@ export function settingWarnings(value: (key: string) => string | null, catalog: 
         message: "Skärmsläckaren är på men inga bilder är valda. Datorn visar då bara KTH-bakgrunden.",
       });
   }
+  const type = value("COMPUTER_TYPE");
+  const resource = (value("RESOURCE_ID") ?? "").trim();
+  if (type === "guestcomputer" && catalog.has("RESOURCE_ID") && (!resource || resource === "x"))
+    warnings.push({
+      key: "RESOURCE_ID",
+      message: "Gästdatorn har inget riktigt resurs-id. Bokningen när någon loggar in fungerar inte förrän datorn finns i bokningssystemet och har sitt id här.",
+    });
   return warnings;
 }

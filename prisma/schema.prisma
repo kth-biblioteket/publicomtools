@@ -19,6 +19,9 @@ model Computer {
   computerName String?
   /// Name in the admin list only; never sent to the computer
   label        String?
+  /// Set when the computer was added in the admin before it was installed (else it
+  /// appeared with its first heartbeat or from the seed)
+  addedBy      String?
   firstSeenAt  DateTime    @default(now())
   lastSeenAt   DateTime
   lastIp       String?

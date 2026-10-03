@@ -86,7 +86,9 @@ export default async function ComputerOverviewPage({ params }: PageProps<"/compu
             </dd>
             <dt className="text-muted">Inställningar</dt>
             <dd>
-              {c.configState === "legacy"
+              {c.configState === "new"
+                ? "Inte hämtade än (datorn är inte installerad)"
+                : c.configState === "legacy"
                 ? "Hämtas från de gamla configfilerna på GitHub"
                 : `Hämtade ${formatWhen(c.configFetchedAt!, now)}${c.configState === "pending" ? ", ändrade efter det" : ""}`}
             </dd>

@@ -37,6 +37,7 @@ export default async function ComputerLayout({ params, children }: LayoutProps<"
           </span>
           {c.configState === "pending" && <Chip tone="draft">Väntar på omstart</Chip>}
           {c.configState === "legacy" && <Chip>Gamla configfiler</Chip>}
+          {c.configState === "new" && <Chip tone="draft">Väntar på installation</Chip>}
         </div>
       </div>
       <Tabs
