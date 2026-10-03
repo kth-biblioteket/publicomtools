@@ -1,3 +1,4 @@
+import { requireAdmin } from "@/lib/auth";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
@@ -18,6 +19,8 @@ function targetLabel(target: string) {
 }
 
 export default async function ComputerOverviewPage({ params }: PageProps<"/computers/[host]">) {
+  // Every page checks itself: the [host] layout is not re-rendered on client-side navigation.
+  await requireAdmin();
   const { host } = await params;
   const [c, config] = await Promise.all([getComputerView(host), getComputerConfig(host)]);
   if (!c || !config) notFound();

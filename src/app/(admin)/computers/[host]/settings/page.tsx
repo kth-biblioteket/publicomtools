@@ -1,3 +1,4 @@
+import { requireAdmin } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import { getSettingsData } from "@/lib/settings";
 import { SettingsEditor } from "@/components/settings/settings-editor";
@@ -5,6 +6,8 @@ import { SettingsEditor } from "@/components/settings/settings-editor";
 export const dynamic = "force-dynamic";
 
 export default async function ComputerSettingsPage({ params }: PageProps<"/computers/[host]/settings">) {
+  // Every page checks itself: the [host] layout is not re-rendered on client-side navigation.
+  await requireAdmin();
   const { host } = await params;
   const data = await getSettingsData(`host:${host}`);
   if (!data) notFound();

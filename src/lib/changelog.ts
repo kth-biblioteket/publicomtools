@@ -41,8 +41,43 @@ export type LogEntry = {
 
 export type LogFilter = "all" | "base" | "profile" | "host";
 
+type ChangeRow = {
+  id: string;
+  target: string;
+  changedBy: string;
+  changedAt: Date;
+  note: string | null;
+  changes: unknown;
+  snapshot: unknown;
+};
+
+/**
+ * Turn rows into entries. Rows without `changes` are diffed against the previous snapshot
+ * of the same target, fetched in one query for all of them (not one query per row).
+ */
+async function toEntries(rows: ChangeRow[]): Promise<LogEntry[]> {
+  const legacy = rows.filter((r) => !Array.isArray(r.changes));
+  const older = legacy.length
+    ? await db.configChange.findMany({
+        where: {
+          target: { in: [...new Set(legacy.map((r) => r.target))] },
+          changedAt: { lt: new Date(Math.max(...legacy.map((r) => r.changedAt.getTime()))) },
+        },
+        orderBy: { changedAt: "desc" },
+        select: { target: true, changedAt: true, snapshot: true },
+      })
+    : [];
+  const previous = (r: ChangeRow) => older.find((o) => o.target === r.target && o.changedAt < r.changedAt);
+
+  return rows.map((r) => {
+    const base = { id: r.id, target: r.target, changedBy: r.changedBy, changedAt: r.changedAt, note: r.note };
+    if (Array.isArray(r.changes)) return { ...base, changes: r.changes as Change[], initial: false };
+    const prev = previous(r);
+    return { ...base, changes: diffSnapshots(prev?.snapshot ?? {}, r.snapshot), initial: !prev };
+  });
+}
+
 export async function listChanges(opts: { targets?: Target[]; filter?: LogFilter; limit?: number } = {}): Promise<LogEntry[]> {
-  const limit = opts.limit ?? 100;
   const where = opts.targets
     ? { target: { in: opts.targets } }
     : opts.filter && opts.filter !== "all"
@@ -50,42 +85,15 @@ export async function listChanges(opts: { targets?: Target[]; filter?: LogFilter
         ? { target: "base" }
         : { target: { startsWith: `${opts.filter}:` } }
       : {};
-  const rows = await db.configChange.findMany({ where, orderBy: { changedAt: "desc" }, take: limit });
-
-  // Older rows need the previous snapshot of the same target to know what changed.
-  const needPrev = rows.filter((r) => !Array.isArray(r.changes));
-  const prevs = await Promise.all(
-    needPrev.map((r) =>
-      db.configChange.findFirst({
-        where: { target: r.target, changedAt: { lt: r.changedAt } },
-        orderBy: { changedAt: "desc" },
-        select: { snapshot: true },
-      })
-    )
-  );
-  const prevById = new Map(needPrev.map((r, i) => [r.id, prevs[i]]));
-
-  return rows.map((r) => {
-    if (Array.isArray(r.changes))
-      return { id: r.id, target: r.target, changedBy: r.changedBy, changedAt: r.changedAt, note: r.note, changes: r.changes as Change[], initial: false };
-    const prev = prevById.get(r.id);
-    return {
-      id: r.id,
-      target: r.target,
-      changedBy: r.changedBy,
-      changedAt: r.changedAt,
-      note: r.note,
-      changes: diffSnapshots(prev?.snapshot ?? {}, r.snapshot),
-      initial: !prev,
-    };
-  });
+  const rows = await db.configChange.findMany({ where, orderBy: { changedAt: "desc" }, take: opts.limit ?? 100 });
+  return toEntries(rows);
 }
 
 export async function getChange(id: string): Promise<LogEntry | null> {
-  const row = await db.configChange.findUnique({ where: { id }, select: { target: true, changedAt: true } });
+  const row = await db.configChange.findUnique({ where: { id } });
   if (!row) return null;
-  const [entry] = await listChanges({ targets: [row.target], limit: 500 }).then((es) => es.filter((e) => e.id === id));
-  return entry ?? null;
+  const [entry] = await toEntries([row]);
+  return entry;
 }
 
 /** Keys whose current value is no longer what this change set them to (changed again later). */

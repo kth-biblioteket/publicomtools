@@ -117,16 +117,6 @@ export async function saveSettings(target: Target, input: SaveInput, changedBy: 
   const meta = new Map(data.catalog.map((k) => [k.key, k]));
   const isHost = target.startsWith("host:");
 
-  // Someone else saved the same key after this editor loaded?
-  const conflicts = [...Object.keys(input.set), ...input.unset].filter(
-    (k) => (data.own[k] ?? null) !== (input.before[k] ?? null)
-  );
-  if (isHost && input.profile !== undefined && (input.before[PROFILE_KEY] ?? null) !== data.profile) conflicts.push(PROFILE_KEY);
-  if (conflicts.length) {
-    const names = conflicts.map((k) => (k === PROFILE_KEY ? "Profil" : meta.get(k)?.label ?? k));
-    return { ok: false, error: `${names.join(", ")} har ändrats av någon annan sedan du öppnade sidan. Ladda om och gör ändringen igen.` };
-  }
-
   const issues: { key: string; problem: string }[] = [];
   for (const [key, value] of Object.entries(input.set)) {
     const m = meta.get(key);
@@ -136,41 +126,66 @@ export async function saveSettings(target: Target, input: SaveInput, changedBy: 
       if (problem) issues.push({ key, problem });
     }
   }
-  if (isHost && input.profile && !(input.profile in data.profiles))
+  if (isHost && input.profile && !Object.hasOwn(data.profiles, input.profile))
     issues.push({ key: PROFILE_KEY, problem: `Profilen ${input.profile} finns inte.` });
   if (issues.length) return { ok: false, error: "Rätta det som är markerat och försök igen.", issues };
 
-  const values: ConfigValues = { ...data.own };
-  const changes: Change[] = [];
-  for (const [key, after] of Object.entries(input.set)) {
-    if (values[key] !== after) changes.push({ key, before: values[key] ?? null, after });
-    values[key] = after;
-  }
-  for (const key of input.unset) {
-    if (key in values) changes.push({ key, before: values[key], after: null });
-    delete values[key];
-  }
-  const newProfile = isHost && input.profile !== undefined ? input.profile : data.profile;
-  if (isHost && newProfile !== data.profile) changes.push({ key: PROFILE_KEY, before: data.profile, after: newProfile });
-  if (!changes.length) return { ok: true, changes };
-
   const note = input.note?.trim().slice(0, 500) || null;
-  const entry = { target, changedBy, note, changes };
-  if (isHost) {
-    const host = target.slice(5);
-    await db.$transaction([
-      db.computer.update({
+  const host = target.slice(5);
+  const [kind, name] = target === "base" ? ["base", ""] : ["profile", target.slice(8)];
+
+  // Read, check and write in one transaction with the row locked, so two saves of the same
+  // layer run one after the other and neither overwrites the other's keys.
+  return db.$transaction(async (tx): Promise<SaveResult> => {
+    let own: ConfigValues;
+    let currentProfile: string | null = null;
+    if (isHost) {
+      const rows = await tx.$queryRaw<{ overrides: unknown; profile: string | null }[]>`
+        SELECT "overrides", "profile" FROM "Computer" WHERE "host" = ${host} FOR UPDATE`;
+      if (!rows.length) return { ok: false, error: "Datorn finns inte längre." };
+      own = asValues(rows[0].overrides);
+      currentProfile = rows[0].profile;
+    } else {
+      const rows = await tx.$queryRaw<{ values: unknown }[]>`
+        SELECT "values" FROM "ConfigLayer" WHERE "kind" = ${kind} AND "name" = ${name} FOR UPDATE`;
+      own = asValues(rows[0]?.values);
+    }
+
+    // Someone else saved the same key after this editor loaded?
+    const conflicts = [...Object.keys(input.set), ...input.unset].filter(
+      (k) => (own[k] ?? null) !== (input.before[k] ?? null)
+    );
+    if (isHost && input.profile !== undefined && (input.before[PROFILE_KEY] ?? null) !== currentProfile) conflicts.push(PROFILE_KEY);
+    if (conflicts.length) {
+      const names = conflicts.map((k) => (k === PROFILE_KEY ? "Profil" : meta.get(k)?.label ?? k));
+      return { ok: false, error: `${names.join(", ")} har ändrats av någon annan sedan du öppnade sidan. Ladda om och gör ändringen igen.` };
+    }
+
+    const values: ConfigValues = { ...own };
+    const changes: Change[] = [];
+    for (const [key, after] of Object.entries(input.set)) {
+      if (values[key] !== after) changes.push({ key, before: values[key] ?? null, after });
+      values[key] = after;
+    }
+    for (const key of input.unset) {
+      if (key in values) changes.push({ key, before: values[key], after: null });
+      delete values[key];
+    }
+    const newProfile = isHost && input.profile !== undefined ? input.profile : currentProfile;
+    if (isHost && newProfile !== currentProfile) changes.push({ key: PROFILE_KEY, before: currentProfile, after: newProfile });
+    if (!changes.length) return { ok: true, changes };
+
+    const entry = { target, changedBy, note, changes };
+    if (isHost) {
+      await tx.computer.update({
         where: { host },
         data: { profile: newProfile, overrides: values, configUpdatedAt: new Date(), configUpdatedBy: changedBy },
-      }),
-      db.configChange.create({ data: { ...entry, snapshot: { profile: newProfile, overrides: values } } }),
-    ]);
-  } else {
-    const [kind, name] = target === "base" ? ["base", ""] : ["profile", target.slice(8)];
-    await db.$transaction([
-      db.configLayer.upsert({ where: { kind_name: { kind, name } }, create: { kind, name, values }, update: { values } }),
-      db.configChange.create({ data: { ...entry, snapshot: values } }),
-    ]);
-  }
-  return { ok: true, changes };
+      });
+      await tx.configChange.create({ data: { ...entry, snapshot: { profile: newProfile, overrides: values } } });
+    } else {
+      await tx.configLayer.upsert({ where: { kind_name: { kind, name } }, create: { kind, name, values }, update: { values } });
+      await tx.configChange.create({ data: { ...entry, snapshot: values } });
+    }
+    return { ok: true, changes };
+  });
 }

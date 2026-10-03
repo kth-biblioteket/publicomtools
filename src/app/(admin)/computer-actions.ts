@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { Prisma } from "@/generated/prisma/client";
 import { PROFILE_KEY } from "@/lib/settings-shared";
 
 export type AddComputerState = { error?: string } | undefined;
@@ -27,20 +28,27 @@ export async function addComputerAction(_prev: AddComputerState, form: FormData)
   if (profile && !(await db.configLayer.findUnique({ where: { kind_name: { kind: "profile", name: profile } }, select: { id: true } })))
     return { error: "Profilen finns inte längre. Ladda om sidan." };
 
-  await db.$transaction([
-    db.computer.create({
-      data: { host, hostname: host, lastSeenAt: new Date(0), status: {}, profile, label, addedBy: user.email, configUpdatedAt: new Date(), configUpdatedBy: user.email },
-    }),
-    db.configChange.create({
-      data: {
-        target: `host:${host}`,
-        snapshot: { profile, overrides: {} },
-        changedBy: user.email,
-        note: "Ny dator",
-        changes: [{ key: PROFILE_KEY, before: null, after: profile }],
-      },
-    }),
-  ]);
+  try {
+    await db.$transaction([
+      db.computer.create({
+        data: { host, hostname: host, lastSeenAt: new Date(0), status: {}, profile, label, addedBy: user.email, configUpdatedAt: new Date(), configUpdatedBy: user.email },
+      }),
+      db.configChange.create({
+        data: {
+          target: `host:${host}`,
+          snapshot: { profile, overrides: {} },
+          changedBy: user.email,
+          note: "Ny dator",
+          changes: [{ key: PROFILE_KEY, before: null, after: profile }],
+        },
+      }),
+    ]);
+  } catch (e) {
+    // The computer appeared in between, e.g. with its first heartbeat
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")
+      return { error: `Det finns redan en dator som heter ${host}.` };
+    throw e;
+  }
   revalidatePath("/", "layout");
   redirect(`/computers/${host}/settings`);
 }

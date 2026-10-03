@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { z } from "zod";
-import type { PrismaClient } from "../generated/prisma/client";
+import { Prisma, type PrismaClient } from "../generated/prisma/client";
 
 /**
  * The config key catalog: which settings the guest computers understand, with the
@@ -155,7 +155,8 @@ export async function applyCatalog(
         label: k.label,
         group: k.group,
         type: k.type,
-        options: k.options ?? undefined,
+        // DbNull clears options a key no longer has (undefined would leave the old ones in place)
+        options: k.options ?? Prisma.DbNull,
         unit: k.unit ?? null,
         separator: k.separator ?? ",",
         defaultValue: k.default ?? null,

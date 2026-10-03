@@ -1,3 +1,4 @@
+import { requireAdmin } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { getComputerView } from "@/lib/computers";
@@ -19,6 +20,8 @@ const SOURCE_LABEL: Record<ConfigSource, (profile: string | null) => string> = {
 };
 
 export default async function ComputerTechPage({ params }: PageProps<"/computers/[host]/tech">) {
+  // Every page checks itself: the [host] layout is not re-rendered on client-side navigation.
+  await requireAdmin();
   const { host } = await params;
   const [c, row, layers] = await Promise.all([
     getComputerView(host),

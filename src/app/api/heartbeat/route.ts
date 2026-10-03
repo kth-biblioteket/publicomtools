@@ -40,9 +40,10 @@ export async function POST(request: Request) {
 
   // Profilen ägs av admin. Datorn rapporterar den profil den startade med (status.profile),
   // vilket släpar efter ett byte i admin tills nästa omstart. Därför fylls Computer.profile
-  // från heartbeat bara när den saknas (ny dator, eller en dator som inte migrerats än).
-  const existing = await db.computer.findUnique({ where: { host: status.host }, select: { profile: true } });
-  const profile = existing?.profile ?? status.profile ?? null;
+  // från heartbeat bara för en dator som aldrig ställts in i admin (configUpdatedAt saknas) och
+  // saknar profil. Har admin valt "Ingen profil" är det också ett val som ska stå kvar.
+  const existing = await db.computer.findUnique({ where: { host: status.host }, select: { profile: true, configUpdatedAt: true } });
+  const profile = existing?.configUpdatedAt ? existing.profile : (existing?.profile ?? status.profile ?? null);
 
   await db.$transaction([
     db.computer.upsert({
