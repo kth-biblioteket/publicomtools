@@ -10,7 +10,8 @@ import { DeleteComputer } from "./delete-computer";
 export const dynamic = "force-dynamic";
 
 const HISTORY_LIMIT = 100;
-const CARD = "rounded-xl border border-line bg-white px-6 py-5 shadow-sm";
+// min-w-0: grid items otherwise grow to fit the history table and the config listing
+const CARD = "min-w-0 rounded-xl border border-line bg-white px-4 py-5 shadow-sm sm:px-6";
 
 const SOURCE_LABEL: Record<ConfigSource, (profile: string | null) => string> = {
   base: () => "grundinställningar",
@@ -58,10 +59,10 @@ export default async function ComputerTechPage({ params }: PageProps<"/computers
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="grid items-start gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
         <section className={CARD}>
           <h2 className="text-base font-extrabold">System</h2>
-          <dl className="mt-3 grid grid-cols-[150px_minmax(0,1fr)] gap-x-4 gap-y-2 text-[13.5px]">
+          <dl className="mt-3 grid grid-cols-[110px_minmax(0,1fr)] gap-x-3 sm:grid-cols-[150px_minmax(0,1fr)] sm:gap-x-4 gap-y-2 text-[13.5px]">
             {facts.map(([k, v]) => (
               <div key={k} className="contents">
                 <dt className="text-muted">{k}</dt>

@@ -10,7 +10,7 @@ import { AlertIcon } from "@/components/ui/icons";
 
 export const dynamic = "force-dynamic";
 
-const CARD = "rounded-xl border border-line bg-white px-6 py-5 shadow-sm";
+const CARD = "min-w-0 rounded-xl border border-line bg-white px-4 py-5 shadow-sm sm:px-6";
 
 function targetLabel(target: string) {
   if (target === "base") return "Grundinställningar";
@@ -109,10 +109,13 @@ export default async function ComputerOverviewPage({ params }: PageProps<"/compu
         ) : (
           <ul className="mt-2 text-sm">
             {changes.map((ch) => (
-              <li key={ch.id} className="grid grid-cols-[140px_200px_minmax(0,1fr)] gap-4 border-t border-line-soft py-2.5">
+              <li
+                key={ch.id}
+                className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-0.5 border-t border-line-soft py-2.5 sm:grid-cols-[140px_200px_minmax(0,1fr)]"
+              >
                 <span className="text-muted">{formatWhen(ch.changedAt, now)}</span>
                 <span>{targetLabel(ch.target)}</span>
-                <span className="truncate text-muted">{ch.changedBy}</span>
+                <span className="col-span-2 truncate text-muted sm:col-span-1">{ch.changedBy}</span>
               </li>
             ))}
           </ul>
