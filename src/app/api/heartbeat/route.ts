@@ -75,6 +75,21 @@ export async function POST(request: Request) {
     const layers = await loadLayers(status.host);
     applied = layers ? mergeLayers(layers).PUBLICOM_CONFIG_VERSION.value === status.configVersion : undefined;
   }
-  const reload = !reboot && existing ? reloadPending(existing, now, applied) : false;
+  const reloadOpen = existing ? reloadPending(existing, now, applied) : false;
+  const reload = !reboot && reloadOpen;
+
+  // A request that is done (or expired) is cleared, so the admin can ask again after the next
+  // change and a later change doesn't revive an old request. Only if nobody asked again meanwhile.
+  if (existing?.reloadRequestedAt && !reloadOpen)
+    await db.computer.updateMany({
+      where: { host: status.host, reloadRequestedAt: existing.reloadRequestedAt },
+      data: { reloadRequestedAt: null, reloadRequestedBy: null },
+    });
+  if (existing?.rebootRequestedAt && !reboot)
+    await db.computer.updateMany({
+      where: { host: status.host, rebootRequestedAt: existing.rebootRequestedAt },
+      data: { rebootRequestedAt: null, rebootRequestedBy: null },
+    });
+
   return Response.json({ ok: true, reload, reboot });
 }

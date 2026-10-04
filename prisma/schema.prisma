@@ -38,11 +38,11 @@ model Computer {
   /// configUpdatedAt/effective changes after this → "väntar på omstart".
   configFetchedAt DateTime?
   /// "Hämta nya inställningar nu": the next heartbeat answers reload=true until the
-  /// computer has fetched its config after this time (configFetchedAt > reloadRequestedAt).
+  /// computer runs the current settings (or fetched its config after this time); then cleared.
   reloadRequestedAt DateTime?
   reloadRequestedBy String?
   /// "Starta om datorn": the next heartbeat answers reboot=true until the computer has
-  /// booted after this time (boot time = heartbeat time - uptime).
+  /// booted after this time (boot time = heartbeat time - uptime); then cleared.
   rebootRequestedAt DateTime?
   rebootRequestedBy String?
 }
