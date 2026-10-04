@@ -46,6 +46,12 @@ export default async function ComputerTechPage({ params }: PageProps<"/computers
     ["Ledig disk", s?.diskFreePercent !== undefined ? `${s.diskFreePercent} %` : "–"],
     ["Config hämtad", c.configFetchedAt ? formatTime(c.configFetchedAt) : c.configState === "new" ? "aldrig (inte installerad)" : "aldrig (gamla configfiler)"],
     ["Config ändrad", formatTime(row.configUpdatedAt ?? undefined)],
+    [
+      "Inställningsversion",
+      c.runningVersion
+        ? `${c.runningVersion}${c.runningVersion === c.expectedVersion ? " (aktuell)" : ` (admin: ${c.expectedVersion ?? "–"})`}`
+        : `rapporteras inte (äldre kod), admin: ${c.expectedVersion ?? "–"}`,
+    ],
     ["Först sedd", formatTime(row.firstSeenAt)],
   ];
 

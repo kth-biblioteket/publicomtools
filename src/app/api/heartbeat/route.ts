@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { checkDeviceAuth } from "@/lib/device-auth";
 import { heartbeatSchema, HEARTBEAT_RETENTION_DAYS } from "@/lib/heartbeat";
 import { rebootPending, reloadPending } from "@/lib/reload";
+import { loadLayers, mergeLayers } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +70,11 @@ export async function POST(request: Request) {
   // (publicom-reload.service). A reboot also fetches the settings, so it wins.
   const bootedAt = new Date(now.getTime() - status.uptimeSeconds * 1000);
   const reboot = existing ? rebootPending(existing, bootedAt, now) : false;
-  const reload = !reboot && existing ? reloadPending(existing, now) : false;
+  let applied: boolean | undefined;
+  if (status.configVersion && existing?.reloadRequestedAt) {
+    const layers = await loadLayers(status.host);
+    applied = layers ? mergeLayers(layers).PUBLICOM_CONFIG_VERSION.value === status.configVersion : undefined;
+  }
+  const reload = !reboot && existing ? reloadPending(existing, now, applied) : false;
   return Response.json({ ok: true, reload, reboot });
 }

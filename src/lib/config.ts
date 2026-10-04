@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { db } from "@/lib/db";
 import { withBasePath } from "@/lib/base-path";
 
@@ -14,7 +15,7 @@ import { withBasePath } from "@/lib/base-path";
 
 export type ConfigValues = Record<string, string>;
 
-function asValues(json: unknown): ConfigValues {
+export function asValues(json: unknown): ConfigValues {
   if (!json || typeof json !== "object") return {};
   const out: ConfigValues = {};
   for (const [k, v] of Object.entries(json as Record<string, unknown>)) {
@@ -51,12 +52,26 @@ export function mergeLayers(layers: Layers, origin?: string): EffectiveConfig {
   out.PUBLICOM_HOST = { value: host, source: "auto" };
   // heartbeat.sh skickar PUBLICOM_PROFILE tillbaka, så nya datorer får sin profil ifylld.
   if (layers.profile) out.PUBLICOM_PROFILE = { value: layers.profile.name, source: "auto" };
+  // Version of these settings. The computer saves the version its session started with and
+  // reports it in its heartbeat, so the admin can tell whether it runs what the admin shows.
+  out.PUBLICOM_CONFIG_VERSION = { value: configVersion(entryValues(out)), source: "auto" };
   if (origin)
     out.REMOTE_CONFIG_URL = {
       value: `${origin}${withBasePath(`/api/device/config?host=${encodeURIComponent(host)}`)}`,
       source: "auto",
     };
   return out;
+}
+
+/**
+ * A short hash of the settings a computer gets, independent of the address it fetched them
+ * from (REMOTE_CONFIG_URL) and of the version key itself.
+ */
+export function configVersion(values: ConfigValues): string {
+  const rest = Object.fromEntries(
+    Object.entries(values).filter(([k]) => k !== "REMOTE_CONFIG_URL" && k !== "PUBLICOM_CONFIG_VERSION")
+  );
+  return createHash("sha256").update(serializeEnv(rest)).digest("hex").slice(0, 12);
 }
 
 export function entryValues(entries: EffectiveConfig): ConfigValues {

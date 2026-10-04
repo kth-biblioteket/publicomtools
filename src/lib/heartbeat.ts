@@ -25,6 +25,8 @@ export const heartbeatSchema = z.object({
   failedUnits: z.array(z.string().max(200)).max(50).default([]),
   rebootRequired: z.boolean().default(false),
   diskFreePercent: z.number().int().min(0).max(100).optional(),
+  /** PUBLICOM_CONFIG_VERSION of the settings the running session started with */
+  configVersion: z.string().max(64).optional(),
 });
 
 export type HeartbeatStatus = z.infer<typeof heartbeatSchema>;

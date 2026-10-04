@@ -4,6 +4,7 @@ import { heartbeatSchema, type HeartbeatStatus } from "@/lib/heartbeat";
 import { evaluate, type Evaluation } from "@/lib/status";
 import { getProfileLabels } from "@/lib/profiles";
 import { displayName } from "@/lib/names";
+import { asValues, mergeLayers, type ConfigValues } from "@/lib/config";
 import { rebootPending, reloadPending } from "@/lib/reload";
 
 /**
@@ -37,6 +38,9 @@ export type ComputerView = {
   reloadRequestedAt: Date | null;
   /** "Starta om datorn" requested and the computer hasn't booted since */
   rebootRequestedAt: Date | null;
+  /** Settings version the session runs (reported by newer computers), and the one it should run */
+  runningVersion: string | null;
+  expectedVersion: string | null;
 };
 
 type ComputerRow = {
@@ -51,29 +55,56 @@ type ComputerRow = {
   configFetchedAt?: Date | null;
   configUpdatedAt?: Date | null;
   addedBy?: string | null;
+  overrides?: unknown;
   reloadRequestedAt?: Date | null;
   rebootRequestedAt?: Date | null;
 };
 
 /** When each layer last had a saved change: base, and every profile by name. */
-export type LayerTimes = { base: Date | null; profiles: Map<string, Date>; labels?: Map<string, string> };
+export type LayerTimes = {
+  base: Date | null;
+  profiles: Map<string, Date>;
+  labels?: Map<string, string>;
+  /** Layer values, to work out the settings version each computer should run */
+  values?: { base: ConfigValues; profiles: Map<string, ConfigValues> };
+};
 
 const SEVERITY = { offline: 0, warning: 1, ok: 2 } as const;
 
 export async function getLayerTimes(): Promise<LayerTimes> {
   // The last saved change per layer (not ConfigLayer.updatedAt, which also moves on a rename).
-  const [latest, labels] = await Promise.all([
+  const [latest, labels, layers] = await Promise.all([
     db.configChange.groupBy({ by: ["target"], where: { NOT: { target: { startsWith: "host:" } } }, _max: { changedAt: true } }),
     getProfileLabels(),
+    db.configLayer.findMany({ select: { kind: true, name: true, values: true } }),
   ]);
+  const values = {
+    base: asValues(layers.find((l) => l.kind === "base")?.values),
+    profiles: new Map(layers.filter((l) => l.kind === "profile").map((l) => [l.name, asValues(l.values)])),
+  };
   const base = latest.find((l) => l.target === "base")?._max.changedAt ?? null;
   const profiles = new Map(
     latest.filter((l) => l.target.startsWith("profile:") && l._max.changedAt).map((l) => [l.target.slice(8), l._max.changedAt!])
   );
-  return { base, profiles, labels };
+  return { base, profiles, labels, values };
 }
 
-function configState(c: ComputerRow, times?: LayerTimes): ConfigState {
+/** PUBLICOM_CONFIG_VERSION of the settings the admin wants this computer to run. */
+export function expectedVersion(c: { host: string; profile: string | null; overrides?: unknown }, times?: LayerTimes): string | null {
+  if (!times?.values) return null;
+  const { base, profiles } = times.values;
+  return mergeLayers({
+    base,
+    profile: c.profile ? { name: c.profile, values: profiles.get(c.profile) ?? {} } : null,
+    host: { host: c.host, overrides: asValues(c.overrides) },
+  }).PUBLICOM_CONFIG_VERSION.value;
+}
+
+function configState(c: ComputerRow, times: LayerTimes | undefined, running: string | undefined): ConfigState {
+  // Newer computers report the settings version their session runs: exact answer.
+  const expected = running ? expectedVersion(c, times) : null;
+  if (running && expected) return running === expected ? "current" : "pending";
+  // Older code: guess from when it last fetched its config.
   if (!c.configFetchedAt) return c.addedBy ? "new" : "legacy";
   if (!times) return "current";
   const changed = [times.base, c.profile ? times.profiles.get(c.profile) : null, c.configUpdatedAt]
@@ -98,6 +129,7 @@ export function toView(computer: ComputerRow, times?: LayerTimes, now = new Date
         ],
       };
   const secondsSinceSeen = (now.getTime() - computer.lastSeenAt.getTime()) / 1000;
+  const state = configState(computer, times, status?.configVersion);
   return {
     host: computer.host,
     hostname: computer.hostname,
@@ -111,9 +143,13 @@ export function toView(computer: ComputerRow, times?: LayerTimes, now = new Date
     status,
     evaluation,
     secondsSinceSeen,
-    configState: configState(computer, times),
+    configState: state,
+    runningVersion: status?.configVersion ?? null,
+    expectedVersion: expectedVersion(computer, times),
     configFetchedAt: computer.configFetchedAt ?? null,
-    reloadRequestedAt: reloadPending(computer, now) ? computer.reloadRequestedAt ?? null : null,
+    reloadRequestedAt: reloadPending(computer, now, status?.configVersion ? state === "current" : undefined)
+      ? computer.reloadRequestedAt ?? null
+      : null,
     rebootRequestedAt: rebootPending(computer, status ? new Date(computer.lastSeenAt.getTime() - status.uptimeSeconds * 1000) : null, now)
       ? computer.rebootRequestedAt ?? null
       : null,
