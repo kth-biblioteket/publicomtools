@@ -87,6 +87,8 @@ model ConfigKey {
   example      String?
   /// Technical (URLs, branches, SSH …): hidden by default in the admin UI
   advanced     Boolean @default(false)
+  /// Belongs to the single computer (name, resource id …): kept when the computer changes profile
+  perComputer  Boolean @default(false)
   sortOrder    Int     @default(0)
 }
 

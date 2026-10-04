@@ -18,6 +18,8 @@ export type CatalogEntry = {
   help: string | null;
   example: string | null;
   advanced: boolean;
+  /** Belongs to the single computer (name, resource id …): kept when it changes profile */
+  perComputer: boolean;
 };
 
 export type Group = { id: string; label: string };

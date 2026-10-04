@@ -31,6 +31,8 @@ export const catalogSchema = z
         help: z.string().optional(),
         example: z.string().optional(),
         advanced: z.boolean().optional(),
+        /** Belongs to the single computer: kept when it changes profile */
+        perComputer: z.boolean().optional(),
       })
     ),
   })
@@ -82,6 +84,7 @@ type StoredKey = {
   help: string | null;
   example: string | null;
   advanced: boolean;
+  perComputer: boolean;
 };
 
 const FIELD_LABELS: Record<string, string> = {
@@ -95,6 +98,7 @@ const FIELD_LABELS: Record<string, string> = {
   help: "hjälptext",
   example: "exempel",
   advanced: "teknisk",
+  perComputer: "per dator",
 };
 
 function comparable(k: StoredKey | CatalogKey) {
@@ -113,6 +117,7 @@ function comparable(k: StoredKey | CatalogKey) {
     help: k.help ?? null,
     example: k.example ?? null,
     advanced: !!k.advanced,
+    perComputer: !!k.perComputer,
   };
 }
 
@@ -163,6 +168,7 @@ export async function applyCatalog(
         help: k.help ?? null,
         example: k.example ?? null,
         advanced: !!k.advanced,
+        perComputer: !!k.perComputer,
         sortOrder: i,
       };
       return db.configKey.upsert({ where: { key: k.key }, create: { key: k.key, ...data }, update: data });

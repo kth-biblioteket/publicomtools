@@ -30,6 +30,8 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
 
   const [drafts, setDrafts] = useState<Drafts>({});
   const [profileDraft, setProfileDraft] = useState<string | null | undefined>(undefined);
+  /** The computer's own values removed because of the profile switch (undone with it) */
+  const [clearedBySwitch, setClearedBySwitch] = useState<string[]>([]);
   const [q, setQ] = useState("");
   const [onlyOwn, setOnlyOwn] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -159,6 +161,7 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
       const n = affected.length;
       setDrafts({});
       setProfileDraft(undefined);
+      setClearedBySwitch([]);
       setNote("");
       setReview(false);
       setServerIssues({});
@@ -237,6 +240,57 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
   };
 
   // --- profile switch (computers) ---
+  // The computer's own values were mostly set for the old profile, so a switch removes them, except
+  // keys that belong to the computer itself (perComputer in the catalog: name, resource id …).
+  const ownKeys = Object.keys(data.own).sort(
+    (a, b) => (meta.get(a)?.label ?? a).localeCompare(meta.get(b)?.label ?? b, "sv")
+  );
+  const switchProfile = (next: string | null | undefined) => {
+    setProfileDraft(next);
+    if (next === undefined) {
+      update((d) => clearedBySwitch.forEach((k) => d[k] === null && delete d[k]));
+      setClearedBySwitch([]);
+    } else if (profileDraft === undefined) {
+      const clear = ownKeys.filter((k) => !meta.get(k)?.perComputer && !(k in drafts));
+      update((d) => clear.forEach((k) => (d[k] = null)));
+      setClearedBySwitch(clear);
+    }
+  };
+  const ownValuesOnSwitch = () => (
+    <div className="mt-3 rounded-[10px] border border-line-soft bg-[#fafbfc] px-3.5 py-3">
+      <div className="text-[13.5px] font-bold">Datorns egna värden</div>
+      <p className="mt-0.5 text-[12.5px] text-muted">
+        Ibockade tas bort, så att datorn får värdet från den nya profilen. Det som hör till just den här datorn står kvar.
+      </p>
+      <ul className="mt-2 flex flex-col gap-1.5">
+        {ownKeys.map((k) => {
+          const m = meta.get(k);
+          const removed = drafts[k] === null;
+          const next = inherited[k]?.value ?? null;
+          return (
+            <li key={k} className="text-[13px]">
+              <label className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  checked={removed}
+                  onChange={(e) => (e.target.checked ? reset(k) : undo(k))}
+                  className="mt-[3px]"
+                />
+                <span>
+                  <b>{m?.label ?? k}</b>: <span className={removed ? "line-through text-muted" : ""}>{formatValue(m, data.own[k])}</span>
+                  {removed ? (
+                    <span className="text-muted"> → {next !== null ? formatValue(m, next) : m?.defaultValue != null ? `${formatValue(m, m.defaultValue)} (standard)` : "inte satt"}</span>
+                  ) : m?.perComputer ? (
+                    <span className="text-muted"> (hör till datorn)</span>
+                  ) : null}
+                </span>
+              </label>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
   const profileImpact = (() => {
     if (kind !== "host" || profileDraft === undefined) return 0;
     const a = inheritedFor(data.profile), b = inheritedFor(profileDraft);
@@ -280,9 +334,10 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
               <p className="mt-2 flex flex-wrap items-center gap-2 text-[12.5px] text-muted">
                 <Chip tone="draft">Osparad</Chip>
                 Bytet ändrar {profileImpact} {profileImpact === 1 ? "inställning" : "inställningar"}.
-                <button type="button" className={LINK} onClick={() => setProfileDraft(undefined)}>Ångra</button>
+                <button type="button" className={LINK} onClick={() => switchProfile(undefined)}>Ångra</button>
               </p>
             )}
+            {profileDraft !== undefined && ownKeys.length > 0 && ownValuesOnSwitch()}
           </div>
           <label htmlFor="profile" className="sr-only">Profil</label>
           <select
@@ -290,7 +345,7 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
             value={profileName ?? ""}
             onChange={(e) => {
               const v = e.target.value || null;
-              setProfileDraft(v === data.profile ? undefined : v);
+              switchProfile(v === data.profile ? undefined : v);
             }}
             className="h-[38px] w-56 rounded-lg border border-field bg-white px-2.5 text-sm"
           >
@@ -432,7 +487,7 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
           <span className="flex-1 text-[13.5px] text-muted">{title}</span>
           <button
             type="button"
-            onClick={() => { setDrafts({}); setProfileDraft(undefined); setServerIssues({}); }}
+            onClick={() => { setDrafts({}); setProfileDraft(undefined); setClearedBySwitch([]); setServerIssues({}); }}
             className="h-9 rounded-lg border border-[#d7dbe0] bg-white px-3.5 text-[13.5px] font-semibold"
           >
             Ångra alla
