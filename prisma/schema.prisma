@@ -41,6 +41,10 @@ model Computer {
   /// computer has fetched its config after this time (configFetchedAt > reloadRequestedAt).
   reloadRequestedAt DateTime?
   reloadRequestedBy String?
+  /// "Starta om datorn": the next heartbeat answers reboot=true until the computer has
+  /// booted after this time (boot time = heartbeat time - uptime).
+  rebootRequestedAt DateTime?
+  rebootRequestedBy String?
 }
 
 /// A config layer: the shared base (kind="base", name="") or a profile

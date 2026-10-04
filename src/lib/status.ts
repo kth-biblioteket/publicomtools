@@ -52,7 +52,7 @@ export function evaluate(lastSeenAt: Date, status: HeartbeatStatus, now = new Da
   if (status.rebootRequired) {
     problems.push({
       text: "Behöver startas om efter en systemuppdatering",
-      hint: "Starta om datorn när ingen använder den.",
+      hint: "Starta om datorn när ingen använder den, med Starta om datorn ovan. Annars startar den om av sig själv kl 03.30.",
       detail: "reboot-required",
     });
   }

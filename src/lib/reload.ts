@@ -15,3 +15,18 @@ export function reloadPending(
   if (!at || now.getTime() - at.getTime() > RELOAD_EXPIRES_MS) return false;
   return !c.configFetchedAt || c.configFetchedAt < at;
 }
+
+/**
+ * "Starta om datorn". Same idea: the next heartbeat gets reboot=true, and the computer reboots
+ * when nobody is using it (reload_config.sh reboot). Done once the computer has booted after
+ * the request, which the heartbeat shows (receivedAt - uptimeSeconds); expires after a day.
+ */
+export function rebootPending(
+  c: { rebootRequestedAt?: Date | null },
+  bootedAt: Date | null,
+  now = new Date()
+): boolean {
+  const at = c.rebootRequestedAt;
+  if (!at || now.getTime() - at.getTime() > RELOAD_EXPIRES_MS) return false;
+  return !bootedAt || bootedAt <= at;
+}

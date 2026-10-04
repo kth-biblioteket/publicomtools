@@ -8,6 +8,12 @@ import { ChevronLeftIcon } from "@/components/ui/icons";
 import { Tabs } from "@/components/ui/tabs";
 import { RenameComputer } from "./rename-computer";
 import { ReloadButton } from "./reload-button";
+import { RebootButton } from "./reboot-button";
+
+/** "11.35" */
+function clock(d: Date) {
+  return d.toLocaleTimeString("sv-SE", { timeZone: "Europe/Stockholm", hour: "2-digit", minute: "2-digit" }).replace(":", ".");
+}
 
 export default async function ComputerLayout({ params, children }: LayoutProps<"/computers/[host]">) {
   await requireAdmin();
@@ -41,13 +47,13 @@ export default async function ComputerLayout({ params, children }: LayoutProps<"
               <Chip tone="draft">Väntar på omstart</Chip>
               <ReloadButton
                 host={c.host}
-                requestedAt={
-                  c.reloadRequestedAt
-                    ? c.reloadRequestedAt.toLocaleTimeString("sv-SE", { timeZone: "Europe/Stockholm", hour: "2-digit", minute: "2-digit" }).replace(":", ".")
-                    : null
-                }
+                requestedAt={c.reloadRequestedAt ? clock(c.reloadRequestedAt) : null}
               />
             </>
+          )}
+          {/* Datorer med gamla configfiler, eller som inte är installerade, kör inte koden som kan starta om */}
+          {(c.configState === "current" || c.configState === "pending") && !c.reloadRequestedAt && (
+            <RebootButton host={c.host} name={c.name} requestedAt={c.rebootRequestedAt ? clock(c.rebootRequestedAt) : null} />
           )}
           {c.configState === "legacy" && <Chip>Gamla configfiler</Chip>}
           {c.configState === "new" && <Chip tone="draft">Väntar på installation</Chip>}

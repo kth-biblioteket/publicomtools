@@ -4,7 +4,7 @@ import { heartbeatSchema, type HeartbeatStatus } from "@/lib/heartbeat";
 import { evaluate, type Evaluation } from "@/lib/status";
 import { getProfileLabels } from "@/lib/profiles";
 import { displayName } from "@/lib/names";
-import { reloadPending } from "@/lib/reload";
+import { rebootPending, reloadPending } from "@/lib/reload";
 
 /**
  * Whether the computer runs the settings in this admin:
@@ -35,6 +35,8 @@ export type ComputerView = {
   configFetchedAt: Date | null;
   /** "Hämta nya inställningar nu" requested and not done yet */
   reloadRequestedAt: Date | null;
+  /** "Starta om datorn" requested and the computer hasn't booted since */
+  rebootRequestedAt: Date | null;
 };
 
 type ComputerRow = {
@@ -50,6 +52,7 @@ type ComputerRow = {
   configUpdatedAt?: Date | null;
   addedBy?: string | null;
   reloadRequestedAt?: Date | null;
+  rebootRequestedAt?: Date | null;
 };
 
 /** When each layer last had a saved change: base, and every profile by name. */
@@ -111,6 +114,9 @@ export function toView(computer: ComputerRow, times?: LayerTimes, now = new Date
     configState: configState(computer, times),
     configFetchedAt: computer.configFetchedAt ?? null,
     reloadRequestedAt: reloadPending(computer, now) ? computer.reloadRequestedAt ?? null : null,
+    rebootRequestedAt: rebootPending(computer, status ? new Date(computer.lastSeenAt.getTime() - status.uptimeSeconds * 1000) : null, now)
+      ? computer.rebootRequestedAt ?? null
+      : null,
   };
 }
 

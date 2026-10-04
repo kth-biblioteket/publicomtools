@@ -25,3 +25,15 @@ export async function requestReloadAction(host: string): Promise<{ ok: true } | 
   revalidatePath("/", "layout");
   return { ok: true };
 }
+
+/** "Starta om datorn": the computer's next heartbeat tells it to reboot when nobody is using it. */
+export async function requestRebootAction(host: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireAdmin();
+  const updated = await db.computer.updateMany({
+    where: { host },
+    data: { rebootRequestedAt: new Date(), rebootRequestedBy: user.email },
+  });
+  if (!updated.count) return { ok: false, error: "Datorn finns inte längre." };
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
