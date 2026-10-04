@@ -107,6 +107,11 @@ export function settingWarnings(value: (key: string) => string | null, catalog: 
       });
   }
   const type = value("COMPUTER_TYPE");
+  if ((value("ALMA_LOGIN") ?? "false") === "true" && (type === "searchcomputer" || type === "signage"))
+    warnings.push({
+      key: "ALMA_LOGIN",
+      message: `Inloggning krävs, men datortypen är ${type === "signage" ? "Skylt" : "Sökdator"}. Sökdatorer och skyltar visar ingen inloggningsskärm, så välj Datortyp Gästdator om datorn ska ha inloggning.`,
+    });
   const resource = (value("RESOURCE_ID") ?? "").trim();
   if (type === "guestcomputer" && catalog.has("RESOURCE_ID") && (!resource || resource === "x"))
     warnings.push({
