@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { getComputerView } from "@/lib/computers";
+import { formatWithin, heartbeatInterval } from "@/lib/status";
 import { HealthBadge } from "@/components/health-badge";
 import { Chip } from "@/components/ui/chip";
 import { ChevronLeftIcon } from "@/components/ui/icons";
@@ -48,12 +49,18 @@ export default async function ComputerLayout({ params, children }: LayoutProps<"
               <ReloadButton
                 host={c.host}
                 requestedAt={c.reloadRequestedAt ? clock(c.reloadRequestedAt) : null}
+                within={formatWithin(heartbeatInterval(c.status))}
               />
             </>
           )}
           {/* Datorer med gamla configfiler, eller som inte är installerade, kör inte koden som kan starta om */}
           {(c.configState === "current" || c.configState === "pending") && !c.reloadRequestedAt && (
-            <RebootButton host={c.host} name={c.name} requestedAt={c.rebootRequestedAt ? clock(c.rebootRequestedAt) : null} />
+            <RebootButton
+              host={c.host}
+              name={c.name}
+              requestedAt={c.rebootRequestedAt ? clock(c.rebootRequestedAt) : null}
+              within={formatWithin(heartbeatInterval(c.status))}
+            />
           )}
           {c.configState === "legacy" && <Chip>Gamla configfiler</Chip>}
           {c.configState === "new" && <Chip tone="draft">Väntar på installation</Chip>}

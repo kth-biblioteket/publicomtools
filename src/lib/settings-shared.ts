@@ -112,6 +112,12 @@ export function settingWarnings(value: (key: string) => string | null, catalog: 
       key: "ALMA_LOGIN",
       message: `Inloggning krävs, men datortypen är ${type === "signage" ? "Skylt" : "Sökdator"}. Sökdatorer och skyltar visar ingen inloggningsskärm, så välj Datortyp Gästdator om datorn ska ha inloggning.`,
     });
+  const interval = value("HEARTBEAT_INTERVAL");
+  if (interval !== null && catalog.has("HEARTBEAT_INTERVAL") && !/^([1-9]|[1-5][0-9]|60)$/.test(interval.trim()))
+    warnings.push({
+      key: "HEARTBEAT_INTERVAL",
+      message: "Statusrapport var: datorn förstår 1–60 minuter och använder 5 för andra värden.",
+    });
   const resource = (value("RESOURCE_ID") ?? "").trim();
   if (type === "guestcomputer" && catalog.has("RESOURCE_ID") && (!resource || resource === "x"))
     warnings.push({

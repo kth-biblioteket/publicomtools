@@ -2,7 +2,7 @@ import "server-only";
 import { z } from "zod";
 
 /**
- * What publicom's /usr/local/bin/heartbeat.sh sends every 5 minutes.
+ * What publicom's /usr/local/bin/heartbeat.sh sends every 5 minutes (HEARTBEAT_INTERVAL changes it).
  * Everything except the identity fields is optional, so older and newer
  * client versions can report to the same server.
  */
@@ -27,6 +27,8 @@ export const heartbeatSchema = z.object({
   diskFreePercent: z.number().int().min(0).max(100).optional(),
   /** PUBLICOM_CONFIG_VERSION of the settings the running session started with */
   configVersion: z.string().max(64).optional(),
+  /** Minutes between heartbeats (HEARTBEAT_INTERVAL as the computer applies it) */
+  intervalMinutes: z.number().int().min(1).max(60).optional(),
 });
 
 export type HeartbeatStatus = z.infer<typeof heartbeatSchema>;

@@ -6,9 +6,19 @@ import { requestRebootAction } from "./actions";
 
 /**
  * "Starta om datorn". The request reaches the computer with its next status report (every
- * 5 minutes), and it reboots when nobody is using it.
+ * 5 minutes, or HEARTBEAT_INTERVAL), and it reboots when nobody is using it.
  */
-export function RebootButton({ host, name, requestedAt }: { host: string; name: string; requestedAt: string | null }) {
+export function RebootButton({
+  host,
+  name,
+  requestedAt,
+  within,
+}: {
+  host: string;
+  name: string;
+  requestedAt: string | null;
+  within: string;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +47,7 @@ export function RebootButton({ host, name, requestedAt }: { host: string; name: 
           <div role="dialog" aria-modal="true" aria-labelledby="reboot-h" className="flex w-full max-w-[520px] flex-col gap-3.5 rounded-2xl bg-white p-6 shadow-2xl">
             <h2 id="reboot-h" className="text-xl font-extrabold">Starta om {name}?</h2>
             <p className="text-sm leading-relaxed text-muted">
-              Datorn får beskedet med nästa statusrapport, inom 5 minuter. Den startar om när ingen använder den: ingen
+              Datorn får beskedet med nästa statusrapport, {within}. Den startar om när ingen använder den: ingen
               inloggad och ingen aktivitet på 2 minuter, senast efter 8 timmar. Efter omstarten hämtar den sina inställningar
               och sin kod som vanligt.
             </p>

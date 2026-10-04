@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { getComputerView } from "@/lib/computers";
 import { loadLayers, mergeLayers, type ConfigSource } from "@/lib/config";
 import { heartbeatSchema } from "@/lib/heartbeat";
-import { formatDuration, formatTime } from "@/lib/status";
+import { formatDuration, formatInterval, formatTime, heartbeatInterval } from "@/lib/status";
 import { DeleteComputer } from "./delete-computer";
 
 export const dynamic = "force-dynamic";
@@ -52,6 +52,7 @@ export default async function ComputerTechPage({ params }: PageProps<"/computers
         ? `${c.runningVersion}${c.runningVersion === c.expectedVersion ? " (aktuell)" : ` (admin: ${c.expectedVersion ?? "–"})`}`
         : `rapporteras inte (äldre kod), admin: ${c.expectedVersion ?? "–"}`,
     ],
+    ["Statusrapport", formatInterval(heartbeatInterval(c.status))],
     ["Först sedd", formatTime(row.firstSeenAt)],
   ];
 

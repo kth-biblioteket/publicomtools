@@ -1,7 +1,25 @@
 import type { HeartbeatStatus } from "@/lib/heartbeat";
 
-/** Computers send a heartbeat every 5 minutes (plus up to 30 s random delay). */
-export const OFFLINE_AFTER_MS = 15 * 60 * 1000;
+/**
+ * Minutes between a computer's heartbeats: 5, or HEARTBEAT_INTERVAL as the computer reports it
+ * (plus up to 30 s random delay). Older computers don't report it and use 5.
+ */
+export function heartbeatInterval(status: Pick<HeartbeatStatus, "intervalMinutes"> | null | undefined): number {
+  return status?.intervalMinutes ?? 5;
+}
+
+/** "varje minut", "var 5 minuter" */
+export function formatInterval(minutes: number): string {
+  return minutes === 1 ? "varje minut" : `var ${minutes} minuter`;
+}
+
+/** When the next heartbeat arrives at the latest: "inom en minut", "inom 5 minuter" */
+export function formatWithin(minutes: number): string {
+  return minutes === 1 ? "inom en minut" : `inom ${minutes} minuter`;
+}
+
+/** "Ingen kontakt" after three missed heartbeats. */
+const MISSED_HEARTBEATS = 3;
 const LOW_DISK_PERCENT = 10;
 
 export type Health = "ok" | "warning" | "offline";
@@ -14,7 +32,7 @@ export type Evaluation = { health: Health; problems: Problem[] };
 /** Decides the colour shown on the status page, with the reasons in Swedish. */
 export function evaluate(lastSeenAt: Date, status: HeartbeatStatus, now = new Date()): Evaluation {
   const sinceMs = now.getTime() - lastSeenAt.getTime();
-  if (sinceMs > OFFLINE_AFTER_MS) {
+  if (sinceMs > MISSED_HEARTBEATS * heartbeatInterval(status) * 60 * 1000) {
     return {
       health: "offline",
       problems: [
