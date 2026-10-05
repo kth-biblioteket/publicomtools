@@ -36,16 +36,21 @@ export async function newEnrollCode(host: string): Promise<{ code: string; expir
   return { code, expiresAt };
 }
 
-/** Exchange a code for a device token. Null if the code is unknown, used or expired. */
-export async function enrollDevice(code: string): Promise<{ host: string; token: string } | null> {
+/**
+ * Exchange a code for a device token, plus a recovery code for the app's settings menu (forgotten
+ * PIN; the device keeps only a hash, IT sees it under Teknik). Null if the code is unknown, used or
+ * expired.
+ */
+export async function enrollDevice(code: string): Promise<{ host: string; token: string; recoveryCode: string } | null> {
   const hash = sha256(normalizeEnrollCode(code));
   const device = await db.computer.findUnique({ where: { enrollCodeHash: hash }, select: { host: true, enrollExpiresAt: true } });
   if (!device || !device.enrollExpiresAt || device.enrollExpiresAt < new Date()) return null;
   const token = `pkd_${randomBytes(32).toString("base64url")}`;
+  const recoveryCode = generateEnrollCode();
   // Only if the code is still the same (two enrollments with one code: one wins)
   const { count } = await db.computer.updateMany({
     where: { host: device.host, enrollCodeHash: hash },
-    data: { tokenHash: sha256(token), enrollCodeHash: null, enrollExpiresAt: null, enrolledAt: new Date() },
+    data: { tokenHash: sha256(token), enrollCodeHash: null, enrollExpiresAt: null, enrolledAt: new Date(), recoveryCode },
   });
-  return count ? { host: device.host, token } : null;
+  return count ? { host: device.host, token, recoveryCode } : null;
 }

@@ -42,6 +42,8 @@ export const heartbeatSchema = z.object({
   pageLoaded: z.boolean().optional(),
   /** Device owner and locked in kiosk mode */
   kioskLocked: z.boolean().optional(),
+  /** The latest event in the settings menu, e.g. "PIN bytt 2026-10-05 21:03" or "upplåst från publicomtools …" */
+  menuEvent: z.string().max(120).optional(),
 });
 
 export type HeartbeatStatus = z.infer<typeof heartbeatSchema>;

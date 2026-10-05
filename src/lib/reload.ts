@@ -34,3 +34,10 @@ export function rebootPending(
   if (!at || now.getTime() - at.getTime() > RELOAD_EXPIRES_MS) return false;
   return !bootedAt || bootedAt <= at;
 }
+
+/** "Ta skärmdump": until a screenshot newer than the request has arrived; expires after a day. */
+export function screenshotPending(c: { screenshotRequestedAt?: Date | null }, takenAt: Date | null, now = new Date()): boolean {
+  const at = c.screenshotRequestedAt;
+  if (!at || now.getTime() - at.getTime() > RELOAD_EXPIRES_MS) return false;
+  return !takenAt || takenAt < at;
+}

@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { authenticateDevice, mayActFor } from "@/lib/device-auth";
 import { heartbeatSchema, HEARTBEAT_RETENTION_DAYS } from "@/lib/heartbeat";
-import { rebootPending, reloadPending } from "@/lib/reload";
+import { rebootPending, reloadPending, RELOAD_EXPIRES_MS, screenshotPending } from "@/lib/reload";
 import { loadLayers, mergeLayers } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
@@ -47,7 +47,16 @@ export async function POST(request: Request) {
   // saknar profil. Har admin valt "Ingen profil" är det också ett val som ska stå kvar.
   const existing = await db.computer.findUnique({
     where: { host: status.host },
-    select: { profile: true, configUpdatedAt: true, reloadRequestedAt: true, configFetchedAt: true, rebootRequestedAt: true },
+    select: {
+      profile: true,
+      configUpdatedAt: true,
+      reloadRequestedAt: true,
+      configFetchedAt: true,
+      rebootRequestedAt: true,
+      screenshotRequestedAt: true,
+      pinUnlockRequestedAt: true,
+      screenshot: { select: { takenAt: true } },
+    },
   });
   const profile = existing?.configUpdatedAt ? existing.profile : (existing?.profile ?? status.profile ?? null);
 
@@ -92,5 +101,17 @@ export async function POST(request: Request) {
       data: { rebootRequestedAt: null, rebootRequestedBy: null },
     });
 
-  return Response.json({ ok: true, reload, reboot });
+  // Android: "Ta skärmdump" until a newer one arrives; "Lås upp menyn" is sent once
+  const screenshot = existing ? screenshotPending(existing, existing.screenshot?.takenAt ?? null, now) : false;
+  let pinUnlock = false;
+  const unlockAt = existing?.pinUnlockRequestedAt;
+  if (unlockAt) {
+    const { count } = await db.computer.updateMany({
+      where: { host: status.host, pinUnlockRequestedAt: unlockAt },
+      data: { pinUnlockRequestedAt: null, pinUnlockRequestedBy: null },
+    });
+    pinUnlock = count > 0 && now.getTime() - unlockAt.getTime() <= RELOAD_EXPIRES_MS;
+  }
+
+  return Response.json({ ok: true, reload, reboot, screenshot, pinUnlock });
 }

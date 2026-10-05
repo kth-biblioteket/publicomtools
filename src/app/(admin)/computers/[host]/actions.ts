@@ -52,3 +52,27 @@ export async function newEnrollCodeAction(host: string): Promise<{ ok: true; cod
   revalidatePath("/", "layout");
   return { ok: true, code, expiresAt: expiresAt.toISOString() };
 }
+
+/** Android: "Ta skärmdump". The tablet sends one with its next heartbeat. */
+export async function requestScreenshotAction(host: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireAdmin();
+  const updated = await db.computer.updateMany({
+    where: { host, platform: "android" },
+    data: { screenshotRequestedAt: new Date(), screenshotRequestedBy: user.email },
+  });
+  if (!updated.count) return { ok: false, error: "Enheten finns inte längre." };
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+/** Android: "Lås upp menyn" after too many wrong PINs. Sent once with the next heartbeat. */
+export async function requestPinUnlockAction(host: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireAdmin();
+  const updated = await db.computer.updateMany({
+    where: { host, platform: "android" },
+    data: { pinUnlockRequestedAt: new Date(), pinUnlockRequestedBy: user.email },
+  });
+  if (!updated.count) return { ok: false, error: "Enheten finns inte längre." };
+  revalidatePath("/", "layout");
+  return { ok: true };
+}

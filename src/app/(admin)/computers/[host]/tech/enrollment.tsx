@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { newEnrollCodeAction } from "../actions";
+import { newEnrollCodeAction, requestPinUnlockAction } from "../actions";
 
 /**
  * Android: enrollment status and "Skapa inskrivningskod". The code is shown once, here; only its
@@ -12,10 +12,16 @@ export function Enrollment({
   host,
   enrolledAt,
   codeExpiresAt,
+  recoveryCode,
+  unlockRequestedAt,
 }: {
   host: string;
   enrolledAt: string | null;
   codeExpiresAt: string | null;
+  /** Unlocks the settings menu on the device without network (forgotten PIN) */
+  recoveryCode: string | null;
+  /** "Lås upp menyn" is waiting for the next status report */
+  unlockRequestedAt: string | null;
 }) {
   const router = useRouter();
   const [code, setCode] = useState<{ code: string; expiresAt: string } | null>(null);
@@ -83,6 +89,42 @@ export function Enrollment({
               </button>
             </span>
           )}
+        </div>
+      )}
+      {enrolledAt && (
+        <div className="mt-5 border-t border-line-soft pt-4">
+          <h3 className="text-[15px] font-extrabold">Menyn på enheten</h3>
+          <p className="mt-1 text-sm text-muted">
+            Efter 5 fel PIN spärras menyn en stund (högst 15 minuter). <b>Lås upp menyn</b> tar bort spärren vid nästa
+            statusrapport. Har ni glömt PIN:en: välj <i>Glömt PIN?</i> på enheten och ange återställningskoden, sedan väljer
+            ni en ny PIN. Det fungerar även utan nät.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-4">
+            {unlockRequestedAt ? (
+              <span className="text-[13px] text-muted">Upplåsning begärd {time(unlockRequestedAt)}.</span>
+            ) : (
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() =>
+                  start(async () => {
+                    setError(null);
+                    const res = await requestPinUnlockAction(host);
+                    if (!res.ok) return setError(res.error);
+                    router.refresh();
+                  })
+                }
+                className="h-9 rounded-lg border border-[#d7dbe0] bg-white px-3.5 text-[13.5px] font-semibold hover:border-kth-blue disabled:opacity-60"
+              >
+                Lås upp menyn
+              </button>
+            )}
+            {recoveryCode && (
+              <span className="text-sm">
+                Återställningskod: <span className="font-mono text-[15px] font-bold tracking-wider">{recoveryCode}</span>
+              </span>
+            )}
+          </div>
         </div>
       )}
       {error && <p role="alert" className="mt-2 text-sm font-semibold text-bad-ink">{error}</p>}

@@ -27,7 +27,10 @@ export default async function ComputerTechPage({ params }: PageProps<"/computers
   const { host } = await params;
   const [c, row, layers] = await Promise.all([
     getComputerView(host),
-    db.computer.findUnique({ where: { host }, select: { firstSeenAt: true, configUpdatedAt: true } }),
+    db.computer.findUnique({
+      where: { host },
+      select: { firstSeenAt: true, configUpdatedAt: true, recoveryCode: true, pinUnlockRequestedAt: true },
+    }),
     loadLayers(host),
   ]);
   if (!c || !row || !layers) notFound();
@@ -49,6 +52,7 @@ export default async function ComputerTechPage({ params }: PageProps<"/computers
           ["Modell", s?.model ?? "–"],
           ["WebView", s?.webViewVersion ?? "–"],
           ["Kioskläge", s?.kioskLocked === undefined ? "–" : s.kioskLocked ? "låst" : "inte låst"],
+          ["Menyn", s?.menuEvent ?? "–"],
         ] as [string, React.ReactNode][])
       : ([
           ["guest.service", s ? `${s.guestService ?? "–"}${s.guestRestarts !== undefined ? `, ${s.guestRestarts} sessioner sedan start` : ""}` : "–"],
@@ -74,6 +78,8 @@ export default async function ComputerTechPage({ params }: PageProps<"/computers
           host={c.host}
           enrolledAt={c.enrolledAt?.toISOString() ?? null}
           codeExpiresAt={c.enrollCodeExpiresAt?.toISOString() ?? null}
+          recoveryCode={row.recoveryCode}
+          unlockRequestedAt={row.pinUnlockRequestedAt?.toISOString() ?? null}
         />
       )}
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">

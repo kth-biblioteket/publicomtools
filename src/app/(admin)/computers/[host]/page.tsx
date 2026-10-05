@@ -4,10 +4,13 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { getComputerView } from "@/lib/computers";
 import { getComputerConfig } from "@/lib/config";
-import { formatAgo, formatDuration, formatWhen } from "@/lib/status";
+import { formatAgo, formatDuration, formatWhen, formatWithin, heartbeatInterval } from "@/lib/status";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { AlertIcon } from "@/components/ui/icons";
 import { baseTarget } from "@/lib/platforms";
+import { ScreenshotCard } from "./screenshot-card";
+import { screenshotPending } from "@/lib/reload";
+import { withBasePath } from "@/lib/base-path";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +32,16 @@ export default async function ComputerOverviewPage({ params }: PageProps<"/compu
   const now = new Date();
   const s = c.status;
   const ownCount = Object.keys(config.overrides).length;
+  // Android: the latest screenshot and whether one is requested
+  const shot =
+    c.platform === "android"
+      ? await db.computer.findUnique({
+          where: { host },
+          select: { screenshotRequestedAt: true, screenshot: { select: { takenAt: true } } },
+        })
+      : null;
+  const shotTakenAt = shot?.screenshot?.takenAt ?? null;
+  const shotRequested = shot && screenshotPending(shot, shotTakenAt, now) ? shot.screenshotRequestedAt : null;
   const changes = await db.configChange.findMany({
     where: { target: { in: [baseTarget(c.platform), `host:${host}`, ...(c.profile ? [`profile:${c.profile}`] : [])] } },
     orderBy: { changedAt: "desc" },
@@ -112,6 +125,16 @@ export default async function ComputerOverviewPage({ params }: PageProps<"/compu
           </dl>
         </section>
       </div>
+
+      {c.platform === "android" && (
+        <ScreenshotCard
+          host={host}
+          src={shotTakenAt ? withBasePath(`/computers/${host}/screenshot?t=${shotTakenAt.getTime()}`) : null}
+          takenAt={shotTakenAt ? formatWhen(shotTakenAt, now) : null}
+          requestedAt={shotRequested ? formatWhen(shotRequested, now) : null}
+          within={formatWithin(heartbeatInterval(s))}
+        />
+      )}
 
       <section className={CARD}>
         <div className="flex items-baseline justify-between gap-4">
