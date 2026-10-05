@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { newEnrollCode } from "@/lib/enroll";
 
 /** The name in the admin list. Admin only; never sent to the computer. Empty = use the computer's own name. */
 export async function renameComputerAction(host: string, label: string): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -36,4 +37,18 @@ export async function requestRebootAction(host: string): Promise<{ ok: true } | 
   if (!updated.count) return { ok: false, error: "Datorn finns inte längre." };
   revalidatePath("/", "layout");
   return { ok: true };
+}
+
+/**
+ * Android: a new one-time enrollment code (valid a day), shown once. Revokes the device's current
+ * token, so the tablet has to be enrolled again with the code.
+ */
+export async function newEnrollCodeAction(host: string): Promise<{ ok: true; code: string; expiresAt: string } | { ok: false; error: string }> {
+  await requireAdmin();
+  const c = await db.computer.findUnique({ where: { host }, select: { platform: true } });
+  if (!c) return { ok: false, error: "Enheten finns inte längre." };
+  if (c.platform !== "android") return { ok: false, error: "Bara Android-enheter skrivs in med kod." };
+  const { code, expiresAt } = await newEnrollCode(host);
+  revalidatePath("/", "layout");
+  return { ok: true, code, expiresAt: expiresAt.toISOString() };
 }

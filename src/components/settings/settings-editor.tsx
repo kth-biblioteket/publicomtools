@@ -20,7 +20,7 @@ type Drafts = Record<string, string | null>;
 const LINK = "text-[12.5px] font-semibold text-kth-blue underline underline-offset-2 hover:text-select-ink";
 
 function kindOf(target: string): Kind {
-  return target === "base" ? "base" : target.startsWith("profile:") ? "profile" : "host";
+  return target === "base" || target.startsWith("base:") ? "base" : target.startsWith("profile:") ? "profile" : "host";
 }
 
 export function SettingsEditor({ data, title }: { data: SettingsData; title: string }) {

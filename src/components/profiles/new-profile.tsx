@@ -2,15 +2,17 @@
 
 import { useActionState, useState } from "react";
 import { createProfileAction } from "@/app/(admin)/config/profile-actions";
+import { PLATFORMS, PLATFORM_LABEL, type Platform } from "@/lib/platforms";
 
 function slug(label: string) {
   return label.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
 }
 
 /** "Ny profil": name, optional copy of an existing profile. */
-export function NewProfile({ profiles }: { profiles: { name: string; label: string }[] }) {
+export function NewProfile({ profiles }: { profiles: { name: string; label: string; platform: Platform }[] }) {
   const [open, setOpen] = useState(false);
   const [label, setLabel] = useState("");
+  const [platform, setPlatform] = useState<Platform>("linux");
   const [state, action, pending] = useActionState(createProfileAction, undefined);
 
   return (
@@ -22,6 +24,17 @@ export function NewProfile({ profiles }: { profiles: { name: string; label: stri
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-[rgba(20,24,32,.45)] px-4 pt-[12vh]" onKeyDown={(e) => e.key === "Escape" && setOpen(false)}>
           <form action={action} role="dialog" aria-modal="true" aria-labelledby="np-h" className="flex w-full max-w-[560px] flex-col gap-3.5 rounded-2xl bg-white p-6 shadow-2xl">
             <h2 id="np-h" className="text-xl font-extrabold">Ny profil</h2>
+            <label className="flex flex-col gap-1.5 text-[13.5px] font-bold">
+              För
+              <select
+                name="platform"
+                value={platform}
+                onChange={(e) => setPlatform(e.target.value as Platform)}
+                className="h-[38px] rounded-lg border border-field bg-white px-2.5 text-sm font-normal"
+              >
+                {PLATFORMS.map((p) => <option key={p} value={p}>{PLATFORM_LABEL[p]}</option>)}
+              </select>
+            </label>
             <div className="grid gap-3.5 sm:grid-cols-2">
               <label className="flex flex-col gap-1.5 text-[13.5px] font-bold">
                 Namn
@@ -29,9 +42,9 @@ export function NewProfile({ profiles }: { profiles: { name: string; label: stri
               </label>
               <label className="flex flex-col gap-1.5 text-[13.5px] font-bold">
                 Börja från
-                <select name="copyFrom" className="h-[38px] rounded-lg border border-field bg-white px-2.5 text-sm font-normal">
+                <select key={platform} name="copyFrom" className="h-[38px] rounded-lg border border-field bg-white px-2.5 text-sm font-normal">
                   <option value="">Tom profil</option>
-                  {profiles.map((p) => <option key={p.name} value={p.name}>Kopia av {p.label}</option>)}
+                  {profiles.filter((p) => p.platform === platform).map((p) => <option key={p.name} value={p.name}>Kopia av {p.label}</option>)}
                 </select>
               </label>
             </div>

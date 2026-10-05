@@ -19,7 +19,8 @@ export const heartbeatSchema = z.object({
   uptimeSeconds: z.number().int().nonnegative(),
   os: z.string().max(200).optional(),
   kernel: z.string().max(100).optional(),
-  guestService: z.string().max(40),
+  /** Linux: systemctl is-active guest.service. Android sends pageLoaded instead. */
+  guestService: z.string().max(40).optional(),
   sessionStartedAt: z.string().max(40).optional(),
   guestRestarts: z.number().int().optional(),
   failedUnits: z.array(z.string().max(200)).max(50).default([]),
@@ -29,6 +30,18 @@ export const heartbeatSchema = z.object({
   configVersion: z.string().max(64).optional(),
   /** Minutes between heartbeats (HEARTBEAT_INTERVAL as the computer applies it) */
   intervalMinutes: z.number().int().min(1).max(60).optional(),
+
+  // Android (PubLiKiosk)
+  platform: z.enum(["linux", "android"]).optional(),
+  appVersion: z.string().max(40).optional(),
+  model: z.string().max(100).optional(),
+  webViewVersion: z.string().max(40).optional(),
+  batteryPercent: z.number().int().min(0).max(100).optional(),
+  charging: z.boolean().optional(),
+  /** The start page has loaded (false = it failed, e.g. no network or a page error) */
+  pageLoaded: z.boolean().optional(),
+  /** Device owner and locked in kiosk mode */
+  kioskLocked: z.boolean().optional(),
 });
 
 export type HeartbeatStatus = z.infer<typeof heartbeatSchema>;

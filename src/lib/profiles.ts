@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { displayName } from "@/lib/names";
+import { asPlatform, type Platform } from "@/lib/platforms";
 
 /**
  * Profiles: a named set of settings for one kind of computer. `name` is the id the
@@ -9,6 +10,7 @@ import { displayName } from "@/lib/names";
 
 export type ProfileSummary = {
   name: string;
+  platform: Platform;
   label: string;
   description: string | null;
   keyCount: number;
@@ -28,6 +30,7 @@ export async function listProfileSummaries(): Promise<ProfileSummary[]> {
   return layers
     .map((l) => ({
       name: l.name,
+      platform: asPlatform(l.platform),
       label: l.label || l.name,
       description: l.description,
       keyCount: Object.keys((l.values ?? {}) as object).length,
@@ -47,7 +50,13 @@ export function profileId(label: string): string {
     .slice(0, 40);
 }
 
-export async function createProfile(label: string, copyFrom: string | null, description: string | null, changedBy: string) {
+export async function createProfile(
+  label: string,
+  copyFrom: string | null,
+  description: string | null,
+  changedBy: string,
+  platform: Platform = "linux"
+) {
   const name = profileId(label);
   if (!name) return { ok: false as const, error: "Skriv ett namn med minst en bokstav eller siffra." };
   const existing = await db.configLayer.findUnique({ where: { kind_name: { kind: "profile", name } } });
@@ -57,11 +66,12 @@ export async function createProfile(label: string, copyFrom: string | null, desc
   if (copyFrom) {
     const src = await db.configLayer.findUnique({ where: { kind_name: { kind: "profile", name: copyFrom } } });
     if (!src) return { ok: false as const, error: "Profilen du vill kopiera finns inte." };
+    if (asPlatform(src.platform) !== platform) return { ok: false as const, error: "Profilen du vill kopiera är för en annan sorts enhet." };
     values = (src.values ?? {}) as Record<string, string>;
   }
   const changes = Object.entries(values).map(([key, after]) => ({ key, before: null, after }));
   await db.$transaction([
-    db.configLayer.create({ data: { kind: "profile", name, label: label.trim(), description, values } }),
+    db.configLayer.create({ data: { kind: "profile", name, platform, label: label.trim(), description, values } }),
     db.configChange.create({
       data: {
         target: `profile:${name}`,

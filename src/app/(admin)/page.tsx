@@ -3,18 +3,19 @@ import { listComputers } from "@/lib/computers";
 import { formatAgo, formatWhen } from "@/lib/status";
 import { ComputerList, type ComputerRow } from "./computer-list";
 import { AddComputer } from "./add-computer";
-import { getProfileLabels } from "@/lib/profiles";
+import { listProfileSummaries } from "@/lib/profiles";
 
 export const dynamic = "force-dynamic";
 
 export default async function ComputersPage() {
   await requireAdmin();
   const now = new Date();
-  const [computers, profileLabels] = await Promise.all([listComputers(), getProfileLabels()]);
-  const profiles = [...profileLabels].map(([name, label]) => ({ name, label })).sort((a, b) => a.label.localeCompare(b.label, "sv"));
+  const [computers, summaries] = await Promise.all([listComputers(), listProfileSummaries()]);
+  const profiles = summaries.map((p) => ({ name: p.name, label: p.label, platform: p.platform }));
 
   const rows: ComputerRow[] = computers.map((c) => ({
     host: c.host,
+    platform: c.platform,
     panelName: c.label && c.computerName && c.computerName !== c.label ? c.computerName : null,
     name: c.name,
     profile: c.profileLabel,
@@ -33,7 +34,7 @@ export default async function ComputersPage() {
         <div>
           <h1 className="text-[26px] font-extrabold tracking-tight">Datorer</h1>
           <p className="mt-1 text-sm text-muted">
-            {rows.length} datorer och skyltar. De som behöver åtgärdas visas först.
+            {rows.length} datorer, skyltar och enheter. De som behöver åtgärdas visas först.
           </p>
         </div>
         <AddComputer profiles={profiles} />

@@ -2,6 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { db } from "@/lib/db";
 import { withBasePath } from "@/lib/base-path";
+import { asPlatform, baseName } from "@/lib/platforms";
 
 /**
  * Guest computer configuration, served to the computers instead of the static
@@ -80,19 +81,22 @@ export function entryValues(entries: EffectiveConfig): ConfigValues {
 
 /** The saved layers for one computer, or null for an unknown host. */
 export async function loadLayers(host: string): Promise<Layers | null> {
-  const computer = await db.computer.findUnique({ where: { host }, select: { profile: true, overrides: true } });
+  const computer = await db.computer.findUnique({ where: { host }, select: { profile: true, overrides: true, platform: true } });
   if (!computer) return null;
+  const platform = asPlatform(computer.platform);
 
   const [base, profile] = await Promise.all([
-    db.configLayer.findUnique({ where: { kind_name: { kind: "base", name: "" } } }),
+    db.configLayer.findUnique({ where: { kind_name: { kind: "base", name: baseName(platform) } } }),
     computer.profile
       ? db.configLayer.findUnique({ where: { kind_name: { kind: "profile", name: computer.profile } } })
       : Promise.resolve(null),
   ]);
+  // A profile of another platform (should not happen: the admin only offers the computer's own) gives nothing
+  const profileValues = profile && asPlatform(profile.platform) === platform ? asValues(profile.values) : {};
 
   return {
     base: asValues(base?.values),
-    profile: computer.profile ? { name: computer.profile, values: asValues(profile?.values) } : null,
+    profile: computer.profile ? { name: computer.profile, values: profileValues } : null,
     host: { host, overrides: asValues(computer.overrides) },
   };
 }

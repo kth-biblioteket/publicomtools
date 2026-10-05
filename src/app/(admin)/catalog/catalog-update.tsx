@@ -4,11 +4,23 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import type { CatalogPreview } from "@/lib/catalog";
 import { previewCatalogAction, updateCatalogAction, type Upload } from "./actions";
+import type { Platform } from "@/lib/platforms";
 
 const TAG = "inline-flex h-[22px] items-center rounded-md px-2 text-xs font-bold";
 
 /** "Hämta från stable": show what would change, then apply. */
-export function CatalogUpdate({ refLabel, keysInUse }: { refLabel: string; keysInUse: string[] }) {
+export function CatalogUpdate({
+  platform,
+  refLabel,
+  repoFile,
+  keysInUse,
+}: {
+  platform: Platform;
+  refLabel: string;
+  /** e.g. "publicom/config/catalog.json", shown next to the file picker */
+  repoFile: string;
+  keysInUse: string[];
+}) {
   const router = useRouter();
   const [preview, setPreview] = useState<CatalogPreview | null>(null);
   /** Set when the preview came from a file instead of GitHub; applied with the same text. */
@@ -22,7 +34,7 @@ export function CatalogUpdate({ refLabel, keysInUse }: { refLabel: string; keysI
       setError(null);
       setDone(null);
       setUpload(from);
-      const res = await previewCatalogAction(from);
+      const res = await previewCatalogAction(platform, from);
       if (!res.ok) return setError(res.error);
       setPreview(res.preview);
     });
@@ -33,7 +45,7 @@ export function CatalogUpdate({ refLabel, keysInUse }: { refLabel: string; keysI
   const apply = () =>
     start(async () => {
       if (!preview) return;
-      const res = await updateCatalogAction(preview.version, upload);
+      const res = await updateCatalogAction(platform, preview.version, upload);
       if (!res.ok) return setError(res.error);
       setPreview(null);
       setDone(`Katalogen är uppdaterad: ${res.keys} inställningar.`);
@@ -60,7 +72,7 @@ export function CatalogUpdate({ refLabel, keysInUse }: { refLabel: string; keysI
             }}
           />
         </label>
-        <span className="text-[13px] text-muted">till exempel <span className="font-mono">publicom/config/catalog.json</span></span>
+        <span className="text-[13px] text-muted">till exempel <span className="font-mono">{repoFile}</span></span>
         {done && <span role="status" className="text-sm font-semibold text-ok-ink">{done}</span>}
         {error && <span role="alert" className="text-sm font-semibold text-bad-ink">{error}</span>}
       </div>

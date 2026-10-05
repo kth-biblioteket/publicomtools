@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { createProfile, deleteProfile, updateProfileMeta } from "@/lib/profiles";
+import { asPlatform } from "@/lib/platforms";
 
 export type ProfileFormState = { error?: string } | undefined;
 
@@ -12,7 +13,8 @@ export async function createProfileAction(_prev: ProfileFormState, form: FormDat
   const label = String(form.get("label") ?? "").trim().slice(0, 80);
   const copyFrom = String(form.get("copyFrom") ?? "") || null;
   const description = String(form.get("description") ?? "").trim().slice(0, 200) || null;
-  const res = await createProfile(label, copyFrom, description, user.email);
+  const platform = asPlatform(form.get("platform"));
+  const res = await createProfile(label, copyFrom, description, user.email, platform);
   if (!res.ok) return { error: res.error };
   revalidatePath("/", "layout");
   redirect(`/config/profiles/${res.name}`);

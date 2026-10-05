@@ -8,9 +8,11 @@ import type { ConfigState } from "@/lib/computers";
 import { HealthBadge } from "@/components/health-badge";
 import { Chip } from "@/components/ui/chip";
 import { PauseIcon, PlayIcon, SearchIcon } from "@/components/ui/icons";
+import { PLATFORMS, PLATFORM_LABEL, PLATFORM_SHORT, type Platform } from "@/lib/platforms";
 
 export type ComputerRow = {
   host: string;
+  platform: Platform;
   name: string;
   /** The computer's own name, when the admin list shows another one */
   panelName: string | null;
@@ -25,8 +27,10 @@ type Filter = "all" | "action" | "offline" | "warning" | "pending";
 
 const REFRESH_MS = 30_000;
 
-function ConfigChip({ state }: { state: ConfigState }) {
+function ConfigChip({ state, platform }: { state: ConfigState; platform: Platform }) {
   if (state === "pending") return <Chip tone="draft" title="Inställningar har ändrats efter att datorn senast startade">Väntar på omstart</Chip>;
+  if (state === "new" && platform === "android")
+    return <Chip tone="draft" title="Tillagd i admin, men enheten är inte inskriven och har inte hämtat sina inställningar än">Väntar på inskrivning</Chip>;
   if (state === "new") return <Chip tone="draft" title="Tillagd i admin, men datorn har inte installerats och hämtat sina inställningar än">Väntar på installation</Chip>;
   if (state === "legacy") return <Chip title="Datorn hämtar fortfarande sina inställningar från de gamla configfilerna på GitHub">Gamla configfiler</Chip>;
   return null;
@@ -47,6 +51,7 @@ export function ComputerList({ rows, renderedAt }: { rows: ComputerRow[]; render
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [profile, setProfile] = useState("");
+  const [platform, setPlatform] = useState<Platform | "">("");
   const [paused, setPaused] = useState(false);
 
   useEffect(() => {
@@ -63,6 +68,7 @@ export function ComputerList({ rows, renderedAt }: { rows: ComputerRow[]; render
     pending: rows.filter((r) => r.configState === "pending").length,
   };
   const profiles = useMemo(() => [...new Set(rows.map((r) => r.profile).filter((p): p is string => !!p))].sort(), [rows]);
+  const platforms = PLATFORMS.filter((p) => rows.some((r) => r.platform === p));
 
   const needle = q.trim().toLowerCase();
   const shown = rows.filter(
@@ -72,6 +78,7 @@ export function ComputerList({ rows, renderedAt }: { rows: ComputerRow[]; render
         (filter === "pending" && r.configState === "pending") ||
         r.health === filter) &&
       (!profile || r.profile === profile) &&
+      (!platform || r.platform === platform) &&
       (!needle || `${r.name} ${r.panelName ?? ""} ${r.host} ${r.profile ?? ""}`.toLowerCase().includes(needle))
   );
 
@@ -129,6 +136,23 @@ export function ComputerList({ rows, renderedAt }: { rows: ComputerRow[]; render
             </button>
           ))}
         </div>
+
+        {platforms.length > 1 && (
+          <>
+            <label htmlFor="platform" className="sr-only">Sort</label>
+            <select
+              id="platform"
+              value={platform}
+              onChange={(e) => setPlatform(e.target.value as Platform | "")}
+              className="h-[38px] rounded-lg border border-field bg-white px-2.5 text-sm"
+            >
+              <option value="">Alla sorter</option>
+              {platforms.map((p) => (
+                <option key={p} value={p}>{PLATFORM_LABEL[p]}</option>
+              ))}
+            </select>
+          </>
+        )}
 
         {profiles.length > 1 && (
           <>
@@ -195,6 +219,7 @@ export function ComputerList({ rows, renderedAt }: { rows: ComputerRow[]; render
                       <Link href={`/computers/${r.host}`} className="font-bold text-ink hover:text-kth-blue hover:underline">
                         {r.name}
                       </Link>
+                      {r.platform !== "linux" && <span className="ml-2 align-middle"><Chip>{PLATFORM_SHORT[r.platform]}</Chip></span>}
                       <div className="mt-0.5 font-mono text-[12.5px] text-muted">
                         {r.host}
                         {r.panelName && <span className="font-sans"> · i panelen: {r.panelName}</span>}
@@ -206,7 +231,7 @@ export function ComputerList({ rows, renderedAt }: { rows: ComputerRow[]; render
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap items-center gap-2">
                         {r.problems.length > 0 && <Todo problems={r.problems} />}
-                        <ConfigChip state={r.configState} />
+                        <ConfigChip state={r.configState} platform={r.platform} />
                         {!r.problems.length && r.configState === "current" && <span className="text-faint">–</span>}
                       </div>
                     </td>
@@ -225,7 +250,10 @@ export function ComputerList({ rows, renderedAt }: { rows: ComputerRow[]; render
                 className="flex flex-col gap-1.5 rounded-xl border border-line bg-white px-4 py-3.5 text-ink"
               >
                 <span className="flex items-center justify-between gap-2">
-                  <span className="text-base font-bold">{r.name}</span>
+                  <span className="text-base font-bold">
+                    {r.name}
+                    {r.platform !== "linux" && <span className="ml-2 align-middle"><Chip>{PLATFORM_SHORT[r.platform]}</Chip></span>}
+                  </span>
                   <HealthBadge health={r.health} />
                 </span>
                 <span className="font-mono text-[12.5px] text-muted">
@@ -233,7 +261,7 @@ export function ComputerList({ rows, renderedAt }: { rows: ComputerRow[]; render
                   {r.profile ? ` · ${r.profile}` : ""} · {r.seen}
                 </span>
                 {r.problems.length > 0 && <span className="text-sm"><Todo problems={r.problems} /></span>}
-                {r.configState !== "current" && <span><ConfigChip state={r.configState} /></span>}
+                {r.configState !== "current" && <span><ConfigChip state={r.configState} platform={r.platform} /></span>}
               </Link>
             ))}
           </div>

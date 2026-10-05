@@ -21,6 +21,7 @@ export function formatWithin(minutes: number): string {
 /** "Ingen kontakt" after three missed heartbeats. */
 const MISSED_HEARTBEATS = 3;
 const LOW_DISK_PERCENT = 10;
+const LOW_BATTERY_PERCENT = 20;
 
 export type Health = "ok" | "warning" | "offline";
 
@@ -38,7 +39,10 @@ export function evaluate(lastSeenAt: Date, status: HeartbeatStatus, now = new Da
       problems: [
         {
           text: `Ingen kontakt sedan ${formatWhen(lastSeenAt, now)}`,
-          hint: "Kontrollera att datorn är påslagen och att nätverkskabeln sitter i.",
+          hint:
+            status.platform === "android"
+              ? "Kontrollera att enheten är påslagen, har ström och är ansluten till Wi-Fi."
+              : "Kontrollera att datorn är påslagen och att nätverkskabeln sitter i.",
           detail: `senaste heartbeat ${formatTime(lastSeenAt)}`,
         },
       ],
@@ -46,7 +50,27 @@ export function evaluate(lastSeenAt: Date, status: HeartbeatStatus, now = new Da
   }
 
   const problems: Problem[] = [];
-  if (status.guestService !== "active") {
+  if (status.platform === "android") {
+    if (status.kioskLocked === false)
+      problems.push({
+        text: "Enheten är inte låst i kioskläge",
+        hint: "Besökare kan ta sig ut ur appen. Starta appen igen, eller kontrollera att den är device owner.",
+        detail: "kioskLocked: false",
+      });
+    if (status.pageLoaded === false)
+      problems.push({
+        text: "Startsidan har inte laddats",
+        hint: "Kontrollera nätverket och startsidans adress. Starta om enheten om det inte löser sig.",
+        detail: "pageLoaded: false",
+      });
+    if (status.batteryPercent !== undefined && status.batteryPercent < LOW_BATTERY_PERCENT && !status.charging)
+      problems.push({
+        text: `Batteriet är nästan slut (${status.batteryPercent} %)`,
+        hint: "Kontrollera att laddaren sitter i.",
+        detail: `${status.batteryPercent} %, laddar inte`,
+      });
+  }
+  if (status.guestService !== undefined && status.guestService !== "active") {
     problems.push({
       text: "Gästprogrammet är inte igång",
       hint: "Vänta några minuter. Starta om datorn om det inte löser sig.",

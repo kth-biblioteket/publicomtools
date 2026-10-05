@@ -6,6 +6,7 @@ import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Prisma } from "@/generated/prisma/client";
 import { PROFILE_KEY } from "@/lib/settings-shared";
+import { asPlatform } from "@/lib/platforms";
 
 export type AddComputerState = { error?: string } | undefined;
 
@@ -21,24 +22,38 @@ export async function addComputerAction(_prev: AddComputerState, form: FormData)
   const host = String(form.get("host") ?? "").trim().toLowerCase();
   const profile = String(form.get("profile") ?? "") || null;
   const label = String(form.get("label") ?? "").trim().slice(0, 80) || null;
+  const platform = asPlatform(form.get("platform"));
 
   if (!HOST.test(host)) return { error: "Värdnamnet får bara innehålla små bokstäver a–z, siffror och bindestreck, och börja med en bokstav eller siffra." };
   if (await db.computer.findUnique({ where: { host }, select: { host: true } }))
     return { error: `Det finns redan en dator som heter ${host}.` };
-  if (profile && !(await db.configLayer.findUnique({ where: { kind_name: { kind: "profile", name: profile } }, select: { id: true } })))
-    return { error: "Profilen finns inte längre. Ladda om sidan." };
+  const layer = profile
+    ? await db.configLayer.findUnique({ where: { kind_name: { kind: "profile", name: profile } }, select: { platform: true } })
+    : null;
+  if (profile && (!layer || asPlatform(layer.platform) !== platform)) return { error: "Profilen finns inte längre. Ladda om sidan." };
 
   try {
     await db.$transaction([
       db.computer.create({
-        data: { host, hostname: host, lastSeenAt: new Date(0), status: {}, profile, label, addedBy: user.email, configUpdatedAt: new Date(), configUpdatedBy: user.email },
+        data: {
+          host,
+          hostname: host,
+          platform,
+          lastSeenAt: new Date(0),
+          status: {},
+          profile,
+          label,
+          addedBy: user.email,
+          configUpdatedAt: new Date(),
+          configUpdatedBy: user.email,
+        },
       }),
       db.configChange.create({
         data: {
           target: `host:${host}`,
           snapshot: { profile, overrides: {} },
           changedBy: user.email,
-          note: "Ny dator",
+          note: platform === "android" ? "Ny Android-enhet" : "Ny dator",
           changes: [{ key: PROFILE_KEY, before: null, after: profile }],
         },
       }),
@@ -50,5 +65,6 @@ export async function addComputerAction(_prev: AddComputerState, form: FormData)
     throw e;
   }
   revalidatePath("/", "layout");
-  redirect(`/computers/${host}/settings`);
+  // Android: next step is the enrollment code (Teknik)
+  redirect(platform === "android" ? `/computers/${host}/tech` : `/computers/${host}/settings`);
 }

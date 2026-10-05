@@ -13,6 +13,8 @@ model Computer {
   /// The publicom config name (config/hosts/<host>.env), e.g. "gc1".
   host         String      @id
   hostname     String
+  /// "linux" (publicom) or "android" (PubLiKiosk): which catalog, base layer and profiles apply
+  platform     String      @default("linux")
   profile      String?
   computerType String?
   /// COMPUTER_NAME as the computer reports it (shown in its panel)
@@ -45,6 +47,14 @@ model Computer {
   /// booted after this time (boot time = heartbeat time - uptime); then cleared.
   rebootRequestedAt DateTime?
   rebootRequestedBy String?
+
+  /// Android: SHA-256 of the device's own token (POST /api/device/enroll). Linux computers use
+  /// the shared PUBLICOM_DEVICE_TOKEN.
+  tokenHash       String?   @unique
+  /// SHA-256 of a one-time enrollment code from the admin, valid until enrollExpiresAt
+  enrollCodeHash  String?   @unique
+  enrollExpiresAt DateTime?
+  enrolledAt      DateTime?
 }
 
 /// A config layer: the shared base (kind="base", name="") or a profile
@@ -53,6 +63,8 @@ model Computer {
 model ConfigLayer {
   id        String   @id @default(cuid())
   kind      String
+  /// "linux" | "android". The base layer of a platform is kind="base", name="" (linux) or the platform
+  platform  String   @default("linux")
   /// Profile id used by the computers (PUBLICOM_PROFILE); fixed once created
   name      String
   /// Display name in the admin UI, e.g. "Sökdator"
@@ -69,7 +81,9 @@ model ConfigLayer {
 /// A cache of config/catalog.json in the publicom repo (the source of truth,
 /// written next to the code that reads each key); refreshed by src/lib/catalog.ts.
 model ConfigKey {
-  key          String  @id
+  /// "linux" (publicom's catalog) | "android" (PubLiKiosk's catalog)
+  platform     String  @default("linux")
+  key          String
   label        String
   /// Group id from the catalog's `groups` (ConfigCatalog.groups)
   group        String
@@ -90,11 +104,13 @@ model ConfigKey {
   /// Belongs to the single computer (name, resource id …): kept when the computer changes profile
   perComputer  Boolean @default(false)
   sortOrder    Int     @default(0)
+
+  @@id([platform, key])
 }
 
-/// Where the ConfigKey cache came from. A single row (id = 1).
+/// Where the ConfigKey cache came from. One row per platform.
 model ConfigCatalog {
-  id        Int      @id @default(1)
+  platform  String   @id @default("linux")
   /// e.g. "kth-biblioteket/publicom@stable:config/catalog.json" or "file:/path"
   source    String
   /// Git blob sha (or content hash for a local file)

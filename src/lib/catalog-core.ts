@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { z } from "zod";
 import { Prisma, type PrismaClient } from "../generated/prisma/client";
+import type { Platform } from "./platforms";
 
 /**
  * The config key catalog: which settings the guest computers understand, with the
@@ -146,15 +147,16 @@ export function diffCatalog(stored: StoredKey[], incoming: CatalogFile): Catalog
   return diff;
 }
 
-/** Replace the ConfigKey cache with the catalog. Values in layers are never touched. */
+/** Replace a platform's ConfigKey cache with the catalog. Values in layers are never touched. */
 export async function applyCatalog(
   db: PrismaClient,
+  platform: Platform,
   catalog: CatalogFile,
   meta: { source: string; version: string; fetchedBy: string }
 ) {
   const keys = catalog.keys.map((k) => k.key);
   await db.$transaction([
-    db.configKey.deleteMany({ where: { key: { notIn: keys } } }),
+    db.configKey.deleteMany({ where: { platform, key: { notIn: keys } } }),
     ...catalog.keys.map((k, i) => {
       const data = {
         label: k.label,
@@ -171,11 +173,15 @@ export async function applyCatalog(
         perComputer: !!k.perComputer,
         sortOrder: i,
       };
-      return db.configKey.upsert({ where: { key: k.key }, create: { key: k.key, ...data }, update: data });
+      return db.configKey.upsert({
+        where: { platform_key: { platform, key: k.key } },
+        create: { platform, key: k.key, ...data },
+        update: data,
+      });
     }),
     db.configCatalog.upsert({
-      where: { id: 1 },
-      create: { id: 1, ...meta, groups: catalog.groups, fetchedAt: new Date() },
+      where: { platform },
+      create: { platform, ...meta, groups: catalog.groups, fetchedAt: new Date() },
       update: { ...meta, groups: catalog.groups, fetchedAt: new Date() },
     }),
   ]);
@@ -183,20 +189,35 @@ export async function applyCatalog(
 
 export type CatalogSource = { text: string; source: string; version: string };
 
+/** Where each platform's catalog lives, and the env variables that override it. */
+export const CATALOG_SOURCES: Record<Platform, { env: string; repo: string; ref: string }> = {
+  linux: { env: "PUBLICOM_CATALOG", repo: "kth-biblioteket/publicom", ref: "stable" },
+  android: { env: "ANDROID_CATALOG", repo: "kth-biblioteket/publikiosk", ref: "main" },
+};
+
+/** The branch a platform's catalog is read from ("stable", "main"), or "lokal fil". */
+export function catalogRefLabel(platform: Platform, env: NodeJS.ProcessEnv = process.env): string {
+  const c = CATALOG_SOURCES[platform];
+  return env[`${c.env}_FILE`] ? "lokal fil" : env[`${c.env}_REF`] || c.ref;
+}
+
 /**
- * config/catalog.json from publicom on the branch the fleet runs (PUBLICOM_CATALOG_REF,
- * default stable), so the admin UI never offers a key the computers don't understand.
- * PUBLICOM_CATALOG_FILE reads a local checkout instead (dev).
+ * config/catalog.json from the platform's repo, on the branch its devices run (linux: publicom
+ * stable, which the fleet runs; android: publikiosk main, which is released to the tablets), so
+ * the admin UI never offers a key the devices don't understand. <PREFIX>_REPO / _REF override
+ * that, and <PREFIX>_FILE reads a local checkout instead (dev); PREFIX is PUBLICOM_CATALOG or
+ * ANDROID_CATALOG.
  */
-export async function fetchCatalogSource(env: NodeJS.ProcessEnv = process.env): Promise<CatalogSource> {
-  const file = env.PUBLICOM_CATALOG_FILE;
+export async function fetchCatalogSource(platform: Platform = "linux", env: NodeJS.ProcessEnv = process.env): Promise<CatalogSource> {
+  const c = CATALOG_SOURCES[platform];
+  const file = env[`${c.env}_FILE`];
   if (file) {
     const text = await readFile(file, "utf8");
     return { text, source: `file:${file}`, version: contentHash(text) };
   }
 
-  const repo = env.PUBLICOM_CATALOG_REPO || "kth-biblioteket/publicom";
-  const ref = env.PUBLICOM_CATALOG_REF || "stable";
+  const repo = env[`${c.env}_REPO`] || c.repo;
+  const ref = env[`${c.env}_REF`] || c.ref;
   const path = "config/catalog.json";
   const res = await fetch(`https://api.github.com/repos/${repo}/contents/${path}?ref=${encodeURIComponent(ref)}`, {
     headers: { Accept: "application/vnd.github+json", "User-Agent": "publicomtools" },

@@ -82,7 +82,7 @@ export async function listChanges(opts: { targets?: Target[]; filter?: LogFilter
     ? { target: { in: opts.targets } }
     : opts.filter && opts.filter !== "all"
       ? opts.filter === "base"
-        ? { target: "base" }
+        ? { OR: [{ target: "base" }, { target: { startsWith: "base:" } }] }
         : { target: { startsWith: `${opts.filter}:` } }
       : {};
   const rows = await db.configChange.findMany({ where, orderBy: { changedAt: "desc" }, take: opts.limit ?? 100 });

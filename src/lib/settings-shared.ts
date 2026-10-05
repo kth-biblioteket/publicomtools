@@ -24,7 +24,7 @@ export type CatalogEntry = {
 
 export type Group = { id: string; label: string };
 
-/** "base" | "profile:<name>" | "host:<host>" */
+/** "base" (Linux) | "base:<platform>" | "profile:<name>" | "host:<host>" */
 export type Target = string;
 
 /** A change as saved in ConfigChange.changes. null = not set in the layer. "__profile" = a computer's profile. */
@@ -84,6 +84,7 @@ export function formatValue(meta: CatalogEntry | undefined, value: string | null
 
 export function targetLabel(target: Target, names?: { host?: string | null }): string {
   if (target === "base") return "Grundinställningar";
+  if (target.startsWith("base:")) return `Grundinställningar ${target.slice(5)}`;
   if (target.startsWith("profile:")) return `Profil ${target.slice(8)}`;
   return names?.host || target.slice(5);
 }

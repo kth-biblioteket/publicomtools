@@ -7,13 +7,14 @@ import { getComputerConfig } from "@/lib/config";
 import { formatAgo, formatDuration, formatWhen } from "@/lib/status";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { AlertIcon } from "@/components/ui/icons";
+import { baseTarget } from "@/lib/platforms";
 
 export const dynamic = "force-dynamic";
 
 const CARD = "min-w-0 rounded-xl border border-line bg-white px-4 py-5 shadow-sm sm:px-6";
 
 function targetLabel(target: string) {
-  if (target === "base") return "Grundinställningar";
+  if (target === "base" || target.startsWith("base:")) return "Grundinställningar";
   if (target.startsWith("profile:")) return "Profilen";
   return "Den här datorn";
 }
@@ -29,7 +30,7 @@ export default async function ComputerOverviewPage({ params }: PageProps<"/compu
   const s = c.status;
   const ownCount = Object.keys(config.overrides).length;
   const changes = await db.configChange.findMany({
-    where: { target: { in: ["base", `host:${host}`, ...(c.profile ? [`profile:${c.profile}`] : [])] } },
+    where: { target: { in: [baseTarget(c.platform), `host:${host}`, ...(c.profile ? [`profile:${c.profile}`] : [])] } },
     orderBy: { changedAt: "desc" },
     take: 3,
     select: { id: true, target: true, changedAt: true, changedBy: true },
@@ -72,8 +73,19 @@ export default async function ComputerOverviewPage({ params }: PageProps<"/compu
             <dd>{s ? `${formatAgo(c.lastSeenAt, now)} (${formatWhen(c.lastSeenAt, now)})` : "aldrig"}</dd>
             <dt className="text-muted">Igång sedan</dt>
             <dd>{s ? formatDuration(s.uptimeSeconds) : "–"}</dd>
-            <dt className="text-muted">Gästprogrammet</dt>
-            <dd>{s ? (s.guestService === "active" ? "Igång" : s.guestService) : "–"}</dd>
+            {c.platform === "android" ? (
+              <>
+                <dt className="text-muted">Startsidan</dt>
+                <dd>{s?.pageLoaded === undefined ? "–" : s.pageLoaded ? "Laddad" : "Inte laddad"}</dd>
+                <dt className="text-muted">Batteri</dt>
+                <dd>{s?.batteryPercent === undefined ? "–" : `${s.batteryPercent} %${s.charging ? ", laddar" : ""}`}</dd>
+              </>
+            ) : (
+              <>
+                <dt className="text-muted">Gästprogrammet</dt>
+                <dd>{s?.guestService ? (s.guestService === "active" ? "Igång" : s.guestService) : "–"}</dd>
+              </>
+            )}
             <dt className="text-muted">Profil</dt>
             <dd>
               {c.profile ? (
@@ -90,7 +102,9 @@ export default async function ComputerOverviewPage({ params }: PageProps<"/compu
             <dt className="text-muted">Inställningar</dt>
             <dd>
               {c.configState === "new"
-                ? "Inte hämtade än (datorn är inte installerad)"
+                ? c.platform === "android"
+                  ? "Inte hämtade än (enheten är inte inskriven)"
+                  : "Inte hämtade än (datorn är inte installerad)"
                 : c.configState === "legacy"
                 ? "Hämtas från de gamla configfilerna på GitHub"
                 : `Hämtade ${formatWhen(c.configFetchedAt!, now)}${c.configState === "pending" ? ", ändrade efter det" : ""}`}

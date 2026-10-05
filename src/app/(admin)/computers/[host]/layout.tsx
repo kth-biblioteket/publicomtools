@@ -46,15 +46,16 @@ export default async function ComputerLayout({ params, children }: LayoutProps<"
           {c.configState === "pending" && (
             <>
               <Chip tone="draft">Väntar på omstart</Chip>
-              <ReloadButton
+              {/* PubLiKiosk gets "Hämta nu" and "Starta om" in a later version */}
+              {c.platform !== "android" && <ReloadButton
                 host={c.host}
                 requestedAt={c.reloadRequestedAt ? clock(c.reloadRequestedAt) : null}
                 within={formatWithin(heartbeatInterval(c.status))}
-              />
+              />}
             </>
           )}
           {/* Datorer med gamla configfiler, eller som inte är installerade, kör inte koden som kan starta om */}
-          {(c.configState === "current" || c.configState === "pending") && !c.reloadRequestedAt && (
+          {c.platform !== "android" && (c.configState === "current" || c.configState === "pending") && !c.reloadRequestedAt && (
             <RebootButton
               host={c.host}
               name={c.name}
@@ -63,7 +64,7 @@ export default async function ComputerLayout({ params, children }: LayoutProps<"
             />
           )}
           {c.configState === "legacy" && <Chip>Gamla configfiler</Chip>}
-          {c.configState === "new" && <Chip tone="draft">Väntar på installation</Chip>}
+          {c.configState === "new" && <Chip tone="draft">{c.platform === "android" ? "Väntar på inskrivning" : "Väntar på installation"}</Chip>}
         </div>
       </div>
       <Tabs

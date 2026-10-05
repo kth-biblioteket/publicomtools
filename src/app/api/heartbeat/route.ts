@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { checkDeviceAuth } from "@/lib/device-auth";
+import { authenticateDevice, mayActFor } from "@/lib/device-auth";
 import { heartbeatSchema, HEARTBEAT_RETENTION_DAYS } from "@/lib/heartbeat";
 import { rebootPending, reloadPending } from "@/lib/reload";
 import { loadLayers, mergeLayers } from "@/lib/config";
@@ -15,8 +15,8 @@ function clientIp(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const denied = checkDeviceAuth(request);
-  if (denied) return denied;
+  const auth = await authenticateDevice(request);
+  if ("denied" in auth) return auth.denied;
 
   let body: unknown;
   try {
@@ -30,6 +30,7 @@ export async function POST(request: Request) {
   }
 
   const status = parsed.data;
+  if (!(await mayActFor(auth.identity, status.host))) return Response.json({ error: "forbidden" }, { status: 403 });
   const now = new Date();
   const fields = {
     hostname: status.hostname,

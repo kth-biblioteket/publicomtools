@@ -2,6 +2,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { displayName } from "@/lib/names";
 import { enumOptions, type ConfigValues } from "@/lib/config";
+import { asPlatform, baseName, baseTargetPlatform, type Platform } from "@/lib/platforms";
 import {
   PROFILE_KEY,
   validateValue,
@@ -23,10 +24,10 @@ function asValues(json: unknown): ConfigValues {
   );
 }
 
-export async function getCatalog(): Promise<{ catalog: CatalogEntry[]; groups: Group[] }> {
+export async function getCatalog(platform: Platform): Promise<{ catalog: CatalogEntry[]; groups: Group[] }> {
   const [rows, meta] = await Promise.all([
-    db.configKey.findMany({ orderBy: [{ sortOrder: "asc" }, { key: "asc" }] }),
-    db.configCatalog.findUnique({ where: { id: 1 } }),
+    db.configKey.findMany({ where: { platform }, orderBy: [{ sortOrder: "asc" }, { key: "asc" }] }),
+    db.configCatalog.findUnique({ where: { platform } }),
   ]);
   const catalog: CatalogEntry[] = rows.map((r) => ({
     key: r.key,
@@ -52,6 +53,8 @@ export type ScopeComputer = { host: string; name: string; profile: string | null
 
 export type SettingsData = {
   target: Target;
+  /** Which devices the layer is for: decides catalog, base layer and profiles */
+  platform: Platform;
   catalog: CatalogEntry[];
   groups: Group[];
   /** Values set in this layer */
@@ -68,13 +71,34 @@ export type SettingsData = {
   computers: ScopeComputer[];
 };
 
+/** The platform a target belongs to, or null if it doesn't exist. */
+async function targetPlatform(target: Target): Promise<Platform | null> {
+  const base = baseTargetPlatform(target);
+  if (base) return base;
+  if (target.startsWith("profile:")) {
+    const l = await db.configLayer.findUnique({ where: { kind_name: { kind: "profile", name: target.slice(8) } }, select: { platform: true } });
+    return l ? asPlatform(l.platform) : null;
+  }
+  if (target.startsWith("host:")) {
+    const c = await db.computer.findUnique({ where: { host: target.slice(5) }, select: { platform: true } });
+    return c ? asPlatform(c.platform) : null;
+  }
+  return null;
+}
+
 export async function getSettingsData(target: Target): Promise<SettingsData | null> {
+  const platform = await targetPlatform(target);
+  if (!platform) return null;
   const [{ catalog, groups }, layers, computers] = await Promise.all([
-    getCatalog(),
-    db.configLayer.findMany(),
-    db.computer.findMany({ select: { host: true, computerName: true, label: true, profile: true, overrides: true }, orderBy: { host: "asc" } }),
+    getCatalog(platform),
+    db.configLayer.findMany({ where: { platform } }),
+    db.computer.findMany({
+      where: { platform },
+      select: { host: true, computerName: true, label: true, profile: true, overrides: true },
+      orderBy: { host: "asc" },
+    }),
   ]);
-  const base = asValues(layers.find((l) => l.kind === "base")?.values);
+  const base = asValues(layers.find((l) => l.kind === "base" && l.name === baseName(platform))?.values);
   const profileLayers = layers.filter((l) => l.kind === "profile");
   const profiles = Object.fromEntries(profileLayers.map((l) => [l.name, asValues(l.values)]));
   const profileLabels = Object.fromEntries(profileLayers.map((l) => [l.name, l.label || l.name]));
@@ -87,7 +111,7 @@ export async function getSettingsData(target: Target): Promise<SettingsData | nu
 
   let own: ConfigValues;
   let profile: string | null = null;
-  if (target === "base") own = base;
+  if (baseTargetPlatform(target)) own = base;
   else if (target.startsWith("profile:")) {
     const name = target.slice(8);
     if (!(name in profiles)) return null;
@@ -98,7 +122,7 @@ export async function getSettingsData(target: Target): Promise<SettingsData | nu
     own = asValues(c.overrides);
     profile = c.profile;
   }
-  return { target, catalog, groups, own, base, profiles, profileLabels, profile, computers: scope };
+  return { target, platform, catalog, groups, own, base, profiles, profileLabels, profile, computers: scope };
 }
 
 export type SaveInput = {
@@ -133,7 +157,8 @@ export async function saveSettings(target: Target, input: SaveInput, changedBy: 
 
   const note = input.note?.trim().slice(0, 500) || null;
   const host = target.slice(5);
-  const [kind, name] = target === "base" ? ["base", ""] : ["profile", target.slice(8)];
+  const platform = data.platform;
+  const [kind, name] = baseTargetPlatform(target) ? ["base", baseName(platform)] : ["profile", target.slice(8)];
 
   // Read, check and write in one transaction with the row locked, so two saves of the same
   // layer run one after the other and neither overwrites the other's keys.
@@ -184,7 +209,7 @@ export async function saveSettings(target: Target, input: SaveInput, changedBy: 
       });
       await tx.configChange.create({ data: { ...entry, snapshot: { profile: newProfile, overrides: values } } });
     } else {
-      await tx.configLayer.upsert({ where: { kind_name: { kind, name } }, create: { kind, name, values }, update: { values } });
+      await tx.configLayer.upsert({ where: { kind_name: { kind, name } }, create: { kind, name, platform, values }, update: { values } });
       await tx.configChange.create({ data: { ...entry, snapshot: values } });
     }
     return { ok: true, changes };

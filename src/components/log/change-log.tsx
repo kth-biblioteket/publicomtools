@@ -6,6 +6,7 @@ import { getProfileLabels } from "@/lib/profiles";
 import { formatValue, PROFILE_KEY, splitList, type CatalogEntry, type Change, type Target } from "@/lib/settings-shared";
 import { formatWhen } from "@/lib/status";
 import { displayName } from "@/lib/names";
+import { asPlatform, baseTargetPlatform, PLATFORMS, PLATFORM_SHORT, type Platform } from "@/lib/platforms";
 import { Chip } from "@/components/ui/chip";
 import { RevertButton } from "./revert-button";
 
@@ -44,18 +45,27 @@ function dayLabel(d: Date, now: Date) {
 /** Change entries, newest first, grouped by day, each with "Ångra den här ändringen". */
 export async function ChangeLog({ targets, filter, showTarget = true }: { targets?: Target[]; filter?: LogFilter; showTarget?: boolean }) {
   const now = new Date();
-  const [entries, { catalog }, computers, profileLabels] = await Promise.all([
+  const [entries, catalogs, computers, profileLabels, profilePlatforms] = await Promise.all([
     listChanges({ targets, filter }),
-    getCatalog(),
-    db.computer.findMany({ select: { host: true, computerName: true, label: true } }),
+    Promise.all(PLATFORMS.map(async (p) => [p, (await getCatalog(p)).catalog] as const)),
+    db.computer.findMany({ select: { host: true, computerName: true, label: true, platform: true } }),
     getProfileLabels(),
+    db.configLayer.findMany({ where: { kind: "profile" }, select: { name: true, platform: true } }),
   ]);
-  const meta = new Map(catalog.map((k) => [k.key, k]));
+  const metaByPlatform = new Map(catalogs.map(([p, catalog]) => [p, new Map(catalog.map((k) => [k.key, k]))]));
   const names = new Map(computers.map((c) => [c.host, displayName(c)]));
+  const hostPlatform = new Map(computers.map((c) => [c.host, asPlatform(c.platform)]));
+  const profilePlatform = new Map(profilePlatforms.map((l) => [l.name, asPlatform(l.platform)]));
+  const platformOf = (t: Target): Platform =>
+    baseTargetPlatform(t) ??
+    (t.startsWith("profile:") ? profilePlatform.get(t.slice(8)) : hostPlatform.get(t.slice(5))) ??
+    "linux";
   const visible = entries.filter((e) => e.changes.length);
 
   const targetLink = (t: Target) => {
-    if (t === "base") return { href: "/config/base", label: "Grundinställningar" };
+    const base = baseTargetPlatform(t);
+    if (base === "linux") return { href: "/config/base", label: "Grundinställningar" };
+    if (base) return { href: `/config/base/${base}`, label: `Grundinställningar ${PLATFORM_SHORT[base]}` };
     if (t.startsWith("profile:")) return { href: `/config/profiles/${t.slice(8)}`, label: `Profil ${profileLabels.get(t.slice(8)) ?? t.slice(8)}` };
     const host = t.slice(5);
     return { href: `/computers/${host}/settings`, label: names.get(host) ?? host };
@@ -68,6 +78,7 @@ export async function ChangeLog({ targets, filter, showTarget = true }: { target
     <div className="flex flex-col gap-3">
       {visible.map((e, i) => {
         const header = i === 0 || days[i] !== days[i - 1] ? days[i] : null;
+        const meta = metaByPlatform.get(platformOf(e.target)) ?? new Map<string, CatalogEntry>();
         const t = targetLink(e.target);
         const lines = e.changes.map((c) => ({
           key: c.key,

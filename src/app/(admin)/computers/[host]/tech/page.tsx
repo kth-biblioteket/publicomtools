@@ -6,6 +6,7 @@ import { loadLayers, mergeLayers, type ConfigSource } from "@/lib/config";
 import { heartbeatSchema } from "@/lib/heartbeat";
 import { formatDuration, formatInterval, formatTime, heartbeatInterval } from "@/lib/status";
 import { DeleteComputer } from "./delete-computer";
+import { Enrollment } from "./enrollment";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +43,16 @@ export default async function ComputerTechPage({ params }: PageProps<"/computers
     ["IP-adress", c.lastIp ?? "–"],
     ["System", s ? `${s.os ?? "–"}${s.kernel ? ` (${s.kernel})` : ""}` : "–"],
     ["Kod", s ? `${s.branch ?? "–"}, ${formatTime(s.deployedAt)}${s.deployFilesChanged !== undefined ? ` (${s.deployFilesChanged} filer)` : ""}` : "–"],
-    ["guest.service", s ? `${s.guestService}${s.guestRestarts !== undefined ? `, ${s.guestRestarts} sessioner sedan start` : ""}` : "–"],
+    ...(c.platform === "android"
+      ? ([
+          ["App", s?.appVersion ?? "–"],
+          ["Modell", s?.model ?? "–"],
+          ["WebView", s?.webViewVersion ?? "–"],
+          ["Kioskläge", s?.kioskLocked === undefined ? "–" : s.kioskLocked ? "låst" : "inte låst"],
+        ] as [string, React.ReactNode][])
+      : ([
+          ["guest.service", s ? `${s.guestService ?? "–"}${s.guestRestarts !== undefined ? `, ${s.guestRestarts} sessioner sedan start` : ""}` : "–"],
+        ] as [string, React.ReactNode][])),
     ["Kraschade tjänster", s && s.failedUnits.length ? s.failedUnits.join(", ") : "–"],
     ["Ledig disk", s?.diskFreePercent !== undefined ? `${s.diskFreePercent} %` : "–"],
     ["Config hämtad", c.configFetchedAt ? formatTime(c.configFetchedAt) : c.configState === "new" ? "aldrig (inte installerad)" : "aldrig (gamla configfiler)"],
@@ -59,6 +69,13 @@ export default async function ComputerTechPage({ params }: PageProps<"/computers
 
   return (
     <div className="flex flex-col gap-5">
+      {c.platform === "android" && (
+        <Enrollment
+          host={c.host}
+          enrolledAt={c.enrolledAt?.toISOString() ?? null}
+          codeExpiresAt={c.enrollCodeExpiresAt?.toISOString() ?? null}
+        />
+      )}
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
         <section className={CARD}>
           <h2 className="text-base font-extrabold">System</h2>
@@ -90,12 +107,18 @@ export default async function ComputerTechPage({ params }: PageProps<"/computers
                 )}
                 {history.map((h) => {
                   const hs = heartbeatSchema.safeParse(h.status);
-                  const bad = hs.success && (hs.data.guestService !== "active" || hs.data.failedUnits.length > 0);
+                  const bad =
+                    hs.success &&
+                    ((hs.data.guestService !== undefined && hs.data.guestService !== "active") ||
+                      hs.data.pageLoaded === false ||
+                      hs.data.failedUnits.length > 0);
                   return (
                     <tr key={h.id.toString()} className={bad ? "bg-[#fff5f5] font-semibold text-bad-ink" : ""}>
                       <td className="whitespace-nowrap border-b border-line-soft px-3 py-2">{formatTime(h.receivedAt)}</td>
                       <td className="whitespace-nowrap border-b border-line-soft px-3 py-2">{hs.success ? formatDuration(hs.data.uptimeSeconds) : "–"}</td>
-                      <td className="border-b border-line-soft px-3 py-2">{hs.success ? hs.data.guestService : "–"}</td>
+                      <td className="border-b border-line-soft px-3 py-2">
+                        {!hs.success ? "–" : hs.data.guestService ?? (hs.data.pageLoaded === undefined ? "–" : hs.data.pageLoaded ? "startsida laddad" : "startsida ej laddad")}
+                      </td>
                       <td className="border-b border-line-soft px-3 py-2">{hs.success && hs.data.failedUnits.length ? hs.data.failedUnits.join(", ") : "–"}</td>
                     </tr>
                   );
