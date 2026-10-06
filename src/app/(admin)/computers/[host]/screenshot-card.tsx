@@ -5,8 +5,10 @@ import { useState, useTransition } from "react";
 import { requestScreenshotAction } from "./actions";
 
 /**
- * Android: what the tablet shows. "Ta skärmdump" reaches it with its next status report; the
- * page refreshes itself, so the picture appears when it has arrived.
+ * Android: what the tablet shows. "Ta skärmdump" reaches it with its next status report, and the
+ * tablet takes the picture when nobody has touched it for 2 minutes (by then the app is back on its
+ * start page with a new session), so no visitor's input is in it. The page refreshes itself, so the
+ * picture appears when it has arrived.
  */
 export function ScreenshotCard({
   host,
@@ -33,7 +35,9 @@ export function ScreenshotCard({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-[17px] font-extrabold">Skärmen</h2>
         {requestedAt ? (
-          <span className="text-[13px] text-muted">Skärmdump begärd {requestedAt}, kommer {within}.</span>
+          <span className="text-[13px] text-muted">
+            Skärmdump begärd {requestedAt}. Den tas när ingen har rört skärmen på 2 minuter och kommer sedan {within}.
+          </span>
         ) : (
           <button
             type="button"
@@ -61,7 +65,7 @@ export function ScreenshotCard({
             alt="Enhetens skärm"
             className="max-h-[480px] w-auto max-w-full rounded-lg border border-line"
           />
-          <figcaption className="mt-1.5 text-[13px] text-muted">Tagen {takenAt}. Visar bara appen, inget annat på enheten.</figcaption>
+          <figcaption className="mt-1.5 text-[13px] text-muted">Tagen {takenAt}, när ingen använde enheten. Visar bara appen, inget annat på enheten.</figcaption>
         </figure>
       ) : (
         <p className="mt-2 text-sm text-muted">Ingen skärmdump än.</p>
