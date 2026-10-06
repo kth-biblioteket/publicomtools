@@ -13,6 +13,9 @@ function Svg({ className, children }: IconProps & { children: React.ReactNode })
 export const MonitorIcon = (p: IconProps) => (
   <Svg {...p}><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8" /><path d="M12 17v4" /></Svg>
 );
+export const ChartIcon = (p: IconProps) => (
+  <Svg {...p}><path d="M3 3v18h18" /><path d="M7 16v-4" /><path d="M12 16V8" /><path d="M17 16v-7" /></Svg>
+);
 export const LayersIcon = (p: IconProps) => (
   <Svg {...p}><path d="m12 2 10 5-10 5L2 7Z" /><path d="m2 17 10 5 10-5" /><path d="m2 12 10 5 10-5" /></Svg>
 );

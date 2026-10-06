@@ -44,8 +44,38 @@ export const heartbeatSchema = z.object({
   kioskLocked: z.boolean().optional(),
   /** The latest event in the settings menu, e.g. "PIN bytt 2026-10-05 21:03" or "upplåst från publicomtools …" */
   menuEvent: z.string().max(120).optional(),
+
+  /**
+   * Visits that ended since the last acknowledged heartbeat (epoch seconds). The device keeps them
+   * until the answer has visitsAck=true; duplicates are ignored (host + start is unique).
+   */
+  visits: z
+    .array(
+      z.object({
+        start: z.number().int().positive(),
+        end: z.number().int().positive(),
+        reason: z.string().max(20).optional(),
+        pages: z.number().int().min(0).max(10000).optional(),
+      }),
+    )
+    .max(500)
+    .optional(),
 });
 
 export type HeartbeatStatus = z.infer<typeof heartbeatSchema>;
 
 export const HEARTBEAT_RETENTION_DAYS = 30;
+/** Visits and online time per day are kept two years, so a term can be compared with the year before */
+export const USAGE_RETENTION_DAYS = 760;
+/** A visit longer than this is a stuck tracker, not a visit */
+const MAX_VISIT_SECONDS = 12 * 60 * 60;
+
+export type ReportedVisit = NonNullable<HeartbeatStatus["visits"]>[number];
+
+/** The reported visits that make sense: end after start, at most 12 hours, not in the future. */
+export function plausibleVisits(visits: ReportedVisit[] | undefined, now: Date): ReportedVisit[] {
+  const nowSeconds = Math.floor(now.getTime() / 1000) + 300; // device clocks may be a little ahead
+  return (visits ?? []).filter(
+    (v) => v.end >= v.start && v.end - v.start <= MAX_VISIT_SECONDS && v.end <= nowSeconds,
+  );
+}

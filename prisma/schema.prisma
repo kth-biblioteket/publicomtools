@@ -30,6 +30,8 @@ model Computer {
   /// The latest heartbeat payload as sent by the computer.
   status       Json
   heartbeats   Heartbeat[]
+  visits       Visit[]
+  days         DeviceDay[]
 
   /// Host-specific config overrides ({ KEY: "value" }), on top of base + profile.
   /// See docs/config-via-publicomtools.md in the publicom repo. Config only, never secrets.
@@ -166,6 +168,42 @@ model Heartbeat {
   status     Json
 
   @@index([host, receivedAt])
+}
+
+/// One use of a computer or kiosk, reported by the device with a later heartbeat: from the first
+/// touch/keypress after the device was reset to the last activity before it was reset again (the
+/// idle tail is not included). No user, address or text: only times. See src/lib/stats.ts.
+model Visit {
+  id        BigInt   @id @default(autoincrement())
+  host      String
+  computer  Computer @relation(fields: [host], references: [host], onDelete: Cascade)
+  startedAt DateTime
+  endedAt   DateTime
+  seconds   Int
+  /// idle | home | logout | timeout | config | reboot | crash | end
+  reason    String?
+  /// Android: pages viewed during the visit
+  pages     Int?
+  /// Platform and profile when the visit happened, so old statistics stay right after a change
+  platform  String
+  profile   String?
+
+  @@unique([host, startedAt])
+  @@index([startedAt])
+}
+
+/// How long a device was running per day (Swedish date), from its heartbeats. The denominator of
+/// "beläggning": a kiosk that was switched off is not "little used".
+model DeviceDay {
+  host          String
+  computer      Computer @relation(fields: [host], references: [host], onDelete: Cascade)
+  day           DateTime @db.Date
+  onlineSeconds Int      @default(0)
+  platform      String
+  profile       String?
+
+  @@id([host, day])
+  @@index([day])
 }
 
 /// One login screen on a guest computer: created when the session starts

@@ -1,6 +1,8 @@
 import { db } from "@/lib/db";
 import { authenticateDevice, mayActFor } from "@/lib/device-auth";
-import { heartbeatSchema, HEARTBEAT_RETENTION_DAYS } from "@/lib/heartbeat";
+import { heartbeatSchema, HEARTBEAT_RETENTION_DAYS, plausibleVisits, USAGE_RETENTION_DAYS } from "@/lib/heartbeat";
+import { heartbeatInterval } from "@/lib/status";
+import { swedishDay } from "@/lib/stats";
 import { rebootPending, reloadPending, RELOAD_EXPIRES_MS, screenshotPending } from "@/lib/reload";
 import { loadLayers, mergeLayers } from "@/lib/config";
 
@@ -29,7 +31,8 @@ export async function POST(request: Request) {
     return Response.json({ error: "invalid payload", issues: parsed.error.issues }, { status: 400 });
   }
 
-  const status = parsed.data;
+  // The visits go to their own table, not into the stored status
+  const { visits: reportedVisits, ...status } = parsed.data;
   if (!(await mayActFor(auth.identity, status.host))) return Response.json({ error: "forbidden" }, { status: 403 });
   const now = new Date();
   const fields = {
@@ -48,6 +51,8 @@ export async function POST(request: Request) {
   const existing = await db.computer.findUnique({
     where: { host: status.host },
     select: {
+      platform: true,
+      lastSeenAt: true,
       profile: true,
       configUpdatedAt: true,
       reloadRequestedAt: true,
@@ -59,6 +64,16 @@ export async function POST(request: Request) {
     },
   });
   const profile = existing?.configUpdatedAt ? existing.profile : (existing?.profile ?? status.profile ?? null);
+  const platform = existing?.platform ?? status.platform ?? "linux";
+
+  // Användningsstatistik: besöken som enheten rapporterar, och igångtiden sedan förra rapporten
+  // (högst två intervall: en längre lucka betyder att enheten var avstängd eller utan nät)
+  const visits = plausibleVisits(reportedVisits, now);
+  if (reportedVisits && visits.length < reportedVisits.length)
+    console.warn(`heartbeat ${status.host}: ${reportedVisits.length - visits.length} orimliga besök ignorerades`);
+  const onlineSeconds = existing
+    ? Math.round(Math.min((now.getTime() - existing.lastSeenAt.getTime()) / 1000, 2 * heartbeatInterval(status) * 60))
+    : 0;
 
   await db.$transaction([
     db.computer.upsert({
@@ -67,12 +82,34 @@ export async function POST(request: Request) {
       update: { ...fields, profile },
     }),
     db.heartbeat.create({ data: { host: status.host, receivedAt: now, status } }),
+    db.visit.createMany({
+      data: visits.map((v) => ({
+        host: status.host,
+        startedAt: new Date(v.start * 1000),
+        endedAt: new Date(v.end * 1000),
+        seconds: v.end - v.start,
+        reason: v.reason ?? null,
+        pages: v.pages ?? null,
+        platform,
+        profile,
+      })),
+      skipDuplicates: true,
+    }),
+    db.$executeRaw`
+      INSERT INTO "DeviceDay" ("host", "day", "onlineSeconds", "platform", "profile")
+      VALUES (${status.host}, ${swedishDay(now)}::date, ${onlineSeconds}, ${platform}, ${profile})
+      ON CONFLICT ("host", "day") DO UPDATE SET
+        "onlineSeconds" = "DeviceDay"."onlineSeconds" + EXCLUDED."onlineSeconds",
+        "platform" = EXCLUDED."platform", "profile" = EXCLUDED."profile"`,
   ]);
 
   if (now.getTime() - lastPrunedAt > PRUNE_INTERVAL_MS) {
     lastPrunedAt = now.getTime();
     const cutoff = new Date(now.getTime() - HEARTBEAT_RETENTION_DAYS * 24 * 60 * 60 * 1000);
     await db.heartbeat.deleteMany({ where: { receivedAt: { lt: cutoff } } });
+    const usageCutoff = new Date(now.getTime() - USAGE_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+    await db.visit.deleteMany({ where: { startedAt: { lt: usageCutoff } } });
+    await db.deviceDay.deleteMany({ where: { day: { lt: usageCutoff } } });
   }
 
   // Commands from the admin, carried out by heartbeat.sh when nobody is using the computer:
@@ -113,5 +150,6 @@ export async function POST(request: Request) {
     pinUnlock = count > 0 && now.getTime() - unlockAt.getTime() <= RELOAD_EXPIRES_MS;
   }
 
-  return Response.json({ ok: true, reload, reboot, screenshot, pinUnlock });
+  // visitsAck: the visits are stored (or were duplicates), the device may forget them
+  return Response.json({ ok: true, reload, reboot, screenshot, pinUnlock, visitsAck: reportedVisits !== undefined });
 }

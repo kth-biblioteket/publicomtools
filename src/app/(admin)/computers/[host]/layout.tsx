@@ -71,6 +71,7 @@ export default async function ComputerLayout({ params, children }: LayoutProps<"
         tabs={[
           { href: base, label: "Översikt" },
           { href: `${base}/settings`, label: "Inställningar" },
+          { href: `${base}/usage`, label: "Användning" },
           { href: `${base}/history`, label: "Historik" },
           { href: `${base}/tech`, label: "Teknik" },
         ]}
