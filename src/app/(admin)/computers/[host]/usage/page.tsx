@@ -1,7 +1,7 @@
 import { requireAdmin } from "@/lib/auth";
 import { filterOptions, PERIODS, resolvePeriod, swedishDay } from "@/lib/stats";
 import { StatsFilters } from "@/components/stats/stats-filters";
-import { UsageView } from "@/components/stats/usage-view";
+import { UsageView, visitLimit } from "@/components/stats/usage-view";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +12,9 @@ export default async function ComputerUsagePage({ params, searchParams }: PagePr
   const sp = await searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   const period = resolvePeriod({ period: one(sp.period), from: one(sp.from), to: one(sp.to) });
+  const pageQuery = new URLSearchParams(
+    Object.entries(sp).flatMap(([k, v]) => (typeof v === "string" ? [[k, v]] : [])),
+  ).toString();
   const options = await filterOptions();
   const lastDay = swedishDay(new Date(new Date(`${period.to}T12:00:00Z`).getTime() - 24 * 3600 * 1000));
 
@@ -23,7 +26,11 @@ export default async function ComputerUsagePage({ params, searchParams }: PagePr
         from={period.from}
         to={lastDay}
       />
-      <UsageView period={period} filter={{ host }} query="" showDevices={false} profileLabels={options.labels} />
+      <UsageView period={period} filter={{ host }} query="" showDevices={false}
+        profileLabels={options.labels}
+        visits={visitLimit(one(sp.antal))}
+        pageQuery={pageQuery}
+      />
     </div>
   );
 }

@@ -302,3 +302,50 @@ export async function filterOptions(): Promise<{
     labels,
   };
 }
+
+export type VisitRow = {
+  id: string;
+  host: string;
+  name: string;
+  startedAt: Date;
+  endedAt: Date;
+  seconds: number;
+  reason: string | null;
+  pages: number | null;
+};
+
+/** The visits of the period, newest first: the first `limit`, and how many there are in all */
+export async function visitList(
+  p: Period,
+  f: StatsFilter,
+  limit: number,
+): Promise<{ visits: VisitRow[]; total: number }> {
+  const where = {
+    startedAt: { gte: swedishMidnight(p.from), lt: swedishMidnight(p.to) },
+    ...(f.platform ? { platform: f.platform } : {}),
+    ...(f.profile === "none" ? { profile: null } : f.profile ? { profile: f.profile } : {}),
+    ...(f.host ? { host: f.host } : {}),
+  };
+  const [rows, total] = await Promise.all([
+    db.visit.findMany({
+      where,
+      orderBy: { startedAt: "desc" },
+      take: limit,
+      include: { computer: { select: { label: true, computerName: true } } },
+    }),
+    db.visit.count({ where }),
+  ]);
+  return {
+    total,
+    visits: rows.map((v) => ({
+      id: v.id.toString(),
+      host: v.host,
+      name: v.computer.label || v.computer.computerName || v.host,
+      startedAt: v.startedAt,
+      endedAt: v.endedAt,
+      seconds: v.seconds,
+      reason: v.reason,
+      pages: v.pages,
+    })),
+  };
+}

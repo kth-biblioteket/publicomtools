@@ -8,6 +8,7 @@ import {
   perDevice,
   previousPeriod,
   summary,
+  visitList,
   type Period,
   type StatsFilter,
   type Summary,
@@ -18,6 +19,17 @@ import { BarChart, type Bar } from "./bar-chart";
 import { Heatmap } from "./heatmap";
 import { Sparkline } from "./sparkline";
 import { StatCard, StatPanel } from "./stat-card";
+import { VisitList } from "./visit-list";
+
+/** How many visits the list shows at first, and per "Visa fler" */
+export const VISIT_PAGE = 50;
+const VISIT_MAX = 1000;
+
+/** ?antal= from the address: how many visits to show */
+export function visitLimit(value: string | undefined): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n > VISIT_PAGE ? Math.min(VISIT_MAX, Math.ceil(n / VISIT_PAGE) * VISIT_PAGE) : VISIT_PAGE;
+}
 
 const num = (n: number) => n.toLocaleString("sv-SE");
 const pct = (n: number) => `${Math.round(n * 100)} %`;
@@ -71,6 +83,8 @@ export async function UsageView({
   query,
   showDevices,
   profileLabels,
+  visits: shown,
+  pageQuery,
 }: {
   period: Period;
   filter: StatsFilter;
@@ -78,9 +92,13 @@ export async function UsageView({
   query: string;
   showDevices: boolean;
   profileLabels: Map<string, string>;
+  /** How many visits the list shows (visitLimit) */
+  visits: number;
+  /** All of the page's current ?…, for the "Visa fler" link */
+  pageQuery: string;
 }) {
   const before = previousPeriod(period);
-  const [now, prev, cells, days, lengths, devices, first] = await Promise.all([
+  const [now, prev, cells, days, lengths, devices, first, list] = await Promise.all([
     summary(period, filter),
     summary(before, filter),
     heatmap(period, filter),
@@ -88,7 +106,14 @@ export async function UsageView({
     durations(period, filter),
     showDevices ? perDevice(period, filter) : Promise.resolve([]),
     firstVisitAt(),
+    visitList(period, filter, shown),
   ]);
+  const more = new URLSearchParams(pageQuery);
+  more.set("antal", String(shown + VISIT_PAGE));
+  const moreHref =
+    list.total > list.visits.length && shown < VISIT_MAX
+      ? `${filter.host ? `/computers/${filter.host}/usage` : "/stats"}?${more.toString()}`
+      : null;
 
   if (!first) {
     return (
@@ -148,6 +173,10 @@ export async function UsageView({
           <DeviceTable devices={devices} query={query} profileLabels={profileLabels} />
         </StatPanel>
       )}
+
+      <StatPanel title="Besök" hint="Varje besök under perioden, senaste först.">
+        <VisitList visits={list.visits} total={list.total} showDevice={!filter.host} moreHref={moreHref} />
+      </StatPanel>
     </div>
   );
 }
