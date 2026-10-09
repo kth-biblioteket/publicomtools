@@ -3,10 +3,14 @@
 #
 # The Node version is pinned to an exact patch and matches .nvmrc,
 # package.json's "engines" and Dockerfile-dev. Bump all of them together.
+#
+# The official Node image is pulled from AWS's mirror of Docker Hub's library
+# (public.ecr.aws/docker/library), not docker.io: GitHub's runners hit Docker
+# Hub's anonymous pull limit (429) and its outages. Same image, same tag.
 # Same layout as bookingtools.
 
 # ---- deps: install once, reused by the builder stage ----
-FROM node:22.23.2-alpine AS deps
+FROM public.ecr.aws/docker/library/node:22.23.2-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -14,13 +18,13 @@ RUN npm ci
 # ---- prod-deps: runtime dependencies only (no typescript/eslint/tailwind) for
 # the runner stage. `prisma` and `dotenv` are regular dependencies, since
 # `prisma migrate deploy` (which loads prisma.config.ts) runs at container start.
-FROM node:22.23.2-alpine AS prod-deps
+FROM public.ecr.aws/docker/library/node:22.23.2-alpine AS prod-deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
 # ---- builder: generate the Prisma client and build the Next.js app ----
-FROM node:22.23.2-alpine AS builder
+FROM public.ecr.aws/docker/library/node:22.23.2-alpine AS builder
 WORKDIR /app
 # Baked into the build (see next.config.ts). Must match the Traefik PathPrefix
 # this image is deployed behind (PATHPREFIX in docker-compose.yml).
@@ -36,7 +40,7 @@ RUN npx prisma generate
 RUN npm run build
 
 # ---- runner: the smallest image that can actually run the app ----
-FROM node:22.23.2-alpine AS runner
+FROM public.ecr.aws/docker/library/node:22.23.2-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
