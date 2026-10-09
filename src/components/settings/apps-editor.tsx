@@ -3,6 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { APP_ICONS, appProblems, MAX_APPS, MAX_APPS_LAUNCHER, parseApps, serializeApps, type AppEntry, type CatalogEntry } from "@/lib/settings-shared";
 import { AppIcon } from "@/components/ui/app-icons";
+// KTH:s vita logotyp (samma fil som i static och bookingtools), som statisk tillgång så att sökvägen
+// får BASE_PATH även här i webbläsaren
+import kthLogoWhite from "@/components/ui/kth-logo-white.svg";
 import { FieldControl } from "./field-control";
 
 /** One setting as the editor shows it (the same as a row in the settings form gets) */
@@ -214,12 +217,14 @@ export function AppsEditor({
   const homeIconName = homeIcon?.value ?? homeIcon?.meta.defaultValue ?? "house";
 
   return (
-    <div className="flex flex-col gap-4">
+    // @container: rutnäten följer redigerarens och kortens bredd, inte fönstrets (med sidomenyn
+    // och inställningsgrupperna bredvid blev korten trånga i ett halvbrett fönster)
+    <div className="@container flex flex-col gap-4">
       {/* Börja med */}
       {homeMode && (
         <section className="rounded-[10px] border border-line-soft px-4 py-4">
           <h4 className="text-[15px] font-extrabold">Börja med</h4>
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <div className="mt-3 grid gap-3 @2xl:grid-cols-2">
             <ModeCard
               selected={launcher}
               title="Förstasida med tjänster"
@@ -261,7 +266,7 @@ export function AppsEditor({
             <h4 className="text-[15px] font-extrabold">Förstasidan</h4>
             <p className="text-[13px] text-muted">Texterna på sidan där besökaren väljer tjänst. Tomt ger standardtexten.</p>
           </div>
-          <div className="mt-3 grid gap-4 md:grid-cols-2">
+          <div className="mt-3 grid gap-4 @xl:grid-cols-2">
             {launcherTitle && <LiveText field={launcherTitle} label="Rubrik" />}
             {launcherSubtitle && <LiveText field={launcherSubtitle} label="Underrubrik" />}
           </div>
@@ -280,7 +285,7 @@ export function AppsEditor({
           <h4 className="text-[15px] font-extrabold">Startsida</h4>
           <p className="text-[13px] text-muted">Hem-appen. Dit går enheten tillbaka när ingen använder den, och med knappen längst till vänster.</p>
         </div>
-        <div className="mt-3 grid gap-4 md:grid-cols-[2fr_1fr_1fr]">
+        <div className="mt-3 grid gap-4 @2xl:grid-cols-[2fr_1fr_1fr]">
           {homeUrl && (
             <div className="flex min-w-0 flex-col gap-1.5">
               <label htmlFor={`f-${homeUrl.meta.key}`} className={LABEL}>Adress</label>
@@ -362,8 +367,8 @@ export function AppsEditor({
                       <path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" />
                     </svg>
                   </button>
-                  <div className="flex min-w-0 flex-1 flex-col gap-2.5">
-                    <div className="grid gap-3 md:grid-cols-[1fr_2fr_1fr]">
+                  <div className="@container flex min-w-0 flex-1 flex-col gap-2.5">
+                    <div className="grid gap-3 @xl:grid-cols-[1fr_2fr_1fr]">
                       <div className="flex min-w-0 flex-col gap-1.5">
                         <label htmlFor={`app-${r.id}-name`} className={LABEL}>{launcher ? "Namn på kortet" : "Namn på knappen"}</label>
                         <input
@@ -461,20 +466,29 @@ export function AppsEditor({
             <p className="text-[13px] text-muted">Liggande skärm, förminskad. Kortens ordning följer listan ovan.</p>
           </div>
           <div className="mt-3 w-full max-w-[640px] overflow-hidden rounded-xl border border-field bg-page" aria-label="Förhandsvisning av förstasidan">
-            <div className="relative overflow-hidden bg-kth-navy px-6 pb-10 pt-4 text-white">
+            {/* Som appens huvud: logga till vänster, texten bredvid, English uppe till höger och linjemönstret
+                nere till höger, aldrig bakom text eller logga (KTH:s grafiska manual) */}
+            <div className="relative flex items-center gap-3.5 overflow-hidden bg-kth-navy py-4 pl-6 pr-28 text-white">
               <svg
                 aria-hidden="true"
                 viewBox="460 0 620 380"
                 preserveAspectRatio="xMaxYMin slice"
-                className="pointer-events-none absolute bottom-0 right-0 h-[92px] w-[150px] -scale-y-100 fill-none stroke-[#6a8ee0] stroke-[1.5] [stroke-linecap:round] [stroke-linejoin:round]"
+                className="pointer-events-none absolute bottom-0 right-0 h-[61px] w-[100px] -scale-y-100 fill-none stroke-[#6a8ee0] stroke-[1.5] [stroke-linecap:round] [stroke-linejoin:round]"
               >
                 <polyline vectorEffect="non-scaling-stroke" points="0 120 240 120 -2 483" />
                 <path vectorEffect="non-scaling-stroke" d="m600-3v243c-66.27,0-120-53.73-120-120h602.35" />
                 <path vectorEffect="non-scaling-stroke" d="m720,0c0,198.82,161.18,360,360,360" />
               </svg>
-              <div className="relative text-xs font-bold text-kth-light-blue">KTH Biblioteket</div>
-              <div className="relative text-[24px] font-extrabold leading-tight">{title}</div>
-              <div className="relative text-[13px] text-kth-light-blue">{subtitle}</div>
+              <span className="absolute right-4 top-3 flex h-5 items-center gap-1 rounded-full border border-[#5a6fb0] px-2 text-[9px] font-bold" aria-hidden="true">
+                English
+              </span>
+              {/* eslint-disable-next-line @next/next/no-img-element -- liten förhandsvisning, ingen bildoptimering behövs */}
+              <img src={kthLogoWhite.src} alt="KTH" width={44} height={49} className="relative h-[49px] w-11 shrink-0" />
+              <div className="relative flex min-w-0 flex-col gap-0.5">
+                <div className="text-xs font-bold tracking-[0.02em] text-kth-light-blue">KTH Biblioteket</div>
+                <div className="truncate text-[24px] font-extrabold leading-tight">{title}</div>
+                <div className="truncate text-[13px] text-kth-light-blue">{subtitle}</div>
+              </div>
             </div>
             {rows.length > 0 ? (
               <div className="grid grid-cols-2 gap-2.5 p-3.5">
