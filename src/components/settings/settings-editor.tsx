@@ -23,7 +23,18 @@ const LINK = "text-[12.5px] font-semibold text-kth-blue underline underline-offs
  * Edited in the apps editor together with the apps key (Android): what the tablet starts with, the
  * first page's texts, and the home app's address, name and icon
  */
-const HOME_KEYS = ["HOME_MODE", "LAUNCHER_TITLE", "LAUNCHER_SUBTITLE", "LAUNCHER_FOOTER", "START_URL", "START_LABEL", "START_ICON"];
+const HOME_KEYS = [
+  "HOME_MODE",
+  "LAUNCHER_TITLE",
+  "LAUNCHER_SUBTITLE",
+  "LAUNCHER_FOOTER",
+  "LAUNCHER_TITLE_EN",
+  "LAUNCHER_SUBTITLE_EN",
+  "LAUNCHER_FOOTER_EN",
+  "START_URL",
+  "START_LABEL",
+  "START_ICON",
+];
 
 function kindOf(target: string): Kind {
   return target === "base" || target.startsWith("base:") ? "base" : target.startsWith("profile:") ? "profile" : "host";
@@ -228,6 +239,9 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
           launcherTitle={field("LAUNCHER_TITLE")}
           launcherSubtitle={field("LAUNCHER_SUBTITLE")}
           launcherFooter={field("LAUNCHER_FOOTER")}
+          launcherTitleEn={field("LAUNCHER_TITLE_EN")}
+          launcherSubtitleEn={field("LAUNCHER_SUBTITLE_EN")}
+          launcherFooterEn={field("LAUNCHER_FOOTER_EN")}
         />
         {keys.map((h) => warningFor(h)).filter(Boolean).map((w) => (
           <p key={w} className="rounded-md bg-warn-bg px-2.5 py-1.5 text-[12.5px] font-semibold text-warn-ink">{w}</p>

@@ -28,7 +28,7 @@ const GAP = 12;
 let nextId = 1;
 const toRows = (value: string | null): Row[] =>
   parseApps(value).map((a) => ({ ...a, id: nextId++, adv: !!a.scope }));
-const toValue = (rows: Row[]) => serializeApps(rows.map(({ name, url, icon, scope, desc }) => ({ name, url, icon, scope, desc })));
+const toValue = (rows: Row[]) => serializeApps(rows);
 
 /** A text setting that updates the preview as you type; emptied = not set here (the tablet's default text) */
 function LiveText({ field, label, placeholder }: { field: EditorField; label: string; placeholder?: string }) {
@@ -115,6 +115,9 @@ export function AppsEditor({
   launcherTitle,
   launcherSubtitle,
   launcherFooter,
+  launcherTitleEn,
+  launcherSubtitleEn,
+  launcherFooterEn,
 }: {
   apps: EditorField;
   homeUrl?: EditorField;
@@ -125,6 +128,10 @@ export function AppsEditor({
   launcherTitle?: EditorField;
   launcherSubtitle?: EditorField;
   launcherFooter?: EditorField;
+  /** The first page's texts in English (empty: the Swedish text) */
+  launcherTitleEn?: EditorField;
+  launcherSubtitleEn?: EditorField;
+  launcherFooterEn?: EditorField;
 }) {
   const launcher = (homeMode?.value ?? homeMode?.meta.defaultValue ?? "app") === "launcher";
   const max = launcher ? MAX_APPS_LAUNCHER : MAX_APPS;
@@ -210,9 +217,16 @@ export function AppsEditor({
     if (mode === (homeMode.meta.defaultValue ?? "app") && !homeMode.inherited) homeMode.onClear();
     else homeMode.onChange(mode);
   };
-  const title = launcherTitle?.value?.trim() || launcherTitle?.meta.example || "Vad vill du göra?";
-  const subtitle = launcherSubtitle?.value?.trim() || launcherSubtitle?.meta.example || "Tryck på en tjänst för att börja.";
-  const footer = launcherFooter?.value?.trim() ?? "";
+  // Förhandsvisningen på svenska eller engelska, med appens fallback: tom engelsk text → den svenska →
+  // standardtexten på engelska (LauncherScreen.pick)
+  const [english, setEnglish] = useState(false);
+  const text = (sv: EditorField | undefined, en: EditorField | undefined, svDefault: string, enDefault: string) => {
+    const s = sv?.value?.trim() ?? "", e = en?.value?.trim() ?? "";
+    return english ? e || s || enDefault : s || svDefault;
+  };
+  const title = text(launcherTitle, launcherTitleEn, "Vad vill du göra?", "What do you need?");
+  const subtitle = text(launcherSubtitle, launcherSubtitleEn, "Tryck på en tjänst för att börja.", "Tap a service to begin.");
+  const footer = text(launcherFooter, launcherFooterEn, "", "");
   const homeName = homeLabel?.value?.trim() || "Hem";
   const homeIconName = homeIcon?.value ?? homeIcon?.meta.defaultValue ?? "house";
 
@@ -264,17 +278,20 @@ export function AppsEditor({
         <section className="rounded-[10px] border border-line-soft px-4 py-4">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
             <h4 className="text-[15px] font-extrabold">Förstasidan</h4>
-            <p className="text-[13px] text-muted">Texterna på sidan där besökaren väljer tjänst. Tomt ger standardtexten.</p>
+            <p className="text-[13px] text-muted">
+              Texterna på sidan där besökaren väljer tjänst, på svenska och engelska. Tomt ger standardtexten; tom engelska ger den svenska.
+            </p>
           </div>
           <div className="mt-3 grid gap-4 @xl:grid-cols-2">
             {launcherTitle && <LiveText field={launcherTitle} label="Rubrik" />}
+            {launcherTitleEn && <LiveText field={launcherTitleEn} label="Rubrik (English)" placeholder="Tomt: den svenska rubriken" />}
             {launcherSubtitle && <LiveText field={launcherSubtitle} label="Underrubrik" />}
-          </div>
-          {launcherFooter && (
-            <div className="mt-4">
+            {launcherSubtitleEn && <LiveText field={launcherSubtitleEn} label="Underrubrik (English)" placeholder="Tomt: den svenska underrubriken" />}
+            {launcherFooter && (
               <LiveText field={launcherFooter} label="Text längst ner (valfri)" placeholder="Lämna tom om du inte vill ha någon text" />
-            </div>
-          )}
+            )}
+            {launcherFooterEn && <LiveText field={launcherFooterEn} label="Text längst ner (English)" placeholder="Tomt: den svenska texten" />}
+          </div>
         </section>
       )}
 
@@ -322,7 +339,7 @@ export function AppsEditor({
           <button
             type="button"
             disabled={rows.length >= max}
-            onClick={() => commit([...rows, { id: nextId++, name: "", url: "https://", icon: "info", scope: "", desc: "", adv: false }])}
+            onClick={() => commit([...rows, { id: nextId++, name: "", url: "https://", icon: "info", scope: "", desc: "", nameEn: "", descEn: "", adv: false }])}
             className="h-9 rounded-lg border-2 border-kth-blue bg-white px-3.5 text-[13.5px] font-bold text-kth-blue hover:bg-select disabled:opacity-40"
           >
             {launcher ? "+ Lägg till tjänst" : "+ Lägg till app"}
@@ -401,17 +418,43 @@ export function AppsEditor({
                       </div>
                     </div>
                     {launcher && (
-                      <div className="flex min-w-0 flex-col gap-1.5">
-                        <label htmlFor={`app-${r.id}-desc`} className={LABEL}>Beskrivning (en rad)</label>
-                        <input
-                          id={`app-${r.id}-desc`}
-                          value={r.desc}
-                          onChange={(e) => patch(r.id, { desc: e.target.value })}
-                          placeholder="t.ex. Hitta böcker, artiklar och tidskrifter."
-                          aria-invalid={!!p.desc || undefined}
-                          className={`${INPUT} ${p.desc ? "border-bad-ink" : "border-field"}`}
-                        />
-                        {p.desc && <p className="text-[12.5px] font-semibold text-bad-ink">{p.desc}</p>}
+                      <div className="grid gap-3 @xl:grid-cols-[2fr_1fr]">
+                        <div className="flex min-w-0 flex-col gap-1.5">
+                          <label htmlFor={`app-${r.id}-desc`} className={LABEL}>Beskrivning (en rad)</label>
+                          <input
+                            id={`app-${r.id}-desc`}
+                            value={r.desc}
+                            onChange={(e) => patch(r.id, { desc: e.target.value })}
+                            placeholder="t.ex. Hitta böcker, artiklar och tidskrifter."
+                            aria-invalid={!!p.desc || undefined}
+                            className={`${INPUT} ${p.desc ? "border-bad-ink" : "border-field"}`}
+                          />
+                          {p.desc && <p className="text-[12.5px] font-semibold text-bad-ink">{p.desc}</p>}
+                        </div>
+                        <div className="flex min-w-0 flex-col gap-1.5">
+                          <label htmlFor={`app-${r.id}-name-en`} className={LABEL}>Namn (English)</label>
+                          <input
+                            id={`app-${r.id}-name-en`}
+                            value={r.nameEn}
+                            onChange={(e) => patch(r.id, { nameEn: e.target.value })}
+                            placeholder="Tomt: det svenska namnet"
+                            aria-invalid={!!p.nameEn || undefined}
+                            className={`${INPUT} ${p.nameEn ? "border-bad-ink" : "border-field"}`}
+                          />
+                          {p.nameEn && <p className="text-[12.5px] font-semibold text-bad-ink">{p.nameEn}</p>}
+                        </div>
+                        <div className="flex min-w-0 flex-col gap-1.5 @xl:col-span-2">
+                          <label htmlFor={`app-${r.id}-desc-en`} className={LABEL}>Beskrivning (English)</label>
+                          <input
+                            id={`app-${r.id}-desc-en`}
+                            value={r.descEn}
+                            onChange={(e) => patch(r.id, { descEn: e.target.value })}
+                            placeholder="Tomt: den svenska beskrivningen"
+                            aria-invalid={!!p.descEn || undefined}
+                            className={`${INPUT} ${p.descEn ? "border-bad-ink" : "border-field"}`}
+                          />
+                          {p.descEn && <p className="text-[12.5px] font-semibold text-bad-ink">{p.descEn}</p>}
+                        </div>
                       </div>
                     )}
                     <div className="flex flex-col gap-2">
@@ -464,6 +507,19 @@ export function AppsEditor({
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
             <h4 className="text-[15px] font-extrabold">Så ser förstasidan ut</h4>
             <p className="text-[13px] text-muted">Liggande skärm, förminskad. Kortens ordning följer listan ovan.</p>
+            <div className="ml-auto inline-flex gap-0.5 rounded-[9px] bg-[#eceef1] p-[3px]" role="group" aria-label="Språk i förhandsvisningen">
+              {[false, true].map((en) => (
+                <button
+                  key={String(en)}
+                  type="button"
+                  aria-pressed={english === en}
+                  onClick={() => setEnglish(en)}
+                  className={`h-[26px] rounded-[7px] px-2.5 text-[12.5px] font-semibold ${english === en ? "bg-white text-ink shadow-sm" : "text-[#3d444d]"}`}
+                >
+                  {en ? "English" : "Svenska"}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="mt-3 w-full max-w-[640px] overflow-hidden rounded-xl border border-field bg-page" aria-label="Förhandsvisning av förstasidan">
             {/* Som appens huvud: logga till vänster, texten bredvid, English uppe till höger och linjemönstret
@@ -480,12 +536,12 @@ export function AppsEditor({
                 <path vectorEffect="non-scaling-stroke" d="m720,0c0,198.82,161.18,360,360,360" />
               </svg>
               <span className="absolute right-4 top-3 flex h-5 items-center gap-1 rounded-full border border-[#5a6fb0] px-2 text-[9px] font-bold" aria-hidden="true">
-                English
+                {english ? "Svenska" : "English"}
               </span>
               {/* eslint-disable-next-line @next/next/no-img-element -- liten förhandsvisning, ingen bildoptimering behövs */}
               <img src={kthLogoWhite.src} alt="KTH" width={44} height={49} className="relative h-[49px] w-11 shrink-0" />
               <div className="relative flex min-w-0 flex-col gap-0.5">
-                <div className="text-xs font-bold tracking-[0.02em] text-kth-light-blue">KTH Biblioteket</div>
+                <div className="text-xs font-bold tracking-[0.02em] text-kth-light-blue">{english ? "KTH Library" : "KTH Biblioteket"}</div>
                 <div className="truncate text-[24px] font-extrabold leading-tight">{title}</div>
                 <div className="truncate text-[13px] text-kth-light-blue">{subtitle}</div>
               </div>
@@ -498,8 +554,12 @@ export function AppsEditor({
                       <AppIcon name={r.icon} className="size-[26px]" />
                     </span>
                     <span className="flex min-w-0 flex-col gap-0.5">
-                      <span className="truncate text-sm font-extrabold text-kth-navy">{r.name.trim() || "Utan namn"}</span>
-                      {r.desc.trim() && <span className="truncate text-[11px] text-muted">{r.desc}</span>}
+                      <span className="truncate text-sm font-extrabold text-kth-navy">
+                        {(english && r.nameEn.trim()) || r.name.trim() || "Utan namn"}
+                      </span>
+                      {((english && r.descEn.trim()) || r.desc.trim()) && (
+                        <span className="truncate text-[11px] text-muted">{(english && r.descEn.trim()) || r.desc}</span>
+                      )}
                     </span>
                   </div>
                 ))}

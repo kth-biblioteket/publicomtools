@@ -54,7 +54,7 @@ export function validateValue(meta: Pick<CatalogEntry, "type" | "options">, valu
       const bad = apps.map((a, i) => [i, appProblems(a)] as const).find(([, p]) => Object.keys(p).length);
       if (!bad) return null;
       const [i, p] = bad;
-      return `App ${i + 1}${apps[i].name ? ` (${apps[i].name})` : ""}: ${p.name ?? p.url ?? p.icon ?? p.desc ?? p.scope}`;
+      return `App ${i + 1}${apps[i].name ? ` (${apps[i].name})` : ""}: ${p.name ?? p.url ?? p.icon ?? p.desc ?? p.nameEn ?? p.descEn ?? p.scope}`;
     }
     default:
       return null;
@@ -86,12 +86,16 @@ export const APP_ICONS = [
   { value: "graduation-cap", label: "Studentmössa" },
 ] as const;
 
-/** desc: one line under the name on the first page's card (HOME_MODE=launcher) */
-export type AppEntry = { name: string; url: string; icon: string; scope: string; desc: string };
+/**
+ * desc: one line under the name on the first page's card (HOME_MODE=launcher). nameEn, descEn:
+ * the same in English when the visitor chose English (empty: the Swedish text).
+ */
+export type AppEntry = { name: string; url: string; icon: string; scope: string; desc: string; nameEn: string; descEn: string };
 
 /**
  * APPS as the tablet reads it: one entry per line (commas only when there is no line break), each
- * "Namn|https://adress/|ikon|område|beskrivning" (all but name and address optional). Tolerant of older values: an
+ * "Namn|https://adress/|ikon|område|beskrivning|namn_en|beskrivning_en" (all but name and address
+ * optional). Tolerant of older values: an
  * entry without | that looks like an address becomes an app without a name, so it is shown
  * with an error instead of being lost.
  */
@@ -103,8 +107,17 @@ export function parseApps(value: string | null | undefined): AppEntry[] {
     .filter(Boolean)
     .map((entry) => {
       const parts = entry.split("|").map((p) => p.trim());
-      if (parts.length === 1 && /^[a-z]+:\/\//i.test(parts[0])) return { name: "", url: parts[0], icon: "", scope: "", desc: "" };
-      return { name: parts[0] ?? "", url: parts[1] ?? "", icon: parts[2] ?? "", scope: parts[3] ?? "", desc: parts[4] ?? "" };
+      const empty = { icon: "", scope: "", desc: "", nameEn: "", descEn: "" };
+      if (parts.length === 1 && /^[a-z]+:\/\//i.test(parts[0])) return { ...empty, name: "", url: parts[0] };
+      return {
+        name: parts[0] ?? "",
+        url: parts[1] ?? "",
+        icon: parts[2] ?? "",
+        scope: parts[3] ?? "",
+        desc: parts[4] ?? "",
+        nameEn: parts[5] ?? "",
+        descEn: parts[6] ?? "",
+      };
     });
 }
 
@@ -112,7 +125,7 @@ export function parseApps(value: string | null | undefined): AppEntry[] {
 export function serializeApps(apps: AppEntry[]): string {
   return apps
     .map((a) => {
-      const parts = [a.name.trim(), a.url.trim(), a.icon.trim(), a.scope.trim(), a.desc.trim()];
+      const parts = [a.name, a.url, a.icon, a.scope, a.desc, a.nameEn, a.descEn].map((p) => p.trim());
       while (parts.length > 2 && !parts[parts.length - 1]) parts.pop();
       return parts.join("|");
     })
@@ -130,6 +143,8 @@ export function appProblems(a: AppEntry): Partial<Record<keyof AppEntry, string>
   if (a.icon && !APP_ICONS.some((i) => i.value === a.icon)) out.icon = `Okänd ikon: ${a.icon}`;
   if (/[\s|,"]/.test(a.scope.trim())) out.scope = "Området får inte innehålla mellanslag, | , eller \".";
   if (forbidden.test(a.desc)) out.desc = "Beskrivningen får inte innehålla | , eller \".";
+  if (forbidden.test(a.nameEn)) out.nameEn = "Namnet får inte innehålla | , eller \".";
+  if (forbidden.test(a.descEn)) out.descEn = "Beskrivningen får inte innehålla | , eller \".";
   return out;
 }
 
@@ -167,7 +182,8 @@ export function formatValue(meta: CatalogEntry | undefined, value: string | null
         .map((a) => {
           const where = a.url.replace(/^https:\/\//, "").replace(/\/$/, "");
           const icon = APP_ICONS.find((i) => i.value === a.icon)?.label ?? (a.icon || "ingen ikon");
-          return `${a.name || "utan namn"} (${[where, icon, a.scope && `område ${a.scope}`, a.desc && `”${a.desc}”`].filter(Boolean).join(", ")})`;
+          const english = [a.nameEn, a.descEn && `”${a.descEn}”`].filter(Boolean).join(" ");
+          return `${a.name || "utan namn"} (${[where, icon, a.scope && `område ${a.scope}`, a.desc && `”${a.desc}”`, english && `engelska: ${english}`].filter(Boolean).join(", ")})`;
         })
         .join(" · ");
     }
