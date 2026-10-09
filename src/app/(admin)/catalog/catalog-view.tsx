@@ -10,7 +10,7 @@ import { formatWhen } from "@/lib/status";
 import { Chip } from "@/components/ui/chip";
 import { CatalogUpdate } from "./catalog-update";
 
-const TYPE_LABEL = { bool: "Ja/nej", int: "Tal", string: "Text", csv: "Lista", url: "Adress", enum: "Val" } as const;
+const TYPE_LABEL = { bool: "Ja/nej", int: "Tal", string: "Text", csv: "Lista", url: "Adress", enum: "Val", apps: "Webbappar" } as const;
 
 /** Inställningskatalogen för en plattform (/catalog = Linux, /catalog/android). */
 export async function CatalogView({ platform }: { platform: Platform }) {

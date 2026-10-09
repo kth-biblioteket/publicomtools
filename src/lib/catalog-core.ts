@@ -23,7 +23,7 @@ export const catalogSchema = z
         key: keyName,
         label: z.string().min(1),
         group: z.string(),
-        type: z.enum(["int", "bool", "string", "csv", "url", "enum"]),
+        type: z.enum(["int", "bool", "string", "csv", "url", "enum", "apps"]),
         options: z.array(z.object({ value: z.string(), label: z.string().min(1) })).optional(),
         unit: z.string().optional(),
         /** csv only: " " for space-separated lists (WEBSITES); default "," */

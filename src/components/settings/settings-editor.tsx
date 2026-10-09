@@ -7,6 +7,7 @@ import { saveSettingsAction } from "@/app/(admin)/settings-actions";
 import { formatValue, PROFILE_KEY, settingWarnings, validateValue, type CatalogEntry } from "@/lib/settings-shared";
 import { Chip } from "@/components/ui/chip";
 import { SearchIcon } from "@/components/ui/icons";
+import { AppsEditor, type EditorField } from "./apps-editor";
 import { FieldControl } from "./field-control";
 import { KeyPicker } from "./key-picker";
 import { PasteImport } from "./paste-import";
@@ -18,6 +19,8 @@ type Inherited = Record<string, { value: string; source: Source }>;
 type Drafts = Record<string, string | null>;
 
 const LINK = "text-[12.5px] font-semibold text-kth-blue underline underline-offset-2 hover:text-select-ink";
+/** Edited in the apps editor together with the apps key (Android: the home app's address, name and icon) */
+const HOME_KEYS = ["START_URL", "START_LABEL", "START_ICON"];
 
 function kindOf(target: string): Kind {
   return target === "base" || target.startsWith("base:") ? "base" : target.startsWith("profile:") ? "profile" : "host";
@@ -106,8 +109,17 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
     (!onlyOwn || isOwn(k.key) || k.key in drafts || pinned.includes(k.key)) &&
     (!needle || `${k.label} ${k.key} ${k.help ?? ""}`.toLowerCase().includes(needle));
   const hiddenAdvanced = data.catalog.filter((k) => k.advanced && !isOwn(k.key) && !(k.key in drafts)).length;
+  // The apps editor (APPS, type apps) takes the place of the home app's rows: one block where the
+  // first of them would be
+  const appsKey = data.catalog.find((k) => k.type === "apps");
+  const combine = (keys: CatalogEntry[]) => {
+    if (!appsKey) return keys;
+    const grouped = (k: CatalogEntry) => k.key === appsKey.key || HOME_KEYS.includes(k.key);
+    const at = keys.findIndex(grouped);
+    return at < 0 ? keys : [...keys.slice(0, at), appsKey, ...keys.slice(at).filter((k) => !grouped(k))];
+  };
   const groups = data.groups
-    .map((g) => ({ ...g, keys: data.catalog.filter((k) => k.group === g.id && visible(k)) }))
+    .map((g) => ({ ...g, keys: combine(data.catalog.filter((k) => k.group === g.id && visible(k))) }))
     .filter((g) => g.keys.length);
   const unknownKeys = Object.keys(data.own).filter((k) => !meta.has(k) && (!needle || k.toLowerCase().includes(needle)));
   const ownCount = new Set([...Object.keys(data.own), ...Object.keys(drafts)].filter(isOwn)).size;
@@ -174,8 +186,60 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
     });
   };
 
+  // --- the apps editor ---
+  const field = (key: string): EditorField | undefined => {
+    const m = meta.get(key);
+    if (!m) return undefined;
+    const value = shown(key);
+    return {
+      meta: m,
+      value,
+      inherited: ownNow(key) === null && value !== null,
+      problem: issues[key],
+      onChange: (v) => setValue(key, v),
+      onClear: () => reset(key),
+    };
+  };
+  const appsRow = (k: CatalogEntry, first: boolean) => {
+    const keys = [k.key, ...HOME_KEYS.filter((h) => meta.has(h))];
+    const drafted = keys.filter((h) => h in drafts);
+    const own = ownNow(k.key);
+    const inh = inherited[k.key];
+    return (
+      <div key={k.key} className={`flex flex-col gap-3 px-5 py-4 ${first ? "" : "border-t border-line-soft"} ${drafted.length ? "bg-draft" : ""}`}>
+        <div>
+          <span className="text-sm font-bold">Webbappar</span>
+          <span className="ml-1.5 font-mono text-[11px] text-faint">{keys.join(" · ")}</span>
+          <p className="mt-0.5 text-[13px] leading-snug text-muted">
+            Enheten visar en webbapp i taget. Har den fler än en visas en knapp per app längst ner, och besökaren byter med ett tryck. Dra i handtaget för att ändra ordningen.
+          </p>
+        </div>
+        <AppsEditor apps={field(k.key)!} homeUrl={field("START_URL")} homeLabel={field("START_LABEL")} homeIcon={field("START_ICON")} />
+        <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-muted">
+          {drafted.length > 0 && <Chip tone="draft">Osparad</Chip>}
+          {own !== null ? (
+            <>
+              <Chip tone="own">{kind === "base" ? "Appar satta" : kind === "profile" ? "Appar satta i profilen" : "Appar satta här"}</Chip>
+              <button type="button" className={LINK} onClick={() => reset(k.key)}>
+                {inh ? `Använd ärvda appar (${formatValue(k, inh.value)})` : "Ta bort alla appar"}
+              </button>
+            </>
+          ) : inh ? (
+            <Chip>Appar från {sourceText(inh.source)}</Chip>
+          ) : null}
+          {drafted.length > 0 && (
+            <button type="button" className={LINK} onClick={() => update((d) => drafted.forEach((h) => delete d[h]))}>
+              Ångra
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   // --- a row ---
   const row = (k: CatalogEntry, first: boolean) => {
+    if (k.type === "apps") return appsRow(k, first);
     const own = ownNow(k.key);
     const inh = inherited[k.key];
     const drafted = k.key in drafts;

@@ -4,7 +4,8 @@
  * imports here.
  */
 
-export type KeyType = "int" | "bool" | "string" | "csv" | "url" | "enum";
+/** apps: the Android tablets' extra web apps (APPS), edited with the apps editor */
+export type KeyType = "int" | "bool" | "string" | "csv" | "url" | "enum" | "apps";
 
 export type CatalogEntry = {
   key: string;
@@ -46,9 +47,85 @@ export function validateValue(meta: Pick<CatalogEntry, "type" | "options">, valu
       return !value || meta.options.some((o) => o.value === value)
         ? null
         : `Måste vara ett av: ${meta.options.map((o) => o.label).join(", ")}.`;
+    case "apps": {
+      const apps = parseApps(value);
+      if (apps.length > MAX_APPS) return `Högst ${MAX_APPS} appar.`;
+      const bad = apps.map((a, i) => [i, appProblems(a)] as const).find(([, p]) => Object.keys(p).length);
+      if (!bad) return null;
+      const [i, p] = bad;
+      return `App ${i + 1}${apps[i].name ? ` (${apps[i].name})` : ""}: ${p.name ?? p.url ?? p.icon ?? p.scope}`;
+    }
     default:
       return null;
   }
+}
+
+// --- APPS: the Android tablets' extra web apps ---
+
+/** The tablet shows the home app (START_URL) and at most this many more */
+export const MAX_APPS = 5;
+
+/** The icons the tablet has (Lucide names), with their names in the admin */
+export const APP_ICONS = [
+  { value: "house", label: "Hus" },
+  { value: "search", label: "Sök" },
+  { value: "map", label: "Karta" },
+  { value: "map-pin", label: "Kartnål" },
+  { value: "calendar", label: "Kalender" },
+  { value: "book-open", label: "Bok" },
+  { value: "library", label: "Bibliotek" },
+  { value: "info", label: "Information" },
+  { value: "circle-help", label: "Hjälp" },
+  { value: "printer", label: "Skrivare" },
+  { value: "monitor", label: "Dator" },
+  { value: "user", label: "Person" },
+  { value: "clock", label: "Klocka" },
+  { value: "graduation-cap", label: "Studentmössa" },
+] as const;
+
+export type AppEntry = { name: string; url: string; icon: string; scope: string };
+
+/**
+ * APPS as the tablet reads it: entries separated by line breaks or commas, each
+ * "Namn|https://adress/|ikon|område" (icon and scope optional). Tolerant of older values: an
+ * entry without | that looks like an address becomes an app without a name, so it is shown
+ * with an error instead of being lost.
+ */
+export function parseApps(value: string | null | undefined): AppEntry[] {
+  if (!value) return [];
+  return value
+    .split(/[\n,]/)
+    .map((e) => e.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const parts = entry.split("|").map((p) => p.trim());
+      if (parts.length === 1 && /^[a-z]+:\/\//i.test(parts[0])) return { name: "", url: parts[0], icon: "", scope: "" };
+      return { name: parts[0] ?? "", url: parts[1] ?? "", icon: parts[2] ?? "", scope: parts[3] ?? "" };
+    });
+}
+
+/** One app per line; empty trailing parts are left out */
+export function serializeApps(apps: AppEntry[]): string {
+  return apps
+    .map((a) => {
+      const parts = [a.name.trim(), a.url.trim(), a.icon.trim(), a.scope.trim()];
+      while (parts.length > 2 && !parts[parts.length - 1]) parts.pop();
+      return parts.join("|");
+    })
+    .join("\n");
+}
+
+/** Why one app can't be saved, per field (empty = fine). | , and " would split the entry on the tablet. */
+export function appProblems(a: AppEntry): Partial<Record<keyof AppEntry, string>> {
+  const out: Partial<Record<keyof AppEntry, string>> = {};
+  const forbidden = /[|,"]/;
+  if (!a.name.trim()) out.name = "Skriv ett namn på knappen.";
+  else if (forbidden.test(a.name)) out.name = "Namnet får inte innehålla | , eller \".";
+  if (!/^https:\/\/[^\s/|,"]+/.test(a.url.trim())) out.url = "Adressen måste börja med https://";
+  else if (/[\s|,"]/.test(a.url.trim())) out.url = "Adressen får inte innehålla mellanslag, | , eller \".";
+  if (a.icon && !APP_ICONS.some((i) => i.value === a.icon)) out.icon = `Okänd ikon: ${a.icon}`;
+  if (/[\s|,"]/.test(a.scope.trim())) out.scope = "Området får inte innehålla mellanslag, | , eller \".";
+  return out;
 }
 
 export function splitList(value: string, separator: string): string[] {
@@ -76,6 +153,18 @@ export function formatValue(meta: CatalogEntry | undefined, value: string | null
     case "csv": {
       const items = splitList(value, meta.separator);
       return items.length ? items.join(", ") : "tom lista";
+    }
+    case "apps": {
+      // Namn (adress utan https://, ikon): så att en ändrad adress eller ikon syns i granskningen och loggen
+      const apps = parseApps(value);
+      if (!apps.length) return "inga";
+      return apps
+        .map((a) => {
+          const where = a.url.replace(/^https:\/\//, "").replace(/\/$/, "");
+          const icon = APP_ICONS.find((i) => i.value === a.icon)?.label ?? (a.icon || "ingen ikon");
+          return `${a.name || "utan namn"} (${[where, icon, a.scope && `område ${a.scope}`].filter(Boolean).join(", ")})`;
+        })
+        .join(" · ");
     }
     default:
       return value || "tomt";
