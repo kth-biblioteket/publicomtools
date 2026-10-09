@@ -19,8 +19,11 @@ type Inherited = Record<string, { value: string; source: Source }>;
 type Drafts = Record<string, string | null>;
 
 const LINK = "text-[12.5px] font-semibold text-kth-blue underline underline-offset-2 hover:text-select-ink";
-/** Edited in the apps editor together with the apps key (Android: the home app's address, name and icon) */
-const HOME_KEYS = ["START_URL", "START_LABEL", "START_ICON"];
+/**
+ * Edited in the apps editor together with the apps key (Android): what the tablet starts with, the
+ * first page's texts, and the home app's address, name and icon
+ */
+const HOME_KEYS = ["HOME_MODE", "LAUNCHER_TITLE", "LAUNCHER_SUBTITLE", "LAUNCHER_FOOTER", "START_URL", "START_LABEL", "START_ICON"];
 
 function kindOf(target: string): Kind {
   return target === "base" || target.startsWith("base:") ? "base" : target.startsWith("profile:") ? "profile" : "host";
@@ -208,13 +211,27 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
     return (
       <div key={k.key} className={`flex flex-col gap-3 px-5 py-4 ${first ? "" : "border-t border-line-soft"} ${drafted.length ? "bg-draft" : ""}`}>
         <div>
-          <span className="text-sm font-bold">Webbappar</span>
+          <span className="text-sm font-bold">{meta.has("HOME_MODE") ? "Start och webbappar" : "Webbappar"}</span>
           <span className="ml-1.5 font-mono text-[11px] text-faint">{keys.join(" · ")}</span>
           <p className="mt-0.5 text-[13px] leading-snug text-muted">
-            Enheten visar en webbapp i taget. Har den fler än en visas en knapp per app längst ner, och besökaren byter med ett tryck. Dra i handtaget för att ändra ordningen.
+            {meta.has("HOME_MODE")
+              ? "Välj vad besökaren ser först och vilka webbappar enheten har. Dra i handtaget för att ändra ordningen."
+              : "Enheten visar en webbapp i taget. Har den fler än en visas en knapp per app längst ner, och besökaren byter med ett tryck. Dra i handtaget för att ändra ordningen."}
           </p>
         </div>
-        <AppsEditor apps={field(k.key)!} homeUrl={field("START_URL")} homeLabel={field("START_LABEL")} homeIcon={field("START_ICON")} />
+        <AppsEditor
+          apps={field(k.key)!}
+          homeUrl={field("START_URL")}
+          homeLabel={field("START_LABEL")}
+          homeIcon={field("START_ICON")}
+          homeMode={field("HOME_MODE")}
+          launcherTitle={field("LAUNCHER_TITLE")}
+          launcherSubtitle={field("LAUNCHER_SUBTITLE")}
+          launcherFooter={field("LAUNCHER_FOOTER")}
+        />
+        {keys.map((h) => warningFor(h)).filter(Boolean).map((w) => (
+          <p key={w} className="rounded-md bg-warn-bg px-2.5 py-1.5 text-[12.5px] font-semibold text-warn-ink">{w}</p>
+        ))}
         <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-muted">
           {drafted.length > 0 && <Chip tone="draft">Osparad</Chip>}
           {own !== null ? (

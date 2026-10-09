@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { APP_ICONS, appProblems, MAX_APPS, parseApps, serializeApps, type AppEntry, type CatalogEntry } from "@/lib/settings-shared";
+import { APP_ICONS, appProblems, MAX_APPS, MAX_APPS_LAUNCHER, parseApps, serializeApps, type AppEntry, type CatalogEntry } from "@/lib/settings-shared";
 import { AppIcon } from "@/components/ui/app-icons";
 import { FieldControl } from "./field-control";
 
@@ -25,7 +25,44 @@ const GAP = 12;
 let nextId = 1;
 const toRows = (value: string | null): Row[] =>
   parseApps(value).map((a) => ({ ...a, id: nextId++, adv: !!a.scope }));
-const toValue = (rows: Row[]) => serializeApps(rows.map(({ name, url, icon, scope }) => ({ name, url, icon, scope })));
+const toValue = (rows: Row[]) => serializeApps(rows.map(({ name, url, icon, scope, desc }) => ({ name, url, icon, scope, desc })));
+
+/** A text setting that updates the preview as you type; emptied = not set here (the tablet's default text) */
+function LiveText({ field, label, placeholder }: { field: EditorField; label: string; placeholder?: string }) {
+  const id = `f-${field.meta.key}`;
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <label htmlFor={id} className={LABEL}>{label}</label>
+      <input
+        id={id}
+        value={field.value ?? ""}
+        onChange={(e) => (e.target.value === "" ? field.onClear() : field.onChange(e.target.value))}
+        placeholder={placeholder ?? field.meta.example ?? undefined}
+        aria-invalid={!!field.problem || undefined}
+        className={`${INPUT} ${field.problem ? "border-bad-ink" : field.inherited ? "border-dashed border-field bg-[#f8f9fa] text-muted" : "border-field"}`}
+      />
+      {field.problem && <p className="text-[12.5px] font-semibold text-bad-ink">{field.problem}</p>}
+    </div>
+  );
+}
+
+/** "Börja med": one of the two big choice cards */
+function ModeCard({ selected, title, text, picture, onPick }: { selected: boolean; title: string; text: string; picture: React.ReactNode; onPick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      onClick={onPick}
+      className={`flex items-center gap-4 rounded-xl border-2 px-4 py-3.5 text-left ${selected ? "border-kth-blue bg-[#f4f8fd]" : "border-line bg-white hover:border-field"}`}
+    >
+      <span className="flex h-16 w-[92px] shrink-0 rounded-lg border border-field p-1.5" aria-hidden="true">{picture}</span>
+      <span className="flex min-w-0 flex-col gap-1">
+        <span className="text-[16px] font-extrabold text-kth-navy">{title}</span>
+        <span className="text-[13px] leading-snug text-muted">{text}</span>
+      </span>
+    </button>
+  );
+}
 
 function IconSelect({
   id,
@@ -59,8 +96,10 @@ function IconSelect({
 }
 
 /**
- * The Android tablets' web apps: the home app (START_URL, START_LABEL, START_ICON) and up to
- * five more (APPS, one per line "Namn|https://adress/|ikon|område"). Rows are reordered by
+ * The Android tablets' start and web apps. "Börja med" (HOME_MODE): a first page with services
+ * (launcher: LAUNCHER_TITLE/SUBTITLE/FOOTER and up to six services) or one app as home (app:
+ * START_URL, START_LABEL, START_ICON and up to five more). The list is APPS in both modes, one per
+ * line "Namn|https://adress/|ikon|område|beskrivning". Rows are reordered by
  * dragging the handle: pointer events with capture, so the row itself follows the pointer
  * (no browser drag image) and the others move aside as its edge passes their middle.
  */
@@ -69,12 +108,23 @@ export function AppsEditor({
   homeUrl,
   homeLabel,
   homeIcon,
+  homeMode,
+  launcherTitle,
+  launcherSubtitle,
+  launcherFooter,
 }: {
   apps: EditorField;
   homeUrl?: EditorField;
   homeLabel?: EditorField;
   homeIcon?: EditorField;
+  /** Missing in an older catalog: then always one app as home */
+  homeMode?: EditorField;
+  launcherTitle?: EditorField;
+  launcherSubtitle?: EditorField;
+  launcherFooter?: EditorField;
 }) {
+  const launcher = (homeMode?.value ?? homeMode?.meta.defaultValue ?? "app") === "launcher";
+  const max = launcher ? MAX_APPS_LAUNCHER : MAX_APPS;
   const external = apps.value ?? "";
   const [rows, setRows] = useState<Row[]>(() => toRows(apps.value));
   // Ångra, Ångra alla or a save outside the editor: show the value it now has
@@ -151,12 +201,80 @@ export function AppsEditor({
     };
   }, [anyDrag]);
 
+  const pickMode = (mode: "app" | "launcher") => {
+    if (!homeMode) return;
+    // Standardläget (En app) sätts inte uttryckligen: det är vad enheten gör utan inställning
+    if (mode === (homeMode.meta.defaultValue ?? "app") && !homeMode.inherited) homeMode.onClear();
+    else homeMode.onChange(mode);
+  };
+  const title = launcherTitle?.value?.trim() || launcherTitle?.meta.example || "Vad vill du göra?";
+  const subtitle = launcherSubtitle?.value?.trim() || launcherSubtitle?.meta.example || "Tryck på en tjänst för att börja.";
+  const footer = launcherFooter?.value?.trim() ?? "";
   const homeName = homeLabel?.value?.trim() || "Hem";
   const homeIconName = homeIcon?.value ?? homeIcon?.meta.defaultValue ?? "house";
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Börja med */}
+      {homeMode && (
+        <section className="rounded-[10px] border border-line-soft px-4 py-4">
+          <h4 className="text-[15px] font-extrabold">Börja med</h4>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <ModeCard
+              selected={launcher}
+              title="Förstasida med tjänster"
+              text="Besökaren väljer bland stora kort. Alla tjänster är jämställda."
+              onPick={() => pickMode("launcher")}
+              picture={
+                <span className="grid flex-1 grid-cols-2 grid-rows-2 gap-1">
+                  {[0, 1, 2, 3].map((i) => <span key={i} className="rounded-[3px] bg-kth-light-blue" />)}
+                </span>
+              }
+            />
+            <ModeCard
+              selected={!launcher}
+              title="En app"
+              text="Som i dag: en app är startsida. Fler appar går att växla till i ramen."
+              onPick={() => pickMode("app")}
+              picture={
+                <span className="flex flex-1 flex-col justify-between">
+                  <span className="h-1.5 w-3/5 rounded-[3px] bg-line" />
+                  <span className="h-1.5 w-4/5 rounded-[3px] bg-line-soft" />
+                  <span className="h-2.5 rounded-[3px] bg-kth-blue" />
+                </span>
+              }
+            />
+          </div>
+          <p className="mt-3 text-[13px] leading-snug text-muted">
+            {launcher
+              ? "Startsidan (START_URL) används inte. Efter inaktivitet går enheten tillbaka till förstasidan med ny session. Har enheten bara en tjänst går den direkt in i den."
+              : "Hem-appen är startsida, och efter inaktivitet går enheten tillbaka till den. Med fler appar visas ramen alltid."}
+          </p>
+          {homeMode.problem && <p className="mt-1.5 text-[12.5px] font-semibold text-bad-ink">{homeMode.problem}</p>}
+        </section>
+      )}
+
+      {/* Förstasidans texter */}
+      {launcher && (
+        <section className="rounded-[10px] border border-line-soft px-4 py-4">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+            <h4 className="text-[15px] font-extrabold">Förstasidan</h4>
+            <p className="text-[13px] text-muted">Texterna på sidan där besökaren väljer tjänst. Tomt ger standardtexten.</p>
+          </div>
+          <div className="mt-3 grid gap-4 md:grid-cols-2">
+            {launcherTitle && <LiveText field={launcherTitle} label="Rubrik" />}
+            {launcherSubtitle && <LiveText field={launcherSubtitle} label="Underrubrik" />}
+          </div>
+          {launcherFooter && (
+            <div className="mt-4">
+              <LiveText field={launcherFooter} label="Text längst ner (valfri)" placeholder="Lämna tom om du inte vill ha någon text" />
+            </div>
+          )}
+        </section>
+      )}
+
       {/* Startsidan */}
+      {!launcher && (
       <section className="rounded-[10px] border border-line-soft px-4 py-4">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
           <h4 className="text-[15px] font-extrabold">Startsida</h4>
@@ -185,23 +303,24 @@ export function AppsEditor({
           )}
         </div>
       </section>
+      )}
 
-      {/* Fler webbappar */}
+      {/* Tjänster / Fler webbappar */}
       <section className="rounded-[10px] border border-line-soft px-4 py-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-baseline gap-x-3">
-            <h4 className="text-[15px] font-extrabold">Fler webbappar</h4>
-            <span className="text-[13px] text-muted">
-              {rows.length} av {MAX_APPS}
+            <h4 className="text-[15px] font-extrabold">{launcher ? "Tjänster" : "Fler webbappar"}</h4>
+            <span className={`text-[13px] ${rows.length > max ? "font-bold text-bad-ink" : "text-muted"}`}>
+              {rows.length} av {max}
             </span>
           </div>
           <button
             type="button"
-            disabled={rows.length >= MAX_APPS}
-            onClick={() => commit([...rows, { id: nextId++, name: "", url: "https://", icon: "info", scope: "", adv: false }])}
+            disabled={rows.length >= max}
+            onClick={() => commit([...rows, { id: nextId++, name: "", url: "https://", icon: "info", scope: "", desc: "", adv: false }])}
             className="h-9 rounded-lg border-2 border-kth-blue bg-white px-3.5 text-[13.5px] font-bold text-kth-blue hover:bg-select disabled:opacity-40"
           >
-            + Lägg till app
+            {launcher ? "+ Lägg till tjänst" : "+ Lägg till app"}
           </button>
         </div>
         {apps.inherited && rows.length > 0 && (
@@ -210,7 +329,7 @@ export function AppsEditor({
 
         {rows.length === 0 ? (
           <div className="mt-3 rounded-[10px] border border-dashed border-field px-4 py-6 text-center text-sm text-muted">
-            Inga fler appar. Enheten visar bara startsidan, som i dag.
+            {launcher ? "Inga tjänster. Lägg till minst en, annars har förstasidan inget att visa." : "Inga fler appar. Enheten visar bara startsidan, som i dag."}
           </div>
         ) : (
           <div ref={listRef} className="mt-3 flex flex-col" style={{ gap: GAP }}>
@@ -246,7 +365,7 @@ export function AppsEditor({
                   <div className="flex min-w-0 flex-1 flex-col gap-2.5">
                     <div className="grid gap-3 md:grid-cols-[1fr_2fr_1fr]">
                       <div className="flex min-w-0 flex-col gap-1.5">
-                        <label htmlFor={`app-${r.id}-name`} className={LABEL}>Namn på knappen</label>
+                        <label htmlFor={`app-${r.id}-name`} className={LABEL}>{launcher ? "Namn på kortet" : "Namn på knappen"}</label>
                         <input
                           id={`app-${r.id}-name`}
                           value={r.name}
@@ -276,6 +395,20 @@ export function AppsEditor({
                         {p.icon && <p className="text-[12.5px] font-semibold text-bad-ink">{p.icon}</p>}
                       </div>
                     </div>
+                    {launcher && (
+                      <div className="flex min-w-0 flex-col gap-1.5">
+                        <label htmlFor={`app-${r.id}-desc`} className={LABEL}>Beskrivning (en rad)</label>
+                        <input
+                          id={`app-${r.id}-desc`}
+                          value={r.desc}
+                          onChange={(e) => patch(r.id, { desc: e.target.value })}
+                          placeholder="t.ex. Hitta böcker, artiklar och tidskrifter."
+                          aria-invalid={!!p.desc || undefined}
+                          className={`${INPUT} ${p.desc ? "border-bad-ink" : "border-field"}`}
+                        />
+                        {p.desc && <p className="text-[12.5px] font-semibold text-bad-ink">{p.desc}</p>}
+                      </div>
+                    )}
                     <div className="flex flex-col gap-2">
                       <button
                         type="button"
@@ -320,7 +453,53 @@ export function AppsEditor({
         )}
       </section>
 
-      {/* Förhandsvisning */}
+      {/* Förhandsvisning: förstasidan */}
+      {launcher && (
+        <section className="rounded-[10px] border border-line-soft px-4 py-4">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+            <h4 className="text-[15px] font-extrabold">Så ser förstasidan ut</h4>
+            <p className="text-[13px] text-muted">Liggande skärm, förminskad. Kortens ordning följer listan ovan.</p>
+          </div>
+          <div className="mt-3 w-full max-w-[640px] overflow-hidden rounded-xl border border-field bg-page" aria-label="Förhandsvisning av förstasidan">
+            <div className="relative overflow-hidden bg-kth-navy px-6 pb-10 pt-4 text-white">
+              <svg
+                aria-hidden="true"
+                viewBox="460 0 620 380"
+                preserveAspectRatio="xMaxYMin slice"
+                className="pointer-events-none absolute bottom-0 right-0 h-[92px] w-[150px] -scale-y-100 fill-none stroke-[#6a8ee0] stroke-[1.5] [stroke-linecap:round] [stroke-linejoin:round]"
+              >
+                <polyline vectorEffect="non-scaling-stroke" points="0 120 240 120 -2 483" />
+                <path vectorEffect="non-scaling-stroke" d="m600-3v243c-66.27,0-120-53.73-120-120h602.35" />
+                <path vectorEffect="non-scaling-stroke" d="m720,0c0,198.82,161.18,360,360,360" />
+              </svg>
+              <div className="relative text-xs font-bold text-kth-light-blue">KTH Biblioteket</div>
+              <div className="relative text-[24px] font-extrabold leading-tight">{title}</div>
+              <div className="relative text-[13px] text-kth-light-blue">{subtitle}</div>
+            </div>
+            {rows.length > 0 ? (
+              <div className="grid grid-cols-2 gap-2.5 p-3.5">
+                {rows.slice(0, MAX_APPS_LAUNCHER).map((r) => (
+                  <div key={r.id} className="flex min-w-0 items-center gap-3 rounded-xl border border-line bg-white p-3">
+                    <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-kth-light-blue text-kth-blue">
+                      <AppIcon name={r.icon} className="size-[26px]" />
+                    </span>
+                    <span className="flex min-w-0 flex-col gap-0.5">
+                      <span className="truncate text-sm font-extrabold text-kth-navy">{r.name.trim() || "Utan namn"}</span>
+                      {r.desc.trim() && <span className="truncate text-[11px] text-muted">{r.desc}</span>}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-6 text-center text-[13px] text-muted">Inga tjänster att visa.</div>
+            )}
+            {footer && <div className="border-t border-line bg-white px-6 py-2.5 text-xs text-[#3d4452]">{footer}</div>}
+          </div>
+        </section>
+      )}
+
+      {/* Förhandsvisning: ramen */}
+      {!launcher && (
       <section className="rounded-[10px] border border-line-soft px-4 py-4">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
           <h4 className="text-[15px] font-extrabold">Så ser ramen ut</h4>
@@ -347,6 +526,7 @@ export function AppsEditor({
           </div>
         )}
       </section>
+      )}
 
       {apps.problem && <p className="text-[12.5px] font-semibold text-bad-ink">{apps.problem}</p>}
     </div>

@@ -48,12 +48,13 @@ export function validateValue(meta: Pick<CatalogEntry, "type" | "options">, valu
         ? null
         : `Måste vara ett av: ${meta.options.map((o) => o.label).join(", ")}.`;
     case "apps": {
+      // Högst sex (förstasidan); med En app visar enheten fem utöver startsidan (en varning, settingWarnings)
       const apps = parseApps(value);
-      if (apps.length > MAX_APPS) return `Högst ${MAX_APPS} appar.`;
+      if (apps.length > MAX_APPS_LAUNCHER) return `Högst ${MAX_APPS_LAUNCHER} appar.`;
       const bad = apps.map((a, i) => [i, appProblems(a)] as const).find(([, p]) => Object.keys(p).length);
       if (!bad) return null;
       const [i, p] = bad;
-      return `App ${i + 1}${apps[i].name ? ` (${apps[i].name})` : ""}: ${p.name ?? p.url ?? p.icon ?? p.scope}`;
+      return `App ${i + 1}${apps[i].name ? ` (${apps[i].name})` : ""}: ${p.name ?? p.url ?? p.icon ?? p.desc ?? p.scope}`;
     }
     default:
       return null;
@@ -62,8 +63,10 @@ export function validateValue(meta: Pick<CatalogEntry, "type" | "options">, valu
 
 // --- APPS: the Android tablets' extra web apps ---
 
-/** The tablet shows the home app (START_URL) and at most this many more */
+/** HOME_MODE=app: the tablet shows the home app (START_URL) and at most this many more */
 export const MAX_APPS = 5;
+/** HOME_MODE=launcher: at most this many services on the first page */
+export const MAX_APPS_LAUNCHER = 6;
 
 /** The icons the tablet has (Lucide names), with their names in the admin */
 export const APP_ICONS = [
@@ -83,24 +86,25 @@ export const APP_ICONS = [
   { value: "graduation-cap", label: "Studentmössa" },
 ] as const;
 
-export type AppEntry = { name: string; url: string; icon: string; scope: string };
+/** desc: one line under the name on the first page's card (HOME_MODE=launcher) */
+export type AppEntry = { name: string; url: string; icon: string; scope: string; desc: string };
 
 /**
- * APPS as the tablet reads it: entries separated by line breaks or commas, each
- * "Namn|https://adress/|ikon|område" (icon and scope optional). Tolerant of older values: an
+ * APPS as the tablet reads it: one entry per line (commas only when there is no line break), each
+ * "Namn|https://adress/|ikon|område|beskrivning" (all but name and address optional). Tolerant of older values: an
  * entry without | that looks like an address becomes an app without a name, so it is shown
  * with an error instead of being lost.
  */
 export function parseApps(value: string | null | undefined): AppEntry[] {
   if (!value) return [];
   return value
-    .split(/[\n,]/)
+    .split(value.includes("\n") ? "\n" : ",")
     .map((e) => e.trim())
     .filter(Boolean)
     .map((entry) => {
       const parts = entry.split("|").map((p) => p.trim());
-      if (parts.length === 1 && /^[a-z]+:\/\//i.test(parts[0])) return { name: "", url: parts[0], icon: "", scope: "" };
-      return { name: parts[0] ?? "", url: parts[1] ?? "", icon: parts[2] ?? "", scope: parts[3] ?? "" };
+      if (parts.length === 1 && /^[a-z]+:\/\//i.test(parts[0])) return { name: "", url: parts[0], icon: "", scope: "", desc: "" };
+      return { name: parts[0] ?? "", url: parts[1] ?? "", icon: parts[2] ?? "", scope: parts[3] ?? "", desc: parts[4] ?? "" };
     });
 }
 
@@ -108,7 +112,7 @@ export function parseApps(value: string | null | undefined): AppEntry[] {
 export function serializeApps(apps: AppEntry[]): string {
   return apps
     .map((a) => {
-      const parts = [a.name.trim(), a.url.trim(), a.icon.trim(), a.scope.trim()];
+      const parts = [a.name.trim(), a.url.trim(), a.icon.trim(), a.scope.trim(), a.desc.trim()];
       while (parts.length > 2 && !parts[parts.length - 1]) parts.pop();
       return parts.join("|");
     })
@@ -125,6 +129,7 @@ export function appProblems(a: AppEntry): Partial<Record<keyof AppEntry, string>
   else if (/[\s|,"]/.test(a.url.trim())) out.url = "Adressen får inte innehålla mellanslag, | , eller \".";
   if (a.icon && !APP_ICONS.some((i) => i.value === a.icon)) out.icon = `Okänd ikon: ${a.icon}`;
   if (/[\s|,"]/.test(a.scope.trim())) out.scope = "Området får inte innehålla mellanslag, | , eller \".";
+  if (forbidden.test(a.desc)) out.desc = "Beskrivningen får inte innehålla | , eller \".";
   return out;
 }
 
@@ -162,7 +167,7 @@ export function formatValue(meta: CatalogEntry | undefined, value: string | null
         .map((a) => {
           const where = a.url.replace(/^https:\/\//, "").replace(/\/$/, "");
           const icon = APP_ICONS.find((i) => i.value === a.icon)?.label ?? (a.icon || "ingen ikon");
-          return `${a.name || "utan namn"} (${[where, icon, a.scope && `område ${a.scope}`].filter(Boolean).join(", ")})`;
+          return `${a.name || "utan namn"} (${[where, icon, a.scope && `område ${a.scope}`, a.desc && `”${a.desc}”`].filter(Boolean).join(", ")})`;
         })
         .join(" · ");
     }
@@ -210,6 +215,15 @@ export function settingWarnings(value: (key: string) => string | null, catalog: 
       key: "HEARTBEAT_INTERVAL",
       message: "Statusrapport var: datorn förstår 1–60 minuter och använder 5 för andra värden.",
     });
+  const appsMeta = [...catalog.values()].find((k) => k.type === "apps");
+  if (appsMeta) {
+    const apps = parseApps(value(appsMeta.key));
+    const launcher = catalog.has("HOME_MODE") && (value("HOME_MODE") ?? catalog.get("HOME_MODE")!.defaultValue) === "launcher";
+    if (launcher && apps.length === 0)
+      warnings.push({ key: appsMeta.key, message: "Förstasidan har inga tjänster. Enheten visar då startsidan, som med En app." });
+    if (!launcher && apps.length > MAX_APPS)
+      warnings.push({ key: appsMeta.key, message: `Med En app visar enheten högst ${MAX_APPS} appar utöver startsidan. Den sista hoppas över.` });
+  }
   const resource = (value("RESOURCE_ID") ?? "").trim();
   if (type === "guestcomputer" && catalog.has("RESOURCE_ID") && (!resource || resource === "x"))
     warnings.push({
