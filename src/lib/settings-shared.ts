@@ -150,10 +150,12 @@ export function parseApps(value: string | null | undefined): AppEntry[] {
 /**
  * One app per line, empty trailing parts left out; JSON when some text contains | , " or a line
  * break (see parseApps), so the tablets with older apps keep working as long as nobody uses them.
+ * json: always JSON on one line (the Linux kiosk, where every setting is one line in .config; a
+ * line break in a text becomes \n inside the JSON string).
  */
-export function serializeApps(apps: AppEntry[]): string {
+export function serializeApps(apps: AppEntry[], json = false): string {
   const clean = apps.map((a) => Object.fromEntries(APP_FIELDS.map((k) => [k, a[k].trim()])) as AppEntry);
-  if (clean.some((a) => APP_FIELDS.some((k) => /[|,"\n]/.test(a[k]))))
+  if (json || clean.some((a) => APP_FIELDS.some((k) => /[|,"\n]/.test(a[k]))))
     return JSON.stringify(clean.map((a) => Object.fromEntries(APP_FIELDS.filter((k) => a[k]).map((k) => [k, a[k]]))));
   return clean
     .map((a) => {
@@ -233,7 +235,11 @@ export type SettingWarning = { key: string; message: string };
  * form and the review; they never block saving. `value` is the effective value of a key
  * as the editor shows it (own, drafted or inherited; null = not set anywhere).
  */
-export function settingWarnings(value: (key: string) => string | null, catalog: Map<string, CatalogEntry>): SettingWarning[] {
+export function settingWarnings(
+  value: (key: string) => string | null,
+  catalog: Map<string, CatalogEntry>,
+  platform?: string,
+): SettingWarning[] {
   const warnings: SettingWarning[] = [];
   const saver = catalog.get("SCREENSAVER");
   const files = catalog.get("SCREENSAVER_FILES");
@@ -262,14 +268,21 @@ export function settingWarnings(value: (key: string) => string | null, catalog: 
   if (appsMeta) {
     const apps = parseApps(value(appsMeta.key));
     const launcher = catalog.has("HOME_MODE") && (value("HOME_MODE") ?? catalog.get("HOME_MODE")!.defaultValue) === "launcher";
+    // Android har en egen startsida (START_URL); på Linux-kiosken är tjänsterna allt
+    const ownStart = catalog.has("START_URL");
     if (launcher && apps.length === 0)
-      warnings.push({ key: appsMeta.key, message: "Förstasidan har inga tjänster. Enheten visar då startsidan, som med En app." });
-    if ((value(appsMeta.key) ?? "").trim().startsWith("["))
+      warnings.push({
+        key: appsMeta.key,
+        message: ownStart
+          ? "Förstasidan har inga tjänster. Enheten visar då startsidan, som med En app."
+          : "Kiosken har inga tjänster. Lägg till minst en.",
+      });
+    if (platform === "android" && (value(appsMeta.key) ?? "").trim().startsWith("["))
       warnings.push({
         key: appsMeta.key,
         message: "Någon text innehåller | , \" eller en radbrytning. Då sparas apparna i ett format som enheterna läser från PubLiKiosk 3.14.0. Äldre appar visar inga appar.",
       });
-    if (!launcher && apps.length > MAX_APPS)
+    if (ownStart && !launcher && apps.length > MAX_APPS)
       warnings.push({ key: appsMeta.key, message: `Med En app visar enheten högst ${MAX_APPS} appar utöver startsidan. Den sista hoppas över.` });
   }
   const resource = (value("RESOURCE_ID") ?? "").trim();

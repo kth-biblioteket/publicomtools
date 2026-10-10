@@ -28,7 +28,7 @@ const GAP = 12;
 let nextId = 1;
 const toRows = (value: string | null): Row[] =>
   parseApps(value).map((a) => ({ ...a, id: nextId++, adv: !!a.scope }));
-const toValue = (rows: Row[]) => serializeApps(rows);
+const toValue = (rows: Row[], json = false) => serializeApps(rows, json);
 
 /** A text setting that updates the preview as you type; emptied = not set here (the tablet's default text) */
 function LiveText({ field, label, placeholder }: { field: EditorField; label: string; placeholder?: string }) {
@@ -118,6 +118,7 @@ export function AppsEditor({
   launcherTitleEn,
   launcherSubtitleEn,
   launcherFooterEn,
+  alwaysJson = false,
 }: {
   apps: EditorField;
   homeUrl?: EditorField;
@@ -132,16 +133,21 @@ export function AppsEditor({
   launcherTitleEn?: EditorField;
   launcherSubtitleEn?: EditorField;
   launcherFooterEn?: EditorField;
+  /** Linux: APPS is always written as one line of JSON (each setting is one line in .config) */
+  alwaysJson?: boolean;
 }) {
   const launcher = (homeMode?.value ?? homeMode?.meta.defaultValue ?? "app") === "launcher";
-  const max = launcher ? MAX_APPS_LAUNCHER : MAX_APPS;
+  // Utan START_URL (Linux-kiosken) är första tjänsten hem, och START_LABEL/START_ICON är startknappen
+  // som tar besökaren tillbaka till början, i båda lägena
+  const firstAppHome = !homeUrl;
+  const max = launcher || firstAppHome ? MAX_APPS_LAUNCHER : MAX_APPS;
   const external = apps.value ?? "";
   const [rows, setRows] = useState<Row[]>(() => toRows(apps.value));
   // Ångra, Ångra alla or a save outside the editor: show the value it now has
   const [synced, setSynced] = useState(external);
   if (external !== synced) {
     setSynced(external);
-    if (toValue(rows) !== external) setRows(toRows(apps.value));
+    if (toValue(rows, alwaysJson) !== external) setRows(toRows(apps.value));
   }
 
   const listRef = useRef<HTMLDivElement>(null);
@@ -150,7 +156,7 @@ export function AppsEditor({
 
   const commit = (next: Row[]) => {
     setRows(next);
-    const value = toValue(next);
+    const value = toValue(next, alwaysJson);
     setSynced(value);
     apps.onChange(value);
   };
@@ -252,8 +258,12 @@ export function AppsEditor({
             />
             <ModeCard
               selected={!launcher}
-              title="En app"
-              text="Som i dag: en app är startsida. Fler appar går att växla till i ramen."
+              title={firstAppHome ? "Första tjänsten är hem" : "En app"}
+              text={
+                firstAppHome
+                  ? "Första tjänsten öppnas direkt. De övriga ligger som flikar i navigeringen."
+                  : "Som i dag: en app är startsida. Fler appar går att växla till i ramen."
+              }
               onPick={() => pickMode("app")}
               picture={
                 <span className="flex flex-1 flex-col justify-between">
@@ -265,9 +275,13 @@ export function AppsEditor({
             />
           </div>
           <p className="mt-3 text-[13px] leading-snug text-muted">
-            {launcher
-              ? "Startsidan (START_URL) används inte. Efter inaktivitet går enheten tillbaka till förstasidan med ny session. Har enheten bara en tjänst går den direkt in i den."
-              : "Hem-appen är startsida, och efter inaktivitet går enheten tillbaka till den. Med fler appar visas ramen alltid."}
+            {firstAppHome
+              ? launcher
+                ? "Efter inaktivitet går datorn tillbaka till förstasidan med ny session."
+                : "Efter inaktivitet går datorn tillbaka till första tjänsten med ny session."
+              : launcher
+                ? "Startsidan (START_URL) används inte. Efter inaktivitet går enheten tillbaka till förstasidan med ny session. Har enheten bara en tjänst går den direkt in i den."
+                : "Hem-appen är startsida, och efter inaktivitet går enheten tillbaka till den. Med fler appar visas ramen alltid."}
           </p>
           {homeMode.problem && <p className="mt-1.5 text-[12.5px] font-semibold text-bad-ink">{homeMode.problem}</p>}
         </section>
@@ -295,8 +309,27 @@ export function AppsEditor({
         </section>
       )}
 
+      {/* Startknappen (Linux-kiosken): tillbaka till början, i båda lägena */}
+      {firstAppHome && (homeLabel || homeIcon) && (
+        <section className="rounded-[10px] border border-line-soft px-4 py-4">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+            <h4 className="text-[15px] font-extrabold">Startknappen</h4>
+            <p className="text-[13px] text-muted">Knappen i navigeringen som tar besökaren tillbaka till början.</p>
+          </div>
+          <div className="mt-3 grid gap-4 @xl:grid-cols-2">
+            {homeLabel && <LiveText field={homeLabel} label="Namn på knappen" placeholder="Tomt: Startsida (Home på engelska)" />}
+            {homeIcon && (
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <label htmlFor="home-icon" className={LABEL}>Ikon</label>
+                <IconSelect id="home-icon" value={homeIconName} inherited={homeIcon.inherited || homeIcon.value === null} onChange={homeIcon.onChange} />
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
       {/* Startsidan */}
-      {!launcher && (
+      {!launcher && !firstAppHome && (
       <section className="rounded-[10px] border border-line-soft px-4 py-4">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
           <h4 className="text-[15px] font-extrabold">Startsida</h4>
@@ -331,7 +364,7 @@ export function AppsEditor({
       <section className="rounded-[10px] border border-line-soft px-4 py-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-baseline gap-x-3">
-            <h4 className="text-[15px] font-extrabold">{launcher ? "Tjänster" : "Fler webbappar"}</h4>
+            <h4 className="text-[15px] font-extrabold">{launcher || firstAppHome ? "Tjänster" : "Fler webbappar"}</h4>
             <span className={`text-[13px] ${rows.length > max ? "font-bold text-bad-ink" : "text-muted"}`}>
               {rows.length} av {max}
             </span>
@@ -342,7 +375,7 @@ export function AppsEditor({
             onClick={() => commit([...rows, { id: nextId++, name: "", url: "https://", icon: "info", scope: "", desc: "", nameEn: "", descEn: "", adv: false }])}
             className="h-9 rounded-lg border-2 border-kth-blue bg-white px-3.5 text-[13.5px] font-bold text-kth-blue hover:bg-select disabled:opacity-40"
           >
-            {launcher ? "+ Lägg till tjänst" : "+ Lägg till app"}
+            {launcher || firstAppHome ? "+ Lägg till tjänst" : "+ Lägg till app"}
           </button>
         </div>
         {apps.inherited && rows.length > 0 && (
@@ -351,7 +384,9 @@ export function AppsEditor({
 
         {rows.length === 0 ? (
           <div className="mt-3 rounded-[10px] border border-dashed border-field px-4 py-6 text-center text-sm text-muted">
-            {launcher ? "Inga tjänster. Lägg till minst en, annars har förstasidan inget att visa." : "Inga fler appar. Enheten visar bara startsidan, som i dag."}
+            {launcher || firstAppHome
+              ? "Inga tjänster. Lägg till minst en, annars har förstasidan inget att visa."
+              : "Inga fler appar. Enheten visar bara startsidan, som i dag."}
           </div>
         ) : (
           <div ref={listRef} className="mt-3 flex flex-col" style={{ gap: GAP }}>
@@ -578,14 +613,21 @@ export function AppsEditor({
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
           <h4 className="text-[15px] font-extrabold">Så ser ramen ut</h4>
           <p className="text-[13px] text-muted">
-            {rows.length ? "Hem-appen är vald. Ramen visas alltid när det finns fler än en app." : "Med bara startsidan visas ramen som i dag: Tillbaka och Hem när besökaren lämnat appen."}
+            {firstAppHome
+              ? "Första tjänsten är vald. De övriga ligger som flikar."
+              : rows.length
+                ? "Hem-appen är vald. Ramen visas alltid när det finns fler än en app."
+                : "Med bara startsidan visas ramen som i dag: Tillbaka och Hem när besökaren lämnat appen."}
           </p>
         </div>
         {rows.length > 0 && (
           <div className="mt-3 flex h-[68px] items-center gap-2.5 overflow-hidden rounded-[10px] border border-line bg-white px-3" aria-label="Förhandsvisning av ramen">
             <span className="flex h-12 shrink-0 items-center rounded-[10px] border-2 border-field px-3 text-[15px] font-bold opacity-45">‹ Tillbaka</span>
             <div className="flex min-w-0 flex-1 gap-2">
-              {[{ id: 0, label: homeName, icon: homeIconName, home: true }, ...rows.map((r) => ({ id: r.id, label: r.name.trim() || "Utan namn", icon: r.icon, home: false }))].map((c) => (
+              {(firstAppHome
+                ? rows.map((r, i) => ({ id: r.id, label: r.name.trim() || "Utan namn", icon: r.icon, home: i === 0 }))
+                : [{ id: 0, label: homeName, icon: homeIconName, home: true }, ...rows.map((r) => ({ id: r.id, label: r.name.trim() || "Utan namn", icon: r.icon, home: false }))]
+              ).map((c) => (
                 <span
                   key={c.id}
                   className={`flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-[10px] border-2 px-2 text-[15px] font-bold ${

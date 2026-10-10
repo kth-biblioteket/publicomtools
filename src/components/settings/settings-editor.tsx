@@ -157,7 +157,7 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
       .filter(([, p]) => p)
   ) as Record<string, string>;
   const issues = { ...serverIssues, ...clientIssues };
-  const warnings = settingWarnings(shown, meta);
+  const warnings = settingWarnings(shown, meta, data.platform);
   const warningFor = (key: string) => warnings.find((w) => w.key === key)?.message;
 
   const save = () => {
@@ -242,6 +242,7 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
           launcherTitleEn={field("LAUNCHER_TITLE_EN")}
           launcherSubtitleEn={field("LAUNCHER_SUBTITLE_EN")}
           launcherFooterEn={field("LAUNCHER_FOOTER_EN")}
+          alwaysJson={data.platform !== "android"}
         />
         {keys.map((h) => warningFor(h)).filter(Boolean).map((w) => (
           <p key={w} className="rounded-md bg-warn-bg px-2.5 py-1.5 text-[12.5px] font-semibold text-warn-ink">{w}</p>
