@@ -147,7 +147,7 @@ export async function saveSettings(target: Target, input: SaveInput, changedBy: 
     const m = meta.get(key);
     if (!m) issues.push({ key, problem: "Inställningen finns inte i katalogen." });
     else {
-      const problem = validateValue(m, value);
+      const problem = validateValue(m, value, data.platform);
       if (problem) issues.push({ key, problem });
     }
   }

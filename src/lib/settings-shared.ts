@@ -33,9 +33,13 @@ export type Change = { key: string; before: string | null; after: string | null 
 
 export const PROFILE_KEY = "__profile";
 
-/** Why a value can't be saved, or null. */
-export function validateValue(meta: Pick<CatalogEntry, "type" | "options">, value: string): string | null {
-  if (value.includes('"')) return "Får inte innehålla dubbelcitattecken (\").";
+/**
+ * Why a value can't be saved, or null. platform: the Linux computers get their settings as
+ * KEY="value" lines, so a " would end the value there; the Android tablets get JSON, where every
+ * character is fine (no platform: the stricter Linux rule).
+ */
+export function validateValue(meta: Pick<CatalogEntry, "type" | "options">, value: string, platform?: string): string | null {
+  if (platform !== "android" && value.includes('"')) return "Får inte innehålla dubbelcitattecken (\").";
   switch (meta.type) {
     case "int":
       return /^-?\d+$/.test(value) ? null : "Skriv ett heltal.";
@@ -92,15 +96,35 @@ export const APP_ICONS = [
  */
 export type AppEntry = { name: string; url: string; icon: string; scope: string; desc: string; nameEn: string; descEn: string };
 
+const APP_FIELDS = ["name", "url", "icon", "scope", "desc", "nameEn", "descEn"] as const;
+
 /**
- * APPS as the tablet reads it: one entry per line (commas only when there is no line break), each
- * "Namn|https://adress/|ikon|område|beskrivning|namn_en|beskrivning_en" (all but name and address
- * optional). Tolerant of older values: an
- * entry without | that looks like an address becomes an app without a name, so it is shown
- * with an error instead of being lost.
+ * APPS as the tablet reads it, in one of two forms:
+ * - one entry per line (commas only when there is no line break), each
+ *   "Namn|https://adress/|ikon|område|beskrivning|namn_en|beskrivning_en" (all but name and address
+ *   optional);
+ * - a JSON array of {name, url, icon, scope, desc, nameEn, descEn}, written when a text contains a
+ *   character the line form can't carry (| , " or a line break), so that every character works in
+ *   names and descriptions. The tablet reads it from PubLiKiosk 3.14.0.
+ * Tolerant of older values: an entry without | that looks like an address becomes an app without a
+ * name, so it is shown with an error instead of being lost.
  */
 export function parseApps(value: string | null | undefined): AppEntry[] {
   if (!value) return [];
+  const trimmed = value.trim();
+  if (trimmed.startsWith("[")) {
+    try {
+      const list: unknown = JSON.parse(trimmed);
+      if (Array.isArray(list))
+        return list.map((o) => {
+          const rec = o && typeof o === "object" ? (o as Record<string, unknown>) : {};
+          const str = (k: string) => (typeof rec[k] === "string" ? (rec[k] as string) : "");
+          return Object.fromEntries(APP_FIELDS.map((k) => [k, str(k)])) as AppEntry;
+        });
+    } catch {
+      // Inte JSON trots allt: läs som rader nedan, så visas felen i stället för att posterna försvinner
+    }
+  }
   return value
     .split(value.includes("\n") ? "\n" : ",")
     .map((e) => e.trim())
@@ -121,30 +145,31 @@ export function parseApps(value: string | null | undefined): AppEntry[] {
     });
 }
 
-/** One app per line; empty trailing parts are left out */
+/**
+ * One app per line, empty trailing parts left out; JSON when some text contains | , " or a line
+ * break (see parseApps), so the tablets with older apps keep working as long as nobody uses them.
+ */
 export function serializeApps(apps: AppEntry[]): string {
-  return apps
+  const clean = apps.map((a) => Object.fromEntries(APP_FIELDS.map((k) => [k, a[k].trim()])) as AppEntry);
+  if (clean.some((a) => APP_FIELDS.some((k) => /[|,"\n]/.test(a[k]))))
+    return JSON.stringify(clean.map((a) => Object.fromEntries(APP_FIELDS.filter((k) => a[k]).map((k) => [k, a[k]]))));
+  return clean
     .map((a) => {
-      const parts = [a.name, a.url, a.icon, a.scope, a.desc, a.nameEn, a.descEn].map((p) => p.trim());
+      const parts = APP_FIELDS.map((k) => a[k]);
       while (parts.length > 2 && !parts[parts.length - 1]) parts.pop();
       return parts.join("|");
     })
     .join("\n");
 }
 
-/** Why one app can't be saved, per field (empty = fine). | , and " would split the entry on the tablet. */
+/** Why one app can't be saved, per field (empty = fine). Names and descriptions take any character. */
 export function appProblems(a: AppEntry): Partial<Record<keyof AppEntry, string>> {
   const out: Partial<Record<keyof AppEntry, string>> = {};
-  const forbidden = /[|,"]/;
   if (!a.name.trim()) out.name = "Skriv ett namn på knappen.";
-  else if (forbidden.test(a.name)) out.name = "Namnet får inte innehålla | , eller \".";
-  if (!/^https:\/\/[^\s/|,"]+/.test(a.url.trim())) out.url = "Adressen måste börja med https://";
-  else if (/[\s|,"]/.test(a.url.trim())) out.url = "Adressen får inte innehålla mellanslag, | , eller \".";
+  if (!/^https:\/\/[^\s/]+/.test(a.url.trim())) out.url = "Adressen måste börja med https://";
+  else if (/\s/.test(a.url.trim())) out.url = "Adressen får inte innehålla mellanslag.";
   if (a.icon && !APP_ICONS.some((i) => i.value === a.icon)) out.icon = `Okänd ikon: ${a.icon}`;
-  if (/[\s|,"]/.test(a.scope.trim())) out.scope = "Området får inte innehålla mellanslag, | , eller \".";
-  if (forbidden.test(a.desc)) out.desc = "Beskrivningen får inte innehålla | , eller \".";
-  if (forbidden.test(a.nameEn)) out.nameEn = "Namnet får inte innehålla | , eller \".";
-  if (forbidden.test(a.descEn)) out.descEn = "Beskrivningen får inte innehålla | , eller \".";
+  if (/\s/.test(a.scope.trim())) out.scope = "Området får inte innehålla mellanslag.";
   return out;
 }
 
@@ -237,6 +262,11 @@ export function settingWarnings(value: (key: string) => string | null, catalog: 
     const launcher = catalog.has("HOME_MODE") && (value("HOME_MODE") ?? catalog.get("HOME_MODE")!.defaultValue) === "launcher";
     if (launcher && apps.length === 0)
       warnings.push({ key: appsMeta.key, message: "Förstasidan har inga tjänster. Enheten visar då startsidan, som med En app." });
+    if ((value(appsMeta.key) ?? "").trim().startsWith("["))
+      warnings.push({
+        key: appsMeta.key,
+        message: "Någon text innehåller | , \" eller en radbrytning. Då sparas apparna i ett format som enheterna läser från PubLiKiosk 3.14.0. Äldre appar visar inga appar.",
+      });
     if (!launcher && apps.length > MAX_APPS)
       warnings.push({ key: appsMeta.key, message: `Med En app visar enheten högst ${MAX_APPS} appar utöver startsidan. Den sista hoppas över.` });
   }

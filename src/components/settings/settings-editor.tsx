@@ -153,7 +153,7 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
   const clientIssues = Object.fromEntries(
     Object.entries(drafts)
       .filter(([k, v]) => v !== null && meta.has(k))
-      .map(([k, v]) => [k, validateValue(meta.get(k)!, v!)] as const)
+      .map(([k, v]) => [k, validateValue(meta.get(k)!, v!, data.platform)] as const)
       .filter(([, p]) => p)
   ) as Record<string, string>;
   const issues = { ...serverIssues, ...clientIssues };
