@@ -342,7 +342,14 @@ export function AppsEditor({
   const fields = infoFields.filter((f): f is EditorField => !!f);
   const shownFields = fields.map((f) => parseInfoField(f.value)).filter((f) => f.type && !infoFieldProblem(f));
   const messageText = text(message, messageEn, "", "") || (messageUrl?.value?.trim() ? (english ? "(text from the address)" : "(text från adressen)") : "");
-  const alertStyle = (messageStyle?.value ?? messageStyle?.meta.defaultValue) === "alert";
+  // info = blå (information), warning = gul (varning), alert = röd (störning)
+  const messageLevel = messageStyle?.value ?? messageStyle?.meta.defaultValue ?? "warning";
+  const messageColors =
+    messageLevel === "alert"
+      ? "bg-[#b3261e] text-white"
+      : messageLevel === "info"
+        ? "border-t-2 border-kth-blue bg-kth-light-blue text-kth-navy"
+        : "border-t-2 border-[#e0a82e] bg-[#fff3d6] text-[#4a3200]";
   const messageIconName = messageIcon ? (messageIcon.value ?? messageIcon.meta.defaultValue ?? "info") : "info";
   const allowed = [
     ...(allowedSites?.value ?? "").split(/[\s,]+/).filter(Boolean),
@@ -793,7 +800,7 @@ export function AppsEditor({
             )}
             {messageText && (
               <div
-                className={`flex items-center gap-2 px-6 py-2 text-xs font-semibold ${alertStyle ? "bg-[#b3261e] text-white" : "border-t-2 border-[#e0a82e] bg-[#fff3d6] text-[#4a3200]"}`}
+                className={`flex items-center gap-2 px-6 py-2 text-xs font-semibold ${messageColors}`}
               >
                 <AppIcon name={messageIconName} className="size-4" />
                 <span className="truncate">{messageText}</span>
