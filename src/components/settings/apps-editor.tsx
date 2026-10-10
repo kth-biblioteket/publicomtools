@@ -1,7 +1,22 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { APP_ICONS, appProblems, MAX_APPS, MAX_APPS_LAUNCHER, parseApps, serializeApps, type AppEntry, type CatalogEntry } from "@/lib/settings-shared";
+import {
+  APP_ICONS,
+  appProblems,
+  hostAllowed,
+  hostOf,
+  infoFieldProblem,
+  MAX_APPS,
+  MAX_APPS_LAUNCHER,
+  parseApps,
+  parseInfoField,
+  serializeApps,
+  serializeInfoField,
+  type AppEntry,
+  type CatalogEntry,
+  type InfoField,
+} from "@/lib/settings-shared";
 import { AppIcon } from "@/components/ui/app-icons";
 // KTH:s vita logotyp (samma fil som i static och bookingtools), som statisk tillgång så att sökvägen
 // får BASE_PATH även här i webbläsaren
@@ -45,6 +60,60 @@ function LiveText({ field, label, placeholder }: { field: EditorField; label: st
         className={`${INPUT} ${field.problem ? "border-bad-ink" : field.inherited ? "border-dashed border-field bg-[#f8f9fa] text-muted" : "border-field"}`}
       />
       {field.problem && <p className="text-[12.5px] font-semibold text-bad-ink">{field.problem}</p>}
+    </div>
+  );
+}
+
+const INFO_TYPES = [
+  { value: "text", label: "Text" },
+  { value: "url", label: "Text från adress" },
+  { value: "clock", label: "Klocka" },
+];
+
+/** One information field (LAUNCHER_FIELD_n): label, what it shows, the value, and the label in English */
+function InfoFieldRow({ field, n, hostWarning }: { field: EditorField; n: number; hostWarning: (url: string) => string | null }) {
+  const f = parseInfoField(field.value);
+  const set = (p: Partial<InfoField>) => {
+    const v = serializeInfoField({ ...f, ...p });
+    if (v) field.onChange(v);
+    else field.onClear();
+  };
+  const problem = infoFieldProblem(f);
+  const warn = f.type === "url" && !problem ? hostWarning(f.value) : null;
+  const id = `f-${field.meta.key}`;
+  return (
+    <div className="flex flex-col gap-1.5 rounded-[10px] border border-line p-3">
+      <div className="grid gap-3 @2xl:grid-cols-[1fr_1fr_2fr_1fr]">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <label htmlFor={`${id}-label`} className={LABEL}>Fält {n}: etikett</label>
+          <input id={`${id}-label`} value={f.label} onChange={(e) => set({ label: e.target.value })} placeholder="t.ex. Öppet idag" className={`${INPUT} border-field`} />
+        </div>
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <label htmlFor={`${id}-type`} className={LABEL}>Visar</label>
+          <select id={`${id}-type`} value={f.type} onChange={(e) => set({ type: e.target.value })} className={`${INPUT} border-field px-2.5`}>
+            <option value="">Inget (fältet visas inte)</option>
+            {INFO_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+          </select>
+        </div>
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <label htmlFor={`${id}-value`} className={LABEL}>{f.type === "url" ? "Adress (svarar med ren text)" : "Text"}</label>
+          <input
+            id={`${id}-value`}
+            value={f.type === "clock" ? "" : f.value}
+            disabled={f.type === "clock" || !f.type}
+            inputMode={f.type === "url" ? "url" : undefined}
+            onChange={(e) => set({ value: e.target.value })}
+            placeholder={f.type === "clock" ? "Klockan visas" : f.type === "url" ? "https://" : "t.ex. 8–19"}
+            className={`${INPUT} ${f.type === "url" ? "font-mono text-[13px]" : ""} ${problem ? "border-bad-ink" : "border-field"} disabled:bg-page`}
+          />
+        </div>
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <label htmlFor={`${id}-en`} className={LABEL}>Etikett (English)</label>
+          <input id={`${id}-en`} value={f.labelEn} onChange={(e) => set({ labelEn: e.target.value })} placeholder="Tomt: den svenska" className={`${INPUT} border-field`} />
+        </div>
+      </div>
+      {problem && <p className="text-[12.5px] font-semibold text-bad-ink">{problem} Enheten visar inte fältet.</p>}
+      {warn && <p className="rounded-md bg-warn-bg px-2.5 py-1.5 text-[12.5px] font-semibold text-warn-ink">{warn}</p>}
     </div>
   );
 }
@@ -119,6 +188,13 @@ export function AppsEditor({
   launcherSubtitleEn,
   launcherFooterEn,
   alwaysJson = false,
+  infoFields = [],
+  message,
+  messageEn,
+  messageUrl,
+  messageStyle,
+  refresh,
+  allowedSites,
 }: {
   apps: EditorField;
   homeUrl?: EditorField;
@@ -135,6 +211,20 @@ export function AppsEditor({
   launcherFooterEn?: EditorField;
   /** Linux: APPS is always written as one line of JSON (each setting is one line in .config) */
   alwaysJson?: boolean;
+  /** LAUNCHER_FIELD_1–4: the first page's information fields (missing in older catalogs) */
+  infoFields?: (EditorField | undefined)[];
+  /** LAUNCHER_MESSAGE(_EN, _URL, _STYLE): the message line above the fields */
+  message?: EditorField;
+  messageEn?: EditorField;
+  messageUrl?: EditorField;
+  messageStyle?: EditorField;
+  /** LAUNCHER_REFRESH: minutes between fetches from the addresses */
+  refresh?: EditorField;
+  /**
+   * The setting with the allowed sites ({label, key, value}): an address in a field or the message
+   * is fetched only if its host is a service, the start page or one of these
+   */
+  allowedSites?: { label: string; key: string; value: string | null };
 }) {
   const launcher = (homeMode?.value ?? homeMode?.meta.defaultValue ?? "app") === "launcher";
   // Utan START_URL (Linux-kiosken) är första tjänsten hem, och START_LABEL/START_ICON är startknappen
@@ -233,6 +323,23 @@ export function AppsEditor({
   const title = text(launcherTitle, launcherTitleEn, "Vad vill du göra?", "What do you need?");
   const subtitle = text(launcherSubtitle, launcherSubtitleEn, "Tryck på en tjänst för att börja.", "Tap a service to begin.");
   const footer = text(launcherFooter, launcherFooterEn, "", "");
+
+  // Informationsfält och meddelanderad
+  const fields = infoFields.filter((f): f is EditorField => !!f);
+  const shownFields = fields.map((f) => parseInfoField(f.value)).filter((f) => f.type && !infoFieldProblem(f));
+  const messageText = text(message, messageEn, "", "") || (messageUrl?.value?.trim() ? (english ? "(text from the address)" : "(text från adressen)") : "");
+  const alertStyle = (messageStyle?.value ?? messageStyle?.meta.defaultValue) === "alert";
+  const allowed = [
+    ...(allowedSites?.value ?? "").split(/[\s,]+/).filter(Boolean),
+    ...rows.map((r) => r.url),
+    ...(homeUrl?.value ? [homeUrl.value] : []),
+  ];
+  const hostWarning = (url: string) => {
+    const host = hostOf(url);
+    if (!host || hostAllowed(host, allowed)) return null;
+    return `${host} är inte en tillåten webbplats, så enheten hämtar inget därifrån. Lägg till den i ${allowedSites?.label ?? "Tillåtna webbplatser"} (${allowedSites?.key ?? "WHITE_LIST"}) eller som tjänst.`;
+  };
+  const clockNow = new Date().toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
   const homeName = homeLabel?.value?.trim() || "Hem";
   const homeIconName = homeIcon?.value ?? homeIcon?.meta.defaultValue ?? "house";
 
@@ -306,6 +413,53 @@ export function AppsEditor({
             )}
             {launcherFooterEn && <LiveText field={launcherFooterEn} label="Text längst ner (English)" placeholder="Tomt: den svenska texten" />}
           </div>
+        </section>
+      )}
+
+      {/* Informationsfält och meddelande (förstasidan) */}
+      {launcher && (fields.length > 0 || message || messageUrl) && (
+        <section className="rounded-[10px] border border-line-soft px-4 py-4">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+            <h4 className="text-[15px] font-extrabold">Informationsfält och meddelande</h4>
+            <p className="text-[13px] text-muted">
+              Längst ner på förstasidan. Finns något fält döljs textraden längst ner. En adress måste svara med ren text och ligga på en tillåten webbplats.
+            </p>
+          </div>
+          {fields.length > 0 && (
+            <div className="mt-3 flex flex-col gap-2.5">
+              {fields.map((f, i) => (
+                <InfoFieldRow key={f.meta.key} field={f} n={i + 1} hostWarning={hostWarning} />
+              ))}
+            </div>
+          )}
+          {(message || messageUrl) && (
+            <div className="mt-4 grid gap-4 @xl:grid-cols-2">
+              {message && <LiveText field={message} label="Meddelanderad" placeholder="Tom: ingen rad" />}
+              {messageEn && <LiveText field={messageEn} label="Meddelanderad (English)" placeholder="Tomt: den svenska raden" />}
+              {messageUrl && (
+                <div className="flex min-w-0 flex-col gap-1.5">
+                  <LiveText field={messageUrl} label="Meddelande från adress (valfri)" placeholder="https://" />
+                  {messageUrl.value && hostWarning(messageUrl.value) && (
+                    <p className="rounded-md bg-warn-bg px-2.5 py-1.5 text-[12.5px] font-semibold text-warn-ink">{hostWarning(messageUrl.value)}</p>
+                  )}
+                </div>
+              )}
+              <div className="grid gap-4 @md:grid-cols-2">
+                {messageStyle && (
+                  <div className="flex min-w-0 flex-col gap-1.5">
+                    <label htmlFor={`f-${messageStyle.meta.key}`} className={LABEL}>Färg</label>
+                    <FieldControl {...messageStyle} invalid={!!messageStyle.problem} />
+                  </div>
+                )}
+                {refresh && (
+                  <div className="flex min-w-0 flex-col gap-1.5">
+                    <label htmlFor={`f-${refresh.meta.key}`} className={LABEL}>Hämta från adresser var</label>
+                    <FieldControl {...refresh} invalid={!!refresh.problem} />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </section>
       )}
 
@@ -602,7 +756,30 @@ export function AppsEditor({
             ) : (
               <div className="p-6 text-center text-[13px] text-muted">Inga tjänster att visa.</div>
             )}
-            {footer && <div className="border-t border-line bg-white px-6 py-2.5 text-xs text-[#3d4452]">{footer}</div>}
+            {messageText && (
+              <div
+                className={`flex items-center gap-2 px-6 py-2 text-xs font-semibold ${alertStyle ? "bg-[#b3261e] text-white" : "border-t-2 border-[#e0a82e] bg-[#fff3d6] text-[#4a3200]"}`}
+              >
+                <AppIcon name="info" className="size-4" />
+                <span className="truncate">{messageText}</span>
+              </div>
+            )}
+            {shownFields.length > 0 ? (
+              <div className="flex items-center gap-4 bg-kth-light-blue px-6 py-2.5 text-kth-navy">
+                {shownFields.map((f, i) =>
+                  f.type === "clock" ? (
+                    <span key={i} className="ml-auto shrink-0 text-[20px] font-extrabold leading-none">{clockNow}</span>
+                  ) : (
+                    <span key={i} className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="truncate text-[8px] font-bold uppercase tracking-[0.06em] text-kth-blue">{(english && f.labelEn) || f.label}</span>
+                      <span className="truncate text-[15px] font-extrabold leading-none">{f.type === "url" ? "…" : f.value}</span>
+                    </span>
+                  ),
+                )}
+              </div>
+            ) : (
+              footer && <div className="border-t border-line bg-white px-6 py-2.5 text-xs text-[#3d4452]">{footer}</div>
+            )}
           </div>
         </section>
       )}

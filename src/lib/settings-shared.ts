@@ -188,6 +188,53 @@ export function joinList(items: string[], separator: string): string {
   return items.join(separator === " " ? " " : ",");
 }
 
+// --- LAUNCHER_FIELD_1–4: the first page's information fields ---
+
+/** One information field, "Etikett|typ|värde|Label" (type text, url or clock) */
+export type InfoField = { label: string; type: string; value: string; labelEn: string };
+
+export const INFO_FIELD_KEYS = ["LAUNCHER_FIELD_1", "LAUNCHER_FIELD_2", "LAUNCHER_FIELD_3", "LAUNCHER_FIELD_4"] as const;
+
+export function parseInfoField(value: string | null | undefined): InfoField {
+  const p = (value ?? "").split("|").map((x) => x.trim());
+  return { label: p[0] ?? "", type: (p[1] ?? "").toLowerCase(), value: p[2] ?? "", labelEn: p[3] ?? "" };
+}
+
+/** "" when the field is empty (then it isn't set); empty trailing parts are left out */
+export function serializeInfoField(f: InfoField): string {
+  const parts = [f.label, f.type, f.type === "clock" ? "" : f.value, f.labelEn].map((x) => x.trim());
+  if (!parts.some(Boolean)) return "";
+  while (parts.length > 2 && !parts[parts.length - 1]) parts.pop();
+  return parts.join("|");
+}
+
+/**
+ * Why the device would ignore the field (it shows only valid ones), or null. | separates the
+ * parts of the line, so it can't be part of a text.
+ */
+export function infoFieldProblem(f: InfoField): string | null {
+  if (!f.label && !f.type && !f.value && !f.labelEn) return null;
+  if ([f.label, f.value, f.labelEn].some((x) => x.includes("|"))) return "Texterna får inte innehålla |.";
+  if (f.type === "clock") return null;
+  if (f.type === "text") return f.value ? null : "Skriv texten som ska visas.";
+  if (f.type === "url") return /^https:\/\/[^\s/]+/.test(f.value) ? null : "Adressen måste börja med https://";
+  return "Välj vad fältet visar.";
+}
+
+/** The host of an https address, or null */
+export function hostOf(url: string): string | null {
+  const m = /^https?:\/\/([^/\s:?#]+)/i.exec(url.trim());
+  return m ? m[1].toLowerCase() : null;
+}
+
+/** host is one of the allowed sites or a subdomain of one (kth.se allows apps.lib.kth.se) */
+export function hostAllowed(host: string, allowed: string[]): boolean {
+  return allowed.some((a) => {
+    const h = (hostOf(a) ?? a.replace(/^\*\./, "").split("/")[0]).toLowerCase();
+    return !!h && (host === h || host.endsWith(`.${h}`));
+  });
+}
+
 /** A value as library staff read it: "På", "Stående (vänster)", "5 minuter", "3 st". */
 export function formatValue(meta: CatalogEntry | undefined, value: string | null | undefined): string {
   if (value === null || value === undefined) return "inte satt";

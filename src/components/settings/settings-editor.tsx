@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import type { SettingsData } from "@/lib/settings";
 import { saveSettingsAction } from "@/app/(admin)/settings-actions";
-import { formatValue, PROFILE_KEY, settingWarnings, validateValue, type CatalogEntry } from "@/lib/settings-shared";
+import { formatValue, INFO_FIELD_KEYS, PROFILE_KEY, settingWarnings, validateValue, type CatalogEntry } from "@/lib/settings-shared";
 import { Chip } from "@/components/ui/chip";
 import { SearchIcon } from "@/components/ui/icons";
 import { AppsEditor, type EditorField } from "./apps-editor";
@@ -31,6 +31,12 @@ const HOME_KEYS = [
   "LAUNCHER_TITLE_EN",
   "LAUNCHER_SUBTITLE_EN",
   "LAUNCHER_FOOTER_EN",
+  ...INFO_FIELD_KEYS,
+  "LAUNCHER_MESSAGE",
+  "LAUNCHER_MESSAGE_EN",
+  "LAUNCHER_MESSAGE_URL",
+  "LAUNCHER_MESSAGE_STYLE",
+  "LAUNCHER_REFRESH",
   "START_URL",
   "START_LABEL",
   "START_ICON",
@@ -243,6 +249,16 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
           launcherSubtitleEn={field("LAUNCHER_SUBTITLE_EN")}
           launcherFooterEn={field("LAUNCHER_FOOTER_EN")}
           alwaysJson={data.platform !== "android"}
+          infoFields={INFO_FIELD_KEYS.map((key) => field(key))}
+          message={field("LAUNCHER_MESSAGE")}
+          messageEn={field("LAUNCHER_MESSAGE_EN")}
+          messageUrl={field("LAUNCHER_MESSAGE_URL")}
+          messageStyle={field("LAUNCHER_MESSAGE_STYLE")}
+          refresh={field("LAUNCHER_REFRESH")}
+          allowedSites={(() => {
+            const key = data.platform === "android" ? "ALLOWED_HOSTS" : "WHITE_LIST";
+            return meta.has(key) ? { key, label: meta.get(key)!.label, value: shown(key) } : undefined;
+          })()}
         />
         {keys.map((h) => warningFor(h)).filter(Boolean).map((w) => (
           <p key={w} className="rounded-md bg-warn-bg px-2.5 py-1.5 text-[12.5px] font-semibold text-warn-ink">{w}</p>
