@@ -204,6 +204,7 @@ export function AppsEditor({
   messageEn,
   messageUrl,
   messageStyle,
+  messageIcon,
   refresh,
   allowedSites,
 }: {
@@ -229,6 +230,8 @@ export function AppsEditor({
   messageEn?: EditorField;
   messageUrl?: EditorField;
   messageStyle?: EditorField;
+  /** LAUNCHER_MESSAGE_ICON: the icon before the message ("none" = no icon; missing key = info) */
+  messageIcon?: EditorField;
   /** LAUNCHER_REFRESH: minutes between fetches from the addresses */
   refresh?: EditorField;
   /**
@@ -340,6 +343,7 @@ export function AppsEditor({
   const shownFields = fields.map((f) => parseInfoField(f.value)).filter((f) => f.type && !infoFieldProblem(f));
   const messageText = text(message, messageEn, "", "") || (messageUrl?.value?.trim() ? (english ? "(text from the address)" : "(text från adressen)") : "");
   const alertStyle = (messageStyle?.value ?? messageStyle?.meta.defaultValue) === "alert";
+  const messageIconName = messageIcon ? (messageIcon.value ?? messageIcon.meta.defaultValue ?? "info") : "info";
   const allowed = [
     ...(allowedSites?.value ?? "").split(/[\s,]+/).filter(Boolean),
     ...rows.map((r) => r.url),
@@ -460,6 +464,26 @@ export function AppsEditor({
                   <div className="flex min-w-0 flex-col gap-1.5">
                     <label htmlFor={`f-${messageStyle.meta.key}`} className={LABEL}>Färg</label>
                     <FieldControl {...messageStyle} invalid={!!messageStyle.problem} />
+                  </div>
+                )}
+                {messageIcon && (
+                  <div className="flex min-w-0 flex-col gap-1.5">
+                    <label htmlFor={`f-${messageIcon.meta.key}`} className={LABEL}>Ikon</label>
+                    <div
+                      className={`flex h-[38px] items-center gap-2 rounded-lg border px-2.5 ${messageIcon.value === null ? "border-dashed border-field bg-[#f8f9fa] text-muted" : "border-field bg-white"}`}
+                    >
+                      <AppIcon name={messageIconName} className="text-select-ink" />
+                      <select
+                        id={`f-${messageIcon.meta.key}`}
+                        value={messageIconName}
+                        onChange={(e) => messageIcon.onChange(e.target.value)}
+                        className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none"
+                      >
+                        {messageIcon.meta.options.map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 )}
                 {refresh && (
@@ -771,7 +795,7 @@ export function AppsEditor({
               <div
                 className={`flex items-center gap-2 px-6 py-2 text-xs font-semibold ${alertStyle ? "bg-[#b3261e] text-white" : "border-t-2 border-[#e0a82e] bg-[#fff3d6] text-[#4a3200]"}`}
               >
-                <AppIcon name="info" className="size-4" />
+                <AppIcon name={messageIconName} className="size-4" />
                 <span className="truncate">{messageText}</span>
               </div>
             )}

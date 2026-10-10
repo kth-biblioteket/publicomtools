@@ -36,6 +36,7 @@ const HOME_KEYS = [
   "LAUNCHER_MESSAGE_EN",
   "LAUNCHER_MESSAGE_URL",
   "LAUNCHER_MESSAGE_STYLE",
+  "LAUNCHER_MESSAGE_ICON",
   "LAUNCHER_REFRESH",
   "START_URL",
   "START_LABEL",
@@ -254,6 +255,7 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
           messageEn={field("LAUNCHER_MESSAGE_EN")}
           messageUrl={field("LAUNCHER_MESSAGE_URL")}
           messageStyle={field("LAUNCHER_MESSAGE_STYLE")}
+          messageIcon={field("LAUNCHER_MESSAGE_ICON")}
           refresh={field("LAUNCHER_REFRESH")}
           allowedSites={(() => {
             const key = data.platform === "android" ? "ALLOWED_HOSTS" : "WHITE_LIST";
