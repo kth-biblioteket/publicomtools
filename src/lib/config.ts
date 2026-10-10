@@ -109,8 +109,8 @@ export async function getEffectiveConfig(host: string, origin: string): Promise<
 
 /**
  * Serialize to the env format the computers already parse (KEY="value" per line).
- * Values are double-quoted; embedded double quotes are rejected by validation so
- * load_config (which strips one quote layer) stays correct.
+ * Values are double-quoted; load_config strips exactly one quote layer and assigns the rest
+ * verbatim, so quotes inside a value are fine. Line breaks are rejected by validation.
  */
 export function serializeEnv(values: ConfigValues): string {
   return (

@@ -34,12 +34,14 @@ export type Change = { key: string; before: string | null; after: string | null 
 export const PROFILE_KEY = "__profile";
 
 /**
- * Why a value can't be saved, or null. platform: the Linux computers get their settings as
- * KEY="value" lines, so a " would end the value there; the Android tablets get JSON, where every
- * character is fine (no platform: the stricter Linux rule).
+ * Why a value can't be saved, or null. Every character is allowed. platform: the Linux computers get
+ * their settings as one KEY="value" line each (read verbatim by load_config, see publicom
+ * config_lib.sh), so a line break can't be part of a value there; the Android tablets get JSON.
+ * (Requires publicom's init.sh with the format check instead of bash -n, which rejected the whole
+ * file for a value with an odd number of ".)
  */
 export function validateValue(meta: Pick<CatalogEntry, "type" | "options">, value: string, platform?: string): string | null {
-  if (platform !== "android" && value.includes('"')) return "Får inte innehålla dubbelcitattecken (\").";
+  if (platform !== "android" && /[\r\n]/.test(value)) return "Får inte innehålla radbrytningar.";
   switch (meta.type) {
     case "int":
       return /^-?\d+$/.test(value) ? null : "Skriv ett heltal.";
