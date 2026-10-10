@@ -72,9 +72,20 @@ const INFO_TYPES = [
 
 /** One information field (LAUNCHER_FIELD_n): label, what it shows, the value, and the label in English */
 function InfoFieldRow({ field, n, hostWarning }: { field: EditorField; n: number; hostWarning: (url: string) => string | null }) {
-  const f = parseInfoField(field.value);
+  // Det som skrivs hålls här (med mellanslag och allt) och sparas trimmat; annars försvann ett
+  // mellanslag i slutet direkt, och det gick inte att skriva två ord
+  const external = field.value ?? "";
+  const [f, setF] = useState<InfoField>(() => parseInfoField(field.value));
+  const [synced, setSynced] = useState(external);
+  if (external !== synced) {
+    setSynced(external);
+    if (serializeInfoField(f) !== external) setF(parseInfoField(field.value));
+  }
   const set = (p: Partial<InfoField>) => {
-    const v = serializeInfoField({ ...f, ...p });
+    const next = { ...f, ...p };
+    setF(next);
+    const v = serializeInfoField(next);
+    setSynced(v);
     if (v) field.onChange(v);
     else field.onClear();
   };
