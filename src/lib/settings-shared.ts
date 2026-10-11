@@ -12,7 +12,8 @@ export type CatalogEntry = {
   label: string;
   group: string;
   type: KeyType;
-  options: { value: string; label: string }[];
+  /** enum: the choices; csv: the items to pick from. preview: an image path in the publicom repo (see previewUrl) */
+  options: { value: string; label: string; preview?: string }[];
   unit: string | null;
   separator: string;
   defaultValue: string | null;
@@ -177,6 +178,15 @@ export function appProblems(a: AppEntry): Partial<Record<keyof AppEntry, string>
   return out;
 }
 
+/**
+ * Where an option's preview image is shown from: the publicom repo on GitHub (public, no login),
+ * the same files the computers fetch fallback images from. stable = what the fleet runs.
+ */
+export const PREVIEW_BRANCH = "stable";
+export function previewUrl(path: string): string {
+  return `https://raw.githubusercontent.com/kth-biblioteket/publicom/${PREVIEW_BRANCH}/${path.replace(/^\/+/, "")}`;
+}
+
 export function splitList(value: string, separator: string): string[] {
   return value
     .split(separator === " " ? /\s+/ : ",")
@@ -247,7 +257,7 @@ export function formatValue(meta: CatalogEntry | undefined, value: string | null
     case "int":
       return meta.unit ? `${value} ${meta.unit}` : value;
     case "csv": {
-      const items = splitList(value, meta.separator);
+      const items = splitList(value, meta.separator).map((v) => meta.options.find((o) => o.value === v)?.label ?? v);
       return items.length ? items.join(", ") : "tom lista";
     }
     case "apps": {
@@ -297,6 +307,17 @@ export function settingWarnings(
       warnings.push({
         key: "SCREENSAVER_FILES",
         message: "Skärmsläckaren är på men inga bilder är valda. Datorn visar då bara KTH-bakgrunden.",
+      });
+  }
+  // A csv list with options (the screensaver images) is picked from the options; an older value
+  // outside them is kept, but the computer can only show it if the file exists there.
+  for (const k of catalog.values()) {
+    if (k.type !== "csv" || !k.options.length) continue;
+    const unknown = splitList(value(k.key) ?? "", k.separator).filter((v) => !k.options.some((o) => o.value === v));
+    if (unknown.length)
+      warnings.push({
+        key: k.key,
+        message: `${unknown.join(", ")} finns inte bland valen i katalogen. Datorn visar ${unknown.length > 1 ? "dem" : "den"} bara om filen finns där.`,
       });
   }
   const type = value("COMPUTER_TYPE");

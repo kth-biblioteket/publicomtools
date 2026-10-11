@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { joinList, splitList, type CatalogEntry } from "@/lib/settings-shared";
+import { joinList, previewUrl, splitList, type CatalogEntry } from "@/lib/settings-shared";
 
 const INPUT = "h-[38px] w-full rounded-lg border px-3 text-sm";
 
@@ -114,6 +114,148 @@ function TagField({ id, meta, value, inherited, onChange }: Props & { id: string
   );
 }
 
+type Option = CatalogEntry["options"][number];
+
+/** A preview image from the publicom repo, letterboxed so portrait images fit too. */
+function Thumb({ option, className = "" }: { option?: Option; className?: string }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <div className={`flex aspect-video items-center justify-center overflow-hidden rounded-md bg-kth-navy ${className}`}>
+      {option?.preview && !failed ? (
+        // eslint-disable-next-line @next/next/no-img-element -- external, already small; next/image would need remotePatterns
+        <img
+          src={previewUrl(option.preview)}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          onError={() => setFailed(true)}
+          className="size-full object-contain"
+        />
+      ) : (
+        <span className="px-2 text-center text-[11px] text-white/70">{option ? "Ingen bild" : "Okänd bild"}</span>
+      )}
+    </div>
+  );
+}
+
+/** enum whose options have preview images: one card per image instead of a select. */
+function ImageChoice({ id, meta, value, inherited, invalid, onChange }: Props & { id: string }) {
+  const chosen = value ?? meta.defaultValue;
+  const extra = value !== null && !meta.options.some((o) => o.value === value);
+  const cards: { value: string; option?: Option; label: string }[] = [
+    ...meta.options.map((o) => ({ value: o.value, option: o, label: o.label })),
+    ...(extra ? [{ value: value!, label: value || "(tomt)" }] : []),
+  ];
+  return (
+    <div
+      id={id}
+      role="radiogroup"
+      aria-label={meta.label}
+      aria-invalid={invalid || undefined}
+      className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-2"
+    >
+      {cards.map((c) => {
+        const on = c.value === chosen;
+        return (
+          <button
+            key={c.value}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            onClick={() => c.value !== value && onChange(c.value)}
+            className={`flex flex-col gap-1.5 rounded-lg border p-1.5 text-left transition-colors ${
+              on
+                ? `${inherited || value === null ? "border-dashed" : ""} border-kth-blue bg-select ring-1 ring-kth-blue`
+                : "border-line bg-white hover:border-field"
+            } ${on && invalid ? "border-bad-ink ring-bad-ink" : ""}`}
+          >
+            <Thumb option={c.option} />
+            <span className={`px-0.5 text-[12.5px] leading-tight ${on ? "font-semibold text-select-ink" : "text-ink"} ${!c.option ? "break-all font-mono" : ""}`}>
+              {c.label}
+              {c.value === meta.defaultValue && <span className="ml-1 font-normal text-muted">(standard)</span>}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** csv whose options have preview images (SCREENSAVER_FILES): an ordered pick from the options, no free text. */
+function ImageList({ id, meta, value, inherited, onChange }: Props & { id: string }) {
+  const items = value ? splitList(value, meta.separator) : [];
+  const set = (next: string[]) => onChange(joinList(next, meta.separator));
+  const move = (i: number, d: -1 | 1) => {
+    const next = [...items];
+    [next[i], next[i + d]] = [next[i + d], next[i]];
+    set(next);
+  };
+  const left = meta.options.filter((o) => !items.includes(o.value));
+  const btn = "flex size-7 items-center justify-center rounded-md text-muted hover:bg-[#eceef1] hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent";
+  return (
+    <div id={id} className="flex flex-col gap-2">
+      {items.length > 0 ? (
+        <ol aria-label={`Valda: ${meta.label}`} className={`flex flex-col gap-1.5 rounded-lg border p-1.5 ${tone(inherited, false)}`}>
+          {items.map((item, i) => {
+            const o = meta.options.find((x) => x.value === item);
+            return (
+              <li key={`${item}-${i}`} className="flex items-center gap-2.5 rounded-md bg-white p-1 pr-1.5 shadow-[0_0_0_1px_var(--color-line)]">
+                <span className="w-4 shrink-0 text-center text-xs font-semibold text-muted">{i + 1}</span>
+                <Thumb option={o} className="w-24 shrink-0" />
+                <span className="min-w-0 flex-1 text-[13px] leading-tight">
+                  {o ? o.label : <span className="break-all font-mono text-xs">{item}</span>}
+                  {!o && <span className="mt-0.5 block text-[11.5px] font-semibold text-warn-ink">Finns inte bland valen</span>}
+                </span>
+                <span className="flex shrink-0 items-center">
+                  <button type="button" aria-label={`Flytta upp ${o?.label ?? item}`} disabled={i === 0} onClick={() => move(i, -1)} className={btn}>
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Flytta ner ${o?.label ?? item}`}
+                    disabled={i === items.length - 1}
+                    onClick={() => move(i, 1)}
+                    className={btn}
+                  >
+                    ↓
+                  </button>
+                  <button type="button" aria-label={`Ta bort ${o?.label ?? item}`} onClick={() => set(items.filter((_, j) => j !== i))} className={`${btn} text-base`}>
+                    ×
+                  </button>
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      ) : (
+        <p className={`rounded-lg border px-3 py-2 text-[13px] ${tone(inherited, false)}`}>Inga bilder valda.</p>
+      )}
+      {left.length > 0 && (
+        <div>
+          <p className="mb-1 text-[12.5px] font-semibold text-muted">Lägg till</p>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-2">
+            {left.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                aria-label={`Lägg till ${o.label}`}
+                onClick={() => set([...items, o.value])}
+                className="group flex flex-col gap-1 rounded-lg border border-line bg-white p-1.5 text-left hover:border-kth-blue"
+              >
+                <Thumb option={o} />
+                <span className="flex items-start gap-1 px-0.5 text-[12px] leading-tight text-ink">
+                  <span className="font-bold text-kth-blue">+</span>
+                  {o.label}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function FieldControl(props: Props) {
   const { meta, value, inherited, onChange } = props;
   const id = `f-${meta.key}`;
@@ -137,6 +279,10 @@ export function FieldControl(props: Props) {
       </div>
     );
   }
+
+  const withImages = meta.options.some((o) => o.preview);
+  if (meta.type === "enum" && withImages) return <ImageChoice id={id} {...props} />;
+  if (meta.type === "csv" && meta.options.length) return <ImageList id={id} {...props} />;
 
   if (meta.type === "enum") {
     return (

@@ -121,14 +121,18 @@ export function serializeEnv(values: ConfigValues): string {
   );
 }
 
-export type EnumOption = { value: string; label: string };
+export type EnumOption = { value: string; label: string; preview?: string };
 
 /** ConfigKey.options (Json) as a typed list; tolerates a missing or malformed value. */
 export function enumOptions(json: unknown): EnumOption[] {
   if (!Array.isArray(json)) return [];
   return json
-    .filter((o): o is { value: unknown; label?: unknown } => !!o && typeof o === "object" && "value" in o)
-    .map((o) => ({ value: String(o.value), label: String(o.label ?? o.value) }));
+    .filter((o): o is { value: unknown; label?: unknown; preview?: unknown } => !!o && typeof o === "object" && "value" in o)
+    .map((o) => ({
+      value: String(o.value),
+      label: String(o.label ?? o.value),
+      ...(typeof o.preview === "string" && o.preview ? { preview: o.preview } : {}),
+    }));
 }
 
 // --- Admin reads/writes (see the (admin)/config pages) ---

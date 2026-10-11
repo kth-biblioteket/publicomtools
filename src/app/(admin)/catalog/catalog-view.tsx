@@ -91,7 +91,7 @@ export async function CatalogView({ platform }: { platform: Platform }) {
                       <td className="px-4 py-2.5">
                         {TYPE_LABEL[k.type]}
                         {k.unit ? `, ${k.unit}` : ""}
-                        {k.type === "enum" && <div className="text-xs text-muted">{k.options.map((o) => o.label).join(" · ")}</div>}
+                        {k.options.length > 0 && <div className="text-xs text-muted">{k.options.map((o) => o.label).join(" · ")}</div>}
                       </td>
                       <td className="px-4 py-2.5">{k.defaultValue !== null ? formatValue(k, k.defaultValue) : <span className="text-faint">–</span>}</td>
                       <td className="px-4 py-2.5 text-muted">{setIn(k.key)}</td>

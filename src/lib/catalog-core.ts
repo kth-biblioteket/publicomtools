@@ -24,7 +24,8 @@ export const catalogSchema = z
         label: z.string().min(1),
         group: z.string(),
         type: z.enum(["int", "bool", "string", "csv", "url", "enum", "apps"]),
-        options: z.array(z.object({ value: z.string(), label: z.string().min(1) })).optional(),
+        /** enum: the choices; csv: the items to pick from (no free text). preview: an image in the repo, "screensaver/<fil>" */
+        options: z.array(z.object({ value: z.string(), label: z.string().min(1), preview: z.string().optional() })).optional(),
         unit: z.string().optional(),
         /** csv only: " " for space-separated lists (WEBSITES); default "," */
         separator: z.enum([",", " "]).optional(),
@@ -108,9 +109,11 @@ function comparable(k: StoredKey | CatalogKey) {
     label: k.label,
     group: k.group,
     type: k.type,
-    // Postgres jsonb reorders object keys, so compare options as [value, label] pairs.
+    // Postgres jsonb reorders object keys, so compare options as [value, label, preview] tuples.
     options: JSON.stringify(
-      Array.isArray(k.options) ? (k.options as { value: unknown; label: unknown }[]).map((o) => [o.value, o.label]) : null
+      Array.isArray(k.options)
+        ? (k.options as { value: unknown; label: unknown; preview?: unknown }[]).map((o) => [o.value, o.label, o.preview ?? null])
+        : null
     ),
     unit: k.unit ?? null,
     separator: k.separator ?? ",",
