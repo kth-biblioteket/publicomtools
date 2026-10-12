@@ -10,7 +10,7 @@ import {
   infoFieldProblem,
   MAX_APPS,
   MAX_APPS_LAUNCHER,
-  MAX_APPS_LINUX,
+  MAX_APPS_TABS,
   parseApps,
   parseInfoField,
   serializeApps,
@@ -277,8 +277,9 @@ export function AppsEditor({
   // Utan START_URL (Linux-kiosken) är första tjänsten hem, och START_LABEL/START_ICON är startknappen
   // som tar besökaren tillbaka till början, i båda lägena
   const firstAppHome = !homeUrl;
-  // Linux-kiosken: tolv på förstasidan (flera sidor), sex som flikar; Android: sex, med En app fem utöver startsidan
-  const max = firstAppHome ? (launcher ? MAX_APPS_LINUX : MAX_APPS_LAUNCHER) : launcher ? MAX_APPS_LAUNCHER : MAX_APPS;
+  // Tolv på förstasidan (flera sidor); som flikar sex på Linux-kiosken, fem utöver startsidan på surfplattan
+  const max = launcher ? MAX_APPS_LAUNCHER : firstAppHome ? MAX_APPS_TABS : MAX_APPS;
+  // Utan LAUNCHER_PER_PAGE (äldre katalog) visar förstasidan alla på en sida
   const pageSize = perPage ? Number(perPage.value ?? perPage.meta.defaultValue ?? 4) || 4 : MAX_APPS_LAUNCHER;
   const external = apps.value ?? "";
   const [rows, setRows] = useState<Row[]>(() => toRows(apps.value));
