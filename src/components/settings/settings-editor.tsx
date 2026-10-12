@@ -23,6 +23,9 @@ const LINK = "text-[12.5px] font-semibold text-kth-blue underline underline-offs
  * Edited in the apps editor together with the apps key (Android): what the tablet starts with, the
  * first page's texts, and the home app's address, name and icon
  */
+/** PubLiKiosk 3.17.0: a web page in the first page's bottom row, and the attract loop */
+const FOOTER_PAGE_KEYS = ["LAUNCHER_HTML_URL", "LAUNCHER_HTML_HEIGHT", "LAUNCHER_HTML_JS", "LAUNCHER_HTML_TOUCH"];
+const ATTRACT_KEYS = ["ATTRACT_URL", "ATTRACT_AFTER", "ATTRACT_REFRESH", "ATTRACT_JS"];
 const HOME_KEYS = [
   "HOME_MODE",
   "LAUNCHER_TITLE",
@@ -38,6 +41,8 @@ const HOME_KEYS = [
   "LAUNCHER_MESSAGE_STYLE",
   "LAUNCHER_MESSAGE_ICON",
   "LAUNCHER_REFRESH",
+  ...FOOTER_PAGE_KEYS,
+  ...ATTRACT_KEYS,
   "START_URL",
   "START_LABEL",
   "START_ICON",
@@ -257,6 +262,18 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
           messageStyle={field("LAUNCHER_MESSAGE_STYLE")}
           messageIcon={field("LAUNCHER_MESSAGE_ICON")}
           refresh={field("LAUNCHER_REFRESH")}
+          footerPage={{
+            url: field("LAUNCHER_HTML_URL"),
+            height: field("LAUNCHER_HTML_HEIGHT"),
+            js: field("LAUNCHER_HTML_JS"),
+            touch: field("LAUNCHER_HTML_TOUCH"),
+          }}
+          attract={{
+            url: field("ATTRACT_URL"),
+            after: field("ATTRACT_AFTER"),
+            refresh: field("ATTRACT_REFRESH"),
+            js: field("ATTRACT_JS"),
+          }}
           allowedSites={(() => {
             const key = data.platform === "android" ? "ALLOWED_HOSTS" : "WHITE_LIST";
             return meta.has(key) ? { key, label: meta.get(key)!.label, value: shown(key) } : undefined;

@@ -72,6 +72,28 @@ const INFO_TYPES = [
 ];
 
 /** One information field (LAUNCHER_FIELD_n): label, what it shows, the value, and the label in English */
+/** Under an address field: https required, and a warning when the device won't fetch from its host */
+function UrlNote({ field, hostWarning }: { field: EditorField; hostWarning: (url: string) => string | null }) {
+  const url = field.value?.trim() ?? "";
+  if (!url) return null;
+  if (field.problem) return <p className="text-[12.5px] font-semibold text-bad-ink">{field.problem}</p>;
+  const warn = !/^https:\/\/[^\s/]+/.test(url) ? "Adressen måste börja med https://" : hostWarning(url);
+  return warn ? <p className="rounded-md bg-warn-bg px-2.5 py-1.5 text-[12.5px] font-semibold text-warn-ink">{warn}</p> : null;
+}
+
+/** An on/off setting with its label beside the switch */
+function SwitchField({ field, label }: { field: EditorField; label: string }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <label htmlFor={`f-${field.meta.key}`} className={LABEL}>{label}</label>
+      <div className="flex h-[38px] items-center">
+        <FieldControl {...field} invalid={!!field.problem} />
+      </div>
+      {field.meta.help && <p className="text-[12px] leading-snug text-muted">{field.meta.help}</p>}
+    </div>
+  );
+}
+
 function InfoFieldRow({ field, n, hostWarning }: { field: EditorField; n: number; hostWarning: (url: string) => string | null }) {
   // Det som skrivs hålls här (med mellanslag och allt) och sparas trimmat; annars försvann ett
   // mellanslag i slutet direkt, och det gick inte att skriva två ord
@@ -207,6 +229,8 @@ export function AppsEditor({
   messageStyle,
   messageIcon,
   refresh,
+  footerPage = {},
+  attract = {},
   allowedSites,
 }: {
   apps: EditorField;
@@ -235,6 +259,10 @@ export function AppsEditor({
   messageIcon?: EditorField;
   /** LAUNCHER_REFRESH: minutes between fetches from the addresses */
   refresh?: EditorField;
+  /** LAUNCHER_HTML_URL, _HEIGHT, _JS, _TOUCH: a whole web page in the bottom row instead of the fields */
+  footerPage?: { url?: EditorField; height?: EditorField; js?: EditorField; touch?: EditorField };
+  /** ATTRACT_URL, _AFTER, _REFRESH, _JS: a full-screen page while the first page is untouched */
+  attract?: { url?: EditorField; after?: EditorField; refresh?: EditorField; js?: EditorField };
   /**
    * The setting with the allowed sites ({label, key, value}): an address in a field or the message
    * is fetched only if its host is a service, the start page or one of these
@@ -342,6 +370,8 @@ export function AppsEditor({
   // Informationsfält och meddelanderad
   const fields = infoFields.filter((f): f is EditorField => !!f);
   const shownFields = fields.map((f) => parseInfoField(f.value)).filter((f) => f.type && !infoFieldProblem(f));
+  const pageUrl = footerPage.url?.value?.trim() ?? "";
+  const pageHeight = Math.min(400, Math.max(40, Number(footerPage.height?.value ?? footerPage.height?.meta.defaultValue ?? 100) || 100));
   const messageText = text(message, messageEn, "", "") || (messageUrl?.value?.trim() ? (english ? "(text from the address)" : "(text från adressen)") : "");
   // info = blå (information), warning = gul (varning), alert = röd (störning)
   const messageLevel = messageStyle?.value ?? messageStyle?.meta.defaultValue ?? "warning";
@@ -441,7 +471,7 @@ export function AppsEditor({
       )}
 
       {/* Informationsfält och meddelande (förstasidan) */}
-      {launcher && (fields.length > 0 || message || messageUrl) && (
+      {launcher && (fields.length > 0 || message || messageUrl || footerPage.url) && (
         <section className="rounded-[10px] border border-line-soft px-4 py-4">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
             <h4 className="text-[15px] font-extrabold">Informationsfält och meddelande</h4>
@@ -449,8 +479,35 @@ export function AppsEditor({
               Längst ner på förstasidan. Finns något fält döljs textraden längst ner. En adress måste svara med ren text och ligga på en tillåten webbplats.
             </p>
           </div>
+          {footerPage.url && (
+            <div className="mt-3 flex flex-col gap-3 rounded-lg bg-page p-3">
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <LiveText field={footerPage.url} label="Fotrad som webbsida (valfri)" placeholder="Tomt: informationsfälten nedan" />
+                <UrlNote field={footerPage.url} hostWarning={hostWarning} />
+                <p className="text-[12.5px] leading-snug text-muted">
+                  En hel webbsida längst ner i stället för informationsfälten. Sidan ritas för 1280 punkter bred (800 stående). Fälten visas bara om sidan inte går att ladda.
+                </p>
+              </div>
+              {pageUrl && (
+                <div className="grid gap-4 @md:grid-cols-3">
+                  {footerPage.height && (
+                    <div className="flex min-w-0 flex-col gap-1.5">
+                      <label htmlFor={`f-${footerPage.height.meta.key}`} className={LABEL}>Höjd</label>
+                      <FieldControl {...footerPage.height} invalid={!!footerPage.height.problem} />
+                      {/^\d+$/.test(footerPage.height.value?.trim() ?? "") && pageHeight !== Number(footerPage.height.value) && (
+                        <p className="text-[12.5px] font-semibold text-warn-ink">Höjden ska vara 40–400. Enheten använder {pageHeight}.</p>
+                      )}
+                    </div>
+                  )}
+                  {footerPage.js && <SwitchField field={footerPage.js} label="Tillåt skript" />}
+                  {footerPage.touch && <SwitchField field={footerPage.touch} label="Tar emot tryck" />}
+                </div>
+              )}
+            </div>
+          )}
           {fields.length > 0 && (
             <div className="mt-3 flex flex-col gap-2.5">
+              {pageUrl && <p className="text-[12.5px] font-semibold text-muted">Reserv om webbsidan inte går att ladda:</p>}
               {fields.map((f, i) => (
                 <InfoFieldRow key={f.meta.key} field={f} n={i + 1} hostWarning={hostWarning} />
               ))}
@@ -463,9 +520,7 @@ export function AppsEditor({
               {messageUrl && (
                 <div className="flex min-w-0 flex-col gap-1.5">
                   <LiveText field={messageUrl} label="Meddelande från adress (valfri)" placeholder="https://" />
-                  {messageUrl.value && hostWarning(messageUrl.value) && (
-                    <p className="rounded-md bg-warn-bg px-2.5 py-1.5 text-[12.5px] font-semibold text-warn-ink">{hostWarning(messageUrl.value)}</p>
-                  )}
+                  <UrlNote field={messageUrl} hostWarning={hostWarning} />
                 </div>
               )}
               <div className="grid gap-4 @md:grid-cols-2">
@@ -504,6 +559,45 @@ export function AppsEditor({
               </div>
             </div>
           )}
+        </section>
+      )}
+
+      {/* Attract loop (förstasidan, PubLiKiosk 3.17.0) */}
+      {launcher && attract.url && (
+        <section className="rounded-[10px] border border-line-soft px-4 py-4">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+            <h4 className="text-[15px] font-extrabold">Attract loop</h4>
+            <p className="text-[13px] text-muted">
+              En helskärmssida (bildspel, siffror, film utan ljud) när förstasidan stått orörd en stund. Första trycket tar bort den och räknas inte som ett besök.
+            </p>
+          </div>
+          <div className="mt-3 flex flex-col gap-3">
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <LiveText field={attract.url} label="Sida (valfri)" placeholder="Tomt: ingen attract loop" />
+              <UrlNote field={attract.url} hostWarning={hostWarning} />
+              <p className="text-[12.5px] leading-snug text-muted">
+                Ritas för 1280 punkter bred (800 stående). Visar sidan film eller bilder från en annan webbplats måste den också vara tillåten. Svarar adressen inte visas förstasidan som vanligt.
+              </p>
+            </div>
+            {attract.url.value?.trim() && (
+              <div className="grid gap-4 @md:grid-cols-3">
+                {attract.after && (
+                  <div className="flex min-w-0 flex-col gap-1.5">
+                    <label htmlFor={`f-${attract.after.meta.key}`} className={LABEL}>Visas efter</label>
+                    <FieldControl {...attract.after} invalid={!!attract.after.problem} />
+                    {attract.after.value?.trim() === "0" && <p className="text-[12.5px] font-semibold text-warn-ink">0: attract loopen är avstängd.</p>}
+                  </div>
+                )}
+                {attract.refresh && (
+                  <div className="flex min-w-0 flex-col gap-1.5">
+                    <label htmlFor={`f-${attract.refresh.meta.key}`} className={LABEL}>Ladda om var</label>
+                    <FieldControl {...attract.refresh} invalid={!!attract.refresh.problem} />
+                  </div>
+                )}
+                {attract.js && <SwitchField field={attract.js} label="Tillåt skript" />}
+              </div>
+            )}
+          </div>
         </section>
       )}
 
@@ -828,7 +922,15 @@ export function AppsEditor({
                 <span className="truncate">{messageText}</span>
               </div>
             )}
-            {shownFields.length > 0 ? (
+            {pageUrl ? (
+              // Skisspixlar: sidan ritas för 1280 bred, så höjden följer förhandsvisningens bredd
+              <div
+                className="flex items-center justify-center border-t border-dashed border-field bg-white px-6 text-center text-xs text-muted"
+                style={{ aspectRatio: `1280 / ${pageHeight}` }}
+              >
+                <span className="truncate">Webbsida: {pageUrl.replace(/^https:\/\//, "")}</span>
+              </div>
+            ) : shownFields.length > 0 ? (
               <div className="flex items-center gap-4 bg-kth-light-blue px-6 py-2.5 text-kth-navy">
                 {shownFields.map((f, i) =>
                   f.type === "clock" ? (
