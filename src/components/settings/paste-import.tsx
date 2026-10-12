@@ -19,7 +19,7 @@ function distance(a: string, b: string): number {
 }
 
 /** Same rules as the computers' load_config: KEY=value, one layer of quotes, # comments. */
-function parse(text: string, meta: Map<string, CatalogEntry>): Parsed[] {
+function parse(text: string, meta: Map<string, CatalogEntry>, platform?: string): Parsed[] {
   return text.split("\n").map((raw, i) => {
     const line = i + 1;
     const s = raw.replace(/\r$/, "").trim();
@@ -37,7 +37,7 @@ function parse(text: string, meta: Map<string, CatalogEntry>): Parsed[] {
         ? { kind: "error", line, message: `${key} finns inte. Menade du ${meta.get(best[0])!.label} (${best[0]})?`, suggestion: { from: key, to: best[0] } }
         : { kind: "error", line, message: `${key} finns inte i katalogen.` };
     }
-    const problem = validateValue(m, value);
+    const problem = validateValue(m, value, platform);
     return problem ? { kind: "error", line, message: `${m.label}: ${problem}` } : { kind: "ok", line, key, value };
   });
 }
@@ -45,10 +45,12 @@ function parse(text: string, meta: Map<string, CatalogEntry>): Parsed[] {
 /** IT: paste lines in the old .env format; each line is checked before anything changes. */
 export function PasteImport({
   catalog,
+  platform,
   current,
   onApply,
 }: {
   catalog: CatalogEntry[];
+  platform?: string;
   /** What the key is now in the editor (own, drafted or inherited) */
   current: (key: string) => string | null;
   onApply: (entries: { key: string; value: string }[]) => void;
@@ -56,7 +58,7 @@ export function PasteImport({
   const meta = new Map(catalog.map((k) => [k.key, k]));
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
-  const results = parse(text, meta);
+  const results = parse(text, meta, platform);
   const errors = results.filter((r) => r.kind === "error");
   const oks = results.filter((r): r is Extract<Parsed, { kind: "ok" }> => r.kind === "ok");
 

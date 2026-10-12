@@ -10,6 +10,7 @@ import {
   infoFieldProblem,
   MAX_APPS,
   MAX_APPS_LAUNCHER,
+  MAX_APPS_LINUX,
   parseApps,
   parseInfoField,
   serializeApps,
@@ -229,6 +230,7 @@ export function AppsEditor({
   messageStyle,
   messageIcon,
   refresh,
+  perPage,
   footerPage = {},
   attract = {},
   allowedSites,
@@ -259,6 +261,8 @@ export function AppsEditor({
   messageIcon?: EditorField;
   /** LAUNCHER_REFRESH: minutes between fetches from the addresses */
   refresh?: EditorField;
+  /** LAUNCHER_PER_PAGE (Linux-kiosken): services per page on the first page, more become pages */
+  perPage?: EditorField;
   /** LAUNCHER_HTML_URL, _HEIGHT, _JS, _TOUCH: a whole web page in the bottom row instead of the fields */
   footerPage?: { url?: EditorField; height?: EditorField; js?: EditorField; touch?: EditorField };
   /** ATTRACT_URL, _AFTER, _REFRESH, _JS: a full-screen page while the first page is untouched */
@@ -273,7 +277,9 @@ export function AppsEditor({
   // Utan START_URL (Linux-kiosken) är första tjänsten hem, och START_LABEL/START_ICON är startknappen
   // som tar besökaren tillbaka till början, i båda lägena
   const firstAppHome = !homeUrl;
-  const max = launcher || firstAppHome ? MAX_APPS_LAUNCHER : MAX_APPS;
+  // Linux-kiosken: tolv på förstasidan (flera sidor), sex som flikar; Android: sex, med En app fem utöver startsidan
+  const max = firstAppHome ? (launcher ? MAX_APPS_LINUX : MAX_APPS_LAUNCHER) : launcher ? MAX_APPS_LAUNCHER : MAX_APPS;
+  const pageSize = perPage ? Number(perPage.value ?? perPage.meta.defaultValue ?? 4) || 4 : MAX_APPS_LAUNCHER;
   const external = apps.value ?? "";
   const [rows, setRows] = useState<Row[]>(() => toRows(apps.value));
   // Ångra, Ångra alla or a save outside the editor: show the value it now has
@@ -466,6 +472,13 @@ export function AppsEditor({
               <LiveText field={launcherFooter} label="Text längst ner (valfri)" placeholder="Lämna tom om du inte vill ha någon text" />
             )}
             {launcherFooterEn && <LiveText field={launcherFooterEn} label="Text längst ner (English)" placeholder="Tomt: den svenska texten" />}
+            {perPage && (
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <label htmlFor={`f-${perPage.meta.key}`} className={LABEL}>Tjänster per sida</label>
+                <FieldControl {...perPage} invalid={!!perPage.problem} />
+                <p className="text-[12.5px] leading-snug text-muted">Fler tjänster blir flera sidor, som besökaren bläddrar mellan med svep och prickar.</p>
+              </div>
+            )}
           </div>
         </section>
       )}
@@ -853,7 +866,7 @@ export function AppsEditor({
         <section className="rounded-[10px] border border-line-soft px-4 py-4">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
             <h4 className="text-[15px] font-extrabold">Så ser förstasidan ut</h4>
-            <p className="text-[13px] text-muted">Liggande skärm, förminskad. Kortens ordning följer listan ovan.</p>
+            <p className="text-[13px] text-muted">Liggande skärm, förminskad, första sidan. Kortens ordning följer listan ovan.</p>
             <div className="ml-auto inline-flex gap-0.5 rounded-[9px] bg-[#eceef1] p-[3px]" role="group" aria-label="Språk i förhandsvisningen">
               {[false, true].map((en) => (
                 <button
@@ -894,8 +907,9 @@ export function AppsEditor({
               </div>
             </div>
             {rows.length > 0 ? (
-              <div className="grid grid-cols-2 gap-2.5 p-3.5">
-                {rows.slice(0, MAX_APPS_LAUNCHER).map((r) => (
+              <div className="p-3.5">
+              <div className={`grid gap-2.5 ${pageSize <= 4 ? "grid-cols-2" : pageSize <= 6 ? "grid-cols-3" : "grid-cols-4"}`}>
+                {rows.slice(0, pageSize).map((r) => (
                   <div key={r.id} className="flex min-w-0 items-center gap-3 rounded-xl border border-line bg-white p-3">
                     <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-kth-light-blue text-kth-blue">
                       <AppIcon name={r.icon} className="size-[26px]" />
@@ -910,6 +924,14 @@ export function AppsEditor({
                     </span>
                   </div>
                 ))}
+              </div>
+              {rows.length > pageSize && (
+                <div className="mt-2.5 flex justify-center gap-1.5" aria-label={`Sida 1 av ${Math.ceil(rows.length / pageSize)}`}>
+                  {Array.from({ length: Math.ceil(rows.length / pageSize) }, (_, i) => (
+                    <span key={i} className={`size-1.5 rounded-full ${i === 0 ? "bg-kth-blue" : "bg-field"}`} />
+                  ))}
+                </div>
+              )}
               </div>
             ) : (
               <div className="p-6 text-center text-[13px] text-muted">Inga tjänster att visa.</div>

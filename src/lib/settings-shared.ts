@@ -55,9 +55,11 @@ export function validateValue(meta: Pick<CatalogEntry, "type" | "options">, valu
         ? null
         : `Måste vara ett av: ${meta.options.map((o) => o.label).join(", ")}.`;
     case "apps": {
-      // Högst sex (förstasidan); med En app visar enheten fem utöver startsidan (en varning, settingWarnings)
+      // Android högst sex (förstasidan), med En app fem utöver startsidan; Linux-kiosken högst tolv, i
+      // appläget sex (varningar, settingWarnings)
       const apps = parseApps(value);
-      if (apps.length > MAX_APPS_LAUNCHER) return `Högst ${MAX_APPS_LAUNCHER} appar.`;
+      const limit = maxApps(platform);
+      if (apps.length > limit) return `Högst ${limit} appar.`;
       const bad = apps.map((a, i) => [i, appProblems(a)] as const).find(([, p]) => Object.keys(p).length);
       if (!bad) return null;
       const [i, p] = bad;
@@ -74,6 +76,9 @@ export function validateValue(meta: Pick<CatalogEntry, "type" | "options">, valu
 export const MAX_APPS = 5;
 /** HOME_MODE=launcher: at most this many services on the first page */
 export const MAX_APPS_LAUNCHER = 6;
+/** The Linux kiosk: at most this many services on the first page (several pages), six as tabs */
+export const MAX_APPS_LINUX = 12;
+export const maxApps = (platform?: string) => (platform === "android" ? MAX_APPS_LAUNCHER : MAX_APPS_LINUX);
 
 /** The icons the tablet has (Lucide names), with their names in the admin */
 export const APP_ICONS = [
@@ -369,6 +374,11 @@ export function settingWarnings(
       warnings.push({
         key: appsMeta.key,
         message: "Någon text innehåller | , \" eller en radbrytning. Då sparas apparna i ett format som enheterna läser från PubLiKiosk 3.14.0. Äldre appar visar inga appar.",
+      });
+    if (!ownStart && !launcher && apps.length > MAX_APPS_LAUNCHER)
+      warnings.push({
+        key: appsMeta.key,
+        message: `När första tjänsten är hem visar kiosken högst ${MAX_APPS_LAUNCHER} tjänster som flikar. De sista hoppas över; med förstasida visas alla.`,
       });
     if (ownStart && !launcher && apps.length > MAX_APPS)
       warnings.push({ key: appsMeta.key, message: `Med En app visar enheten högst ${MAX_APPS} appar utöver startsidan. Den sista hoppas över.` });

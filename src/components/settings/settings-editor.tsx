@@ -41,6 +41,7 @@ const HOME_KEYS = [
   "LAUNCHER_MESSAGE_STYLE",
   "LAUNCHER_MESSAGE_ICON",
   "LAUNCHER_REFRESH",
+  "LAUNCHER_PER_PAGE",
   ...FOOTER_PAGE_KEYS,
   ...ATTRACT_KEYS,
   "START_URL",
@@ -262,6 +263,7 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
           messageStyle={field("LAUNCHER_MESSAGE_STYLE")}
           messageIcon={field("LAUNCHER_MESSAGE_ICON")}
           refresh={field("LAUNCHER_REFRESH")}
+          perPage={field("LAUNCHER_PER_PAGE")}
           footerPage={{
             url: field("LAUNCHER_HTML_URL"),
             height: field("LAUNCHER_HTML_HEIGHT"),
@@ -536,7 +538,7 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
             }}
           />
         ) : (
-          <PasteImport catalog={data.catalog} current={shown} onApply={(entries) => entries.forEach((e) => setValue(e.key, e.value))} />
+          <PasteImport catalog={data.catalog} platform={data.platform} current={shown} onApply={(entries) => entries.forEach((e) => setValue(e.key, e.value))} />
         )}
         <div className="inline-flex gap-0.5 rounded-[9px] bg-[#eceef1] p-[3px]" role="group" aria-label="Visning">
           {(["form", "text"] as const).map((m) => (
