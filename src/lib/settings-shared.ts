@@ -55,7 +55,7 @@ export function validateValue(meta: Pick<CatalogEntry, "type" | "options">, valu
         ? null
         : `Måste vara ett av: ${meta.options.map((o) => o.label).join(", ")}.`;
     case "apps": {
-      // Högst tolv (förstasidan, flera sidor); som flikar visar Linux-kiosken sex och surfplattan fem
+      // Högst 36 (förstasidan, flera sidor); som flikar visar Linux-kiosken sex och surfplattan fem
       // utöver startsidan (varningar, settingWarnings)
       const apps = parseApps(value);
       if (apps.length > MAX_APPS_LAUNCHER) return `Högst ${MAX_APPS_LAUNCHER} appar.`;
@@ -73,8 +73,8 @@ export function validateValue(meta: Pick<CatalogEntry, "type" | "options">, valu
 
 /** HOME_MODE=app: the tablet shows the home app (START_URL) and at most this many more */
 export const MAX_APPS = 5;
-/** HOME_MODE=launcher: at most this many services on the first page, LAUNCHER_PER_PAGE at a time */
-export const MAX_APPS_LAUNCHER = 12;
+/** HOME_MODE=launcher: at most this many services on the first page, LAUNCHER_PER_PAGE (2–12) at a time */
+export const MAX_APPS_LAUNCHER = 36;
 /** The Linux kiosk with the first service as home: at most this many tabs */
 export const MAX_APPS_TABS = 6;
 

@@ -277,7 +277,7 @@ export function AppsEditor({
   // Utan START_URL (Linux-kiosken) är första tjänsten hem, och START_LABEL/START_ICON är startknappen
   // som tar besökaren tillbaka till början, i båda lägena
   const firstAppHome = !homeUrl;
-  // Tolv på förstasidan (flera sidor); som flikar sex på Linux-kiosken, fem utöver startsidan på surfplattan
+  // 36 på förstasidan (flera sidor); som flikar sex på Linux-kiosken, fem utöver startsidan på surfplattan
   const max = launcher ? MAX_APPS_LAUNCHER : firstAppHome ? MAX_APPS_TABS : MAX_APPS;
   // Utan LAUNCHER_PER_PAGE (äldre katalog) visar förstasidan alla på en sida
   const pageSize = perPage ? Number(perPage.value ?? perPage.meta.defaultValue ?? 4) || 4 : MAX_APPS_LAUNCHER;
