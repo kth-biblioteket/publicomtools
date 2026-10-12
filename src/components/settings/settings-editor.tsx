@@ -278,7 +278,8 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
           }}
           allowedSites={(() => {
             const key = data.platform === "android" ? "ALLOWED_HOSTS" : "WHITE_LIST";
-            return meta.has(key) ? { key, label: meta.get(key)!.label, value: shown(key) } : undefined;
+            // Inte satt någonstans: enheten använder katalogens standard (ALLOWED_HOSTS: kth.se)
+            return meta.has(key) ? { key, label: meta.get(key)!.label, value: shown(key) ?? meta.get(key)!.defaultValue } : undefined;
           })()}
         />
         {keys.map((h) => warningFor(h)).filter(Boolean).map((w) => (
