@@ -1,0 +1,23 @@
+<!doctype html>
+<!-- Testsida för kioskernas fotrad som webbsida (LAUNCHER_HTML_URL), utan skript. Ritas för 1280 punkter bred. -->
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fotrad-test</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; font-family: system-ui, sans-serif; }
+  body { display: flex; align-items: center; gap: 40px; padding: 0 48px; box-sizing: border-box; background: #def0ff; color: #000061; }
+  .f { display: flex; flex-direction: column; gap: 4px; }
+  .l { font-size: 14px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #004791; }
+  .v { font-size: 30px; font-weight: 800; line-height: 1; }
+  .dot { width: 14px; height: 14px; margin-left: auto; border-radius: 50%; background: #004791; animation: p 2s ease-in-out infinite; }
+  @keyframes p { 50% { opacity: .2; transform: scale(.6); } }
+</style>
+</head>
+<body>
+  <div class="f"><span class="l">Fotrad-test</span><span class="v">Webbsida i fotraden</span></div>
+  <div class="f"><span class="l">Öppet idag</span><span class="v">8–19</span></div>
+  <span class="dot" title="Blinkar: sidan lever"></span>
+</body>
+</html>
