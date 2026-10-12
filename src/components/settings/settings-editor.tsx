@@ -250,6 +250,7 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
           launcherSubtitleEn={field("LAUNCHER_SUBTITLE_EN")}
           launcherFooterEn={field("LAUNCHER_FOOTER_EN")}
           alwaysJson={data.platform !== "android"}
+          englishUrls={data.platform === "android"}
           infoFields={INFO_FIELD_KEYS.map((key) => field(key))}
           message={field("LAUNCHER_MESSAGE")}
           messageEn={field("LAUNCHER_MESSAGE_EN")}

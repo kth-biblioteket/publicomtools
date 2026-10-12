@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   APP_ICONS,
   appProblems,
+  EMPTY_APP,
   hostAllowed,
   hostOf,
   infoFieldProblem,
@@ -207,6 +208,7 @@ export function AppsEditor({
   messageIcon,
   refresh,
   allowedSites,
+  englishUrls = false,
 }: {
   apps: EditorField;
   homeUrl?: EditorField;
@@ -239,6 +241,8 @@ export function AppsEditor({
    * is fetched only if its host is a service, the start page or one of these
    */
   allowedSites?: { label: string; key: string; value: string | null };
+  /** Android (PubLiKiosk 3.16.0): each service can have its own address in English (urlEn) */
+  englishUrls?: boolean;
 }) {
   const launcher = (homeMode?.value ?? homeMode?.meta.defaultValue ?? "app") === "launcher";
   // Utan START_URL (Linux-kiosken) är första tjänsten hem, och START_LABEL/START_ICON är startknappen
@@ -353,7 +357,8 @@ export function AppsEditor({
   const messageIconName = messageIcon ? (messageIcon.value ?? messageIcon.meta.defaultValue ?? "info") : "info";
   const allowed = [
     ...(allowedSites?.value ?? "").split(/[\s,]+/).filter(Boolean),
-    ...rows.map((r) => r.url),
+    // Enheten tillåter själv tjänsternas värdar, också den engelska adressens
+    ...rows.flatMap((r) => [r.url, r.urlEn]).filter(Boolean),
     ...(homeUrl?.value ? [homeUrl.value] : []),
   ];
   const hostWarning = (url: string) => {
@@ -568,7 +573,7 @@ export function AppsEditor({
           <button
             type="button"
             disabled={rows.length >= max}
-            onClick={() => commit([...rows, { id: nextId++, name: "", url: "https://", icon: "info", scope: "", desc: "", nameEn: "", descEn: "", adv: false }])}
+            onClick={() => commit([...rows, { ...EMPTY_APP, id: nextId++, adv: false }])}
             className="h-9 rounded-lg border-2 border-kth-blue bg-white px-3.5 text-[13.5px] font-bold text-kth-blue hover:bg-select disabled:opacity-40"
           >
             {launcher || firstAppHome ? "+ Lägg till tjänst" : "+ Lägg till app"}
@@ -686,6 +691,27 @@ export function AppsEditor({
                           />
                           {p.descEn && <p className="text-[12.5px] font-semibold text-bad-ink">{p.descEn}</p>}
                         </div>
+                      </div>
+                    )}
+                    {englishUrls && (
+                      <div className="flex min-w-0 flex-col gap-1.5">
+                        <label htmlFor={`app-${r.id}-url-en`} className={LABEL}>Adress (English)</label>
+                        <input
+                          id={`app-${r.id}-url-en`}
+                          value={r.urlEn}
+                          inputMode="url"
+                          onChange={(e) => patch(r.id, { urlEn: e.target.value })}
+                          placeholder="Tomt: samma adress"
+                          aria-invalid={!!p.urlEn || undefined}
+                          className={`${INPUT} font-mono text-[13px] ${p.urlEn ? "border-bad-ink" : "border-field"}`}
+                        />
+                        {p.urlEn ? (
+                          <p className="text-[12.5px] font-semibold text-bad-ink">{p.urlEn}</p>
+                        ) : (
+                          <p className="text-[12.5px] leading-snug text-muted">
+                            Öppnas i stället för adressen när besökaren valt English. Skriv hela adressen som tjänsten vill ha den, t.ex. https://tjanst.kth.se/?lang=en.
+                          </p>
+                        )}
                       </div>
                     )}
                     <div className="flex flex-col gap-2">

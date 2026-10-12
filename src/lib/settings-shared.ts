@@ -95,22 +95,40 @@ export const APP_ICONS = [
 
 /**
  * desc: one line under the name on the first page's card (HOME_MODE=launcher). nameEn, descEn:
- * the same in English when the visitor chose English (empty: the Swedish text).
+ * the same in English when the visitor chose English (empty: the Swedish text). urlEn: the address
+ * opened instead of url in English, written out in full (…?lang=en); empty: url (PubLiKiosk 3.16.0).
+ * extra, more: parts and JSON keys this form doesn't know (a newer app), kept as they were.
  */
-export type AppEntry = { name: string; url: string; icon: string; scope: string; desc: string; nameEn: string; descEn: string };
+export type AppEntry = {
+  name: string;
+  url: string;
+  icon: string;
+  scope: string;
+  desc: string;
+  nameEn: string;
+  descEn: string;
+  urlEn: string;
+  extra?: string[];
+  more?: Record<string, unknown>;
+};
 
-const APP_FIELDS = ["name", "url", "icon", "scope", "desc", "nameEn", "descEn"] as const;
+const APP_FIELDS = ["name", "url", "icon", "scope", "desc", "nameEn", "descEn", "urlEn"] as const;
+type AppTexts = Record<(typeof APP_FIELDS)[number], string>;
+
+/** A new, empty app in the editor */
+export const EMPTY_APP: AppEntry = { name: "", url: "https://", icon: "info", scope: "", desc: "", nameEn: "", descEn: "", urlEn: "" };
 
 /**
  * APPS as the tablet reads it, in one of two forms:
  * - one entry per line (commas only when there is no line break), each
- *   "Namn|https://adress/|ikon|område|beskrivning|namn_en|beskrivning_en" (all but name and address
- *   optional);
- * - a JSON array of {name, url, icon, scope, desc, nameEn, descEn}, written when a text contains a
- *   character the line form can't carry (| , " or a line break), so that every character works in
- *   names and descriptions. The tablet reads it from PubLiKiosk 3.14.0.
+ *   "Namn|https://adress/|ikon|område|beskrivning|namn_en|beskrivning_en|adress_en" (all but name
+ *   and address optional);
+ * - a JSON array of {name, url, icon, scope, desc, nameEn, descEn, urlEn}, written when a text
+ *   contains a character the line form can't carry (| , " or a line break), so that every character
+ *   works in names and descriptions. The tablet reads it from PubLiKiosk 3.14.0.
  * Tolerant of older values: an entry without | that looks like an address becomes an app without a
- * name, so it is shown with an error instead of being lost.
+ * name, so it is shown with an error instead of being lost. Parts after the eighth and unknown JSON
+ * keys are kept in extra/more and written back.
  */
 export function parseApps(value: string | null | undefined): AppEntry[] {
   if (!value) return [];
@@ -122,7 +140,9 @@ export function parseApps(value: string | null | undefined): AppEntry[] {
         return list.map((o) => {
           const rec = o && typeof o === "object" ? (o as Record<string, unknown>) : {};
           const str = (k: string) => (typeof rec[k] === "string" ? (rec[k] as string) : "");
-          return Object.fromEntries(APP_FIELDS.map((k) => [k, str(k)])) as AppEntry;
+          const more = Object.fromEntries(Object.entries(rec).filter(([k]) => !(APP_FIELDS as readonly string[]).includes(k)));
+          const app = Object.fromEntries(APP_FIELDS.map((k) => [k, str(k)])) as AppTexts;
+          return Object.keys(more).length ? { ...app, more } : app;
         });
     } catch {
       // Inte JSON trots allt: läs som rader nedan, så visas felen i stället för att posterna försvinner
@@ -134,17 +154,9 @@ export function parseApps(value: string | null | undefined): AppEntry[] {
     .filter(Boolean)
     .map((entry) => {
       const parts = entry.split("|").map((p) => p.trim());
-      const empty = { icon: "", scope: "", desc: "", nameEn: "", descEn: "" };
-      if (parts.length === 1 && /^[a-z]+:\/\//i.test(parts[0])) return { ...empty, name: "", url: parts[0] };
-      return {
-        name: parts[0] ?? "",
-        url: parts[1] ?? "",
-        icon: parts[2] ?? "",
-        scope: parts[3] ?? "",
-        desc: parts[4] ?? "",
-        nameEn: parts[5] ?? "",
-        descEn: parts[6] ?? "",
-      };
+      if (parts.length === 1 && /^[a-z]+:\/\//i.test(parts[0])) return { ...EMPTY_APP, icon: "", url: parts[0] };
+      const app = Object.fromEntries(APP_FIELDS.map((k, i) => [k, parts[i] ?? ""])) as AppTexts;
+      return parts.length > APP_FIELDS.length ? { ...app, extra: parts.slice(APP_FIELDS.length) } : app;
     });
 }
 
@@ -152,15 +164,20 @@ export function parseApps(value: string | null | undefined): AppEntry[] {
  * One app per line, empty trailing parts left out; JSON when some text contains | , " or a line
  * break (see parseApps), so the tablets with older apps keep working as long as nobody uses them.
  * json: always JSON on one line (the Linux kiosk, where every setting is one line in .config; a
- * line break in a text becomes \n inside the JSON string).
+ * line break in a text becomes \n inside the JSON string). Unknown JSON keys keep the JSON form;
+ * unknown line parts can only be kept in the line form (they have no names in JSON).
  */
 export function serializeApps(apps: AppEntry[], json = false): string {
-  const clean = apps.map((a) => Object.fromEntries(APP_FIELDS.map((k) => [k, a[k].trim()])) as AppEntry);
-  if (json || clean.some((a) => APP_FIELDS.some((k) => /[|,"\n]/.test(a[k]))))
-    return JSON.stringify(clean.map((a) => Object.fromEntries(APP_FIELDS.filter((k) => a[k]).map((k) => [k, a[k]]))));
+  const clean = apps.map((a) => ({
+    ...(Object.fromEntries(APP_FIELDS.map((k) => [k, (a[k] ?? "").trim()])) as AppTexts),
+    extra: a.extra,
+    more: a.more,
+  }));
+  if (json || clean.some((a) => a.more || APP_FIELDS.some((k) => /[|,"\n]/.test(a[k]))))
+    return JSON.stringify(clean.map((a) => ({ ...Object.fromEntries(APP_FIELDS.filter((k) => a[k]).map((k) => [k, a[k]])), ...a.more })));
   return clean
     .map((a) => {
-      const parts = APP_FIELDS.map((k) => a[k]);
+      const parts: string[] = [...APP_FIELDS.map((k) => a[k]), ...(a.extra ?? [])];
       while (parts.length > 2 && !parts[parts.length - 1]) parts.pop();
       return parts.join("|");
     })
@@ -175,6 +192,9 @@ export function appProblems(a: AppEntry): Partial<Record<keyof AppEntry, string>
   else if (/\s/.test(a.url.trim())) out.url = "Adressen får inte innehålla mellanslag.";
   if (a.icon && !APP_ICONS.some((i) => i.value === a.icon)) out.icon = `Okänd ikon: ${a.icon}`;
   if (/\s/.test(a.scope.trim())) out.scope = "Området får inte innehålla mellanslag.";
+  const en = (a.urlEn ?? "").trim();
+  if (en && !/^https:\/\/[^\s/]+/.test(en)) out.urlEn = "Den engelska adressen måste börja med https://";
+  else if (/\s/.test(en)) out.urlEn = "Den engelska adressen får inte innehålla mellanslag.";
   return out;
 }
 
@@ -268,7 +288,7 @@ export function formatValue(meta: CatalogEntry | undefined, value: string | null
         .map((a) => {
           const where = a.url.replace(/^https:\/\//, "").replace(/\/$/, "");
           const icon = APP_ICONS.find((i) => i.value === a.icon)?.label ?? (a.icon || "ingen ikon");
-          const english = [a.nameEn, a.descEn && `”${a.descEn}”`].filter(Boolean).join(" ");
+          const english = [a.nameEn, a.descEn && `”${a.descEn}”`, a.urlEn && `adress ${a.urlEn.replace(/^https:\/\//, "")}`].filter(Boolean).join(" ");
           return `${a.name || "utan namn"} (${[where, icon, a.scope && `område ${a.scope}`, a.desc && `”${a.desc}”`, english && `engelska: ${english}`].filter(Boolean).join(", ")})`;
         })
         .join(" · ");
