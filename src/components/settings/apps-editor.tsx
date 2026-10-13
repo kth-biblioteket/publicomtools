@@ -758,8 +758,8 @@ export function AppsEditor({
                         {p.icon && <p className="text-[12.5px] font-semibold text-bad-ink">{p.icon}</p>}
                       </div>
                     </div>
-                    {launcher && (
-                      <div className="grid gap-3 @xl:grid-cols-[2fr_1fr]">
+                      <div className={`grid gap-3 ${launcher ? "@xl:grid-cols-[2fr_1fr]" : "max-w-[360px]"}`}>
+                        {launcher && (
                         <div className="flex min-w-0 flex-col gap-1.5">
                           <label htmlFor={`app-${r.id}-desc`} className={LABEL}>Beskrivning (en rad)</label>
                           <input
@@ -772,8 +772,9 @@ export function AppsEditor({
                           />
                           {p.desc && <p className="text-[12.5px] font-semibold text-bad-ink">{p.desc}</p>}
                         </div>
+                        )}
                         <div className="flex min-w-0 flex-col gap-1.5">
-                          <label htmlFor={`app-${r.id}-name-en`} className={LABEL}>Namn (English)</label>
+                          <label htmlFor={`app-${r.id}-name-en`} className={LABEL}>{launcher ? "Namn (English)" : "Namn på knappen (English)"}</label>
                           <input
                             id={`app-${r.id}-name-en`}
                             value={r.nameEn}
@@ -782,8 +783,13 @@ export function AppsEditor({
                             aria-invalid={!!p.nameEn || undefined}
                             className={`${INPUT} ${p.nameEn ? "border-bad-ink" : "border-field"}`}
                           />
-                          {p.nameEn && <p className="text-[12.5px] font-semibold text-bad-ink">{p.nameEn}</p>}
+                          {p.nameEn ? (
+                            <p className="text-[12.5px] font-semibold text-bad-ink">{p.nameEn}</p>
+                          ) : (
+                            !launcher && <p className="text-[12.5px] leading-snug text-muted">Visas mindre under det svenska namnet i ramen.</p>
+                          )}
                         </div>
+                        {launcher && (
                         <div className="flex min-w-0 flex-col gap-1.5 @xl:col-span-2">
                           <label htmlFor={`app-${r.id}-desc-en`} className={LABEL}>Beskrivning (English)</label>
                           <input
@@ -796,8 +802,8 @@ export function AppsEditor({
                           />
                           {p.descEn && <p className="text-[12.5px] font-semibold text-bad-ink">{p.descEn}</p>}
                         </div>
+                        )}
                       </div>
-                    )}
                     {/* PubLiKiosk 3.16.0 och Linux-kiosken (publicom 36a1bbc) */}
                     <div className="flex min-w-0 flex-col gap-1.5">
                       <label htmlFor={`app-${r.id}-url-en`} className={LABEL}>Adress (English)</label>
