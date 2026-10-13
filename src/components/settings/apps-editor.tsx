@@ -986,27 +986,40 @@ export function AppsEditor({
                 : "Med bara startsidan visas ramen som i dag: Tillbaka och Hem när besökaren lämnat appen."}
           </p>
         </div>
-        {rows.length > 0 && (
-          <div className="mt-3 flex h-[68px] items-center gap-2.5 overflow-hidden rounded-[10px] border border-line bg-white px-3" aria-label="Förhandsvisning av ramen">
-            <span className="flex h-12 shrink-0 items-center rounded-[10px] border-2 border-field px-3 text-[15px] font-bold opacity-45">‹ Tillbaka</span>
-            <div className="flex min-w-0 flex-1 gap-2">
-              {(firstAppHome
-                ? rows.map((r, i) => ({ id: r.id, label: r.name.trim() || "Utan namn", icon: r.icon, home: i === 0 }))
-                : [{ id: 0, label: homeName, icon: homeIconName, home: true }, ...rows.map((r) => ({ id: r.id, label: r.name.trim() || "Utan namn", icon: r.icon, home: false }))]
-              ).map((c) => (
-                <span
-                  key={c.id}
-                  className={`flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-[10px] border-2 px-2 text-[15px] font-bold ${
-                    c.home ? "border-kth-blue bg-kth-blue text-white" : "border-field bg-white text-ink"
-                  }`}
-                >
-                  <AppIcon name={c.icon} />
-                  <span className="truncate">{c.label}</span>
+        {rows.length > 0 && (() => {
+          // Tvåspråkig som i kioskerna: svenska fet, engelska mindre under (namn_en; saknas det bara svenska).
+          // Ikonen till vänster, eller ovanför texten när det är fler än fem knappar.
+          const tabs = firstAppHome
+            ? rows.map((r, i) => ({ id: r.id, sv: r.name.trim() || "Utan namn", en: r.nameEn.trim(), icon: r.icon, home: i === 0 }))
+            : [
+                { id: 0, sv: homeName, en: homeLabel?.value?.trim() ? "" : "Home", icon: homeIconName, home: true },
+                ...rows.map((r) => ({ id: r.id, sv: r.name.trim() || "Utan namn", en: r.nameEn.trim(), icon: r.icon, home: false })),
+              ];
+          const stacked = tabs.length + 1 > 5;
+          const button = `flex min-w-0 rounded-[10px] border-2 px-2 ${stacked ? "h-[76px] flex-col items-center justify-center gap-1 text-center" : "h-14 items-center justify-center gap-2"}`;
+          const label = (sv: string, en: string) => (
+            <span className={`flex min-w-0 max-w-full flex-col leading-tight ${stacked ? "w-full items-center" : ""}`}>
+              <span className={`max-w-full truncate font-bold ${stacked ? "text-[13px]" : "text-[15px]"}`}>{sv}</span>
+              {en && <span className={`max-w-full truncate font-medium opacity-70 ${stacked ? "text-[10.5px]" : "text-[11.5px]"}`}>{en}</span>}
+            </span>
+          );
+          return (
+            <div className="mt-3 flex items-center gap-2 overflow-hidden rounded-[10px] border border-line bg-white px-3 py-2.5" aria-label="Förhandsvisning av ramen">
+              <span className={`${button} shrink-0 border-field opacity-45`}>
+                <svg viewBox="0 0 24 24" aria-hidden="true" className="size-5 shrink-0 fill-none stroke-current stroke-2 [stroke-linecap:round] [stroke-linejoin:round]">
+                  <path d="m15 18-6-6 6-6" />
+                </svg>
+                {label("Tillbaka", "Back")}
+              </span>
+              {tabs.map((c) => (
+                <span key={c.id} className={`${button} flex-1 ${c.home ? "border-kth-blue bg-kth-blue text-white" : "border-field bg-white text-ink"}`}>
+                  <AppIcon name={c.icon} className="size-5 shrink-0" />
+                  {label(c.sv, c.en)}
                 </span>
               ))}
             </div>
-          </div>
-        )}
+          );
+        })()}
       </section>
       )}
 
