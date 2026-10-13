@@ -26,7 +26,7 @@ function legacyHome(v: ConfigValues, startIcon: string): AppEntry | null {
   return {
     ...EMPTY_APP,
     name: label || "Hem",
-    nameEn: label ? (v.START_LABEL_EN ?? "").trim() : "Home",
+    nameEn: (v.START_LABEL_EN ?? "").trim() || (label ? "" : "Home"),
     icon: (v.START_ICON ?? "").trim() || startIcon,
     scope: (v.APP_SCOPE ?? "").trim(),
     url,

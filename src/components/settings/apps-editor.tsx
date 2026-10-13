@@ -304,7 +304,7 @@ export function AppsEditor({
       ? {
           ...EMPTY_APP,
           name: homeLabel?.value?.trim() || "Hem",
-          nameEn: homeLabel?.value?.trim() ? (homeLabelEn?.value?.trim() ?? "") : "Home",
+          nameEn: homeLabelEn?.value?.trim() || (homeLabel?.value?.trim() ? "" : "Home"),
           icon: homeIcon?.value ?? homeIcon?.meta.defaultValue ?? "house",
           scope: appScope?.value?.trim() ?? "",
           url: legacyUrl,
@@ -1022,7 +1022,7 @@ export function AppsEditor({
           const tabs =
             homeTabs.length > 1
               ? homeTabs
-              : [{ id: -1, sv: homeName, en: homeLabel?.value?.trim() ? (homeLabelEn?.value?.trim() ?? "") : "Home", icon: homeIconName, home: true }];
+              : [{ id: -1, sv: homeName, en: homeLabelEn?.value?.trim() || (homeLabel?.value?.trim() ? "" : "Home"), icon: homeIconName, home: true }];
           const stacked = tabs.length + 1 > 5;
           const button = `flex min-w-0 rounded-[10px] border-2 px-2 ${stacked ? "h-[76px] flex-col items-center justify-center gap-1 text-center" : "h-14 items-center justify-center gap-2"}`;
           const label = (sv: string, en: string) => (
