@@ -45,6 +45,7 @@ const HOME_KEYS = [
   ...FOOTER_PAGE_KEYS,
   ...ATTRACT_KEYS,
   "START_URL",
+  "APP_SCOPE",
   "START_LABEL",
   "START_ICON",
 ];
@@ -246,6 +247,7 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
         <AppsEditor
           apps={field(k.key)!}
           homeUrl={field("START_URL")}
+          appScope={field("APP_SCOPE")}
           homeLabel={field("START_LABEL")}
           homeIcon={field("START_ICON")}
           homeMode={field("HOME_MODE")}

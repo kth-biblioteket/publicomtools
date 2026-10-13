@@ -8,7 +8,6 @@ import {
   hostAllowed,
   hostOf,
   infoFieldProblem,
-  MAX_APPS,
   MAX_APPS_LAUNCHER,
   MAX_APPS_TABS,
   parseApps,
@@ -213,6 +212,7 @@ function IconSelect({
 export function AppsEditor({
   apps,
   homeUrl,
+  appScope,
   homeLabel,
   homeIcon,
   homeMode,
@@ -236,7 +236,12 @@ export function AppsEditor({
   allowedSites,
 }: {
   apps: EditorField;
+  /**
+   * START_URL/APP_SCOPE (Android, older settings): the home app before the first service was home.
+   * Only shown as "Flytta in som första tjänst"; PubLiKiosk 3.20 still reads them when APPS lacks the address.
+   */
   homeUrl?: EditorField;
+  appScope?: EditorField;
   homeLabel?: EditorField;
   homeIcon?: EditorField;
   /** Missing in an older catalog: then always one app as home */
@@ -274,11 +279,9 @@ export function AppsEditor({
   allowedSites?: { label: string; key: string; value: string | null };
 }) {
   const launcher = (homeMode?.value ?? homeMode?.meta.defaultValue ?? "app") === "launcher";
-  // Utan START_URL (Linux-kiosken) är första tjänsten hem, och START_LABEL/START_ICON är startknappen
-  // som tar besökaren tillbaka till början, i båda lägena
-  const firstAppHome = !homeUrl;
-  // 36 på förstasidan (flera sidor); som flikar sex på Linux-kiosken, fem utöver startsidan på surfplattan
-  const max = launcher ? MAX_APPS_LAUNCHER : firstAppHome ? MAX_APPS_TABS : MAX_APPS;
+  // Första tjänsten är hem på båda plattformarna (PubLiKiosk 3.20, Linux-kiosken); START_LABEL/START_ICON
+  // är startknappen som tar besökaren tillbaka till början. 36 på förstasidan (flera sidor), sex som flikar.
+  const max = launcher ? MAX_APPS_LAUNCHER : MAX_APPS_TABS;
   // Utan LAUNCHER_PER_PAGE (äldre katalog) visar förstasidan alla på en sida
   const pageSize = perPage ? Number(perPage.value ?? perPage.meta.defaultValue ?? 4) || 4 : MAX_APPS_LAUNCHER;
   const external = apps.value ?? "";
@@ -289,6 +292,31 @@ export function AppsEditor({
     setSynced(external);
     if (toValue(rows, alwaysJson) !== external) setRows(toRows(apps.value));
   }
+
+  // Äldre Android-inställning: startsidan i START_URL som PubLiKiosk lägger först om adressen saknas i APPS
+  const legacyUrl = homeUrl?.value?.trim() ?? "";
+  const legacyHome =
+    legacyUrl && !rows.some((r) => r.url.trim() === legacyUrl || r.urlEn.trim() === legacyUrl)
+      ? {
+          ...EMPTY_APP,
+          name: homeLabel?.value?.trim() || "Hem",
+          nameEn: homeLabel?.value?.trim() ? "" : "Home",
+          icon: homeIcon?.value ?? homeIcon?.meta.defaultValue ?? "house",
+          scope: appScope?.value?.trim() ?? "",
+          url: legacyUrl,
+        }
+      : null;
+  const homeTabs = [
+    ...(legacyHome ? [{ id: -2, sv: legacyHome.name, en: legacyHome.nameEn, icon: legacyHome.icon, home: true }] : []),
+    ...rows.map((r, i) => ({ id: r.id, sv: r.name.trim() || "Utan namn", en: r.nameEn.trim(), icon: r.icon, home: !legacyHome && i === 0 })),
+  ];
+  /** Startsidan in som första tjänst, och START_URL/APP_SCOPE bort på den här nivån (ärvda värden ligger kvar men dubblas inte) */
+  const moveLegacyHome = () => {
+    if (!legacyHome) return;
+    commit([{ ...legacyHome, id: nextId++, adv: !!legacyHome.scope }, ...rows]);
+    if (homeUrl && !homeUrl.inherited) homeUrl.onClear();
+    if (appScope && appScope.value !== null && !appScope.inherited) appScope.onClear();
+  };
 
   const listRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ id: number; hs: number[]; startY: number; startTop: number; cur: number } | null>(null);
@@ -426,12 +454,8 @@ export function AppsEditor({
             />
             <ModeCard
               selected={!launcher}
-              title={firstAppHome ? "Första tjänsten är hem" : "En app"}
-              text={
-                firstAppHome
-                  ? "Första tjänsten öppnas direkt. De övriga ligger som flikar i navigeringen."
-                  : "Som i dag: en app är startsida. Fler appar går att växla till i ramen."
-              }
+              title="Första tjänsten är hem"
+              text="Första tjänsten öppnas direkt. De övriga ligger som flikar i navigeringen."
               onPick={() => pickMode("app")}
               picture={
                 <span className="flex flex-1 flex-col justify-between">
@@ -443,13 +467,9 @@ export function AppsEditor({
             />
           </div>
           <p className="mt-3 text-[13px] leading-snug text-muted">
-            {firstAppHome
-              ? launcher
-                ? "Efter inaktivitet går datorn tillbaka till förstasidan med ny session."
-                : "Efter inaktivitet går datorn tillbaka till första tjänsten med ny session."
-              : launcher
-                ? "Startsidan (START_URL) används inte. Efter inaktivitet går enheten tillbaka till förstasidan med ny session. Har enheten bara en tjänst går den direkt in i den."
-                : "Hem-appen är startsida, och efter inaktivitet går enheten tillbaka till den. Med fler appar visas ramen alltid."}
+            {launcher
+              ? "Efter inaktivitet går enheten tillbaka till förstasidan med ny session. Har den bara en tjänst går den direkt in i den."
+              : "Efter inaktivitet går enheten tillbaka till första tjänsten med ny session."}
           </p>
           {homeMode.problem && <p className="mt-1.5 text-[12.5px] font-semibold text-bad-ink">{homeMode.problem}</p>}
         </section>
@@ -615,8 +635,8 @@ export function AppsEditor({
         </section>
       )}
 
-      {/* Startknappen (Linux-kiosken): tillbaka till början, i båda lägena */}
-      {firstAppHome && (homeLabel || homeIcon) && (
+      {/* Startknappen: tillbaka till början, i båda lägena */}
+      {(homeLabel || homeIcon) && (
         <section className="rounded-[10px] border border-line-soft px-4 py-4">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
             <h4 className="text-[15px] font-extrabold">Startknappen</h4>
@@ -634,43 +654,11 @@ export function AppsEditor({
         </section>
       )}
 
-      {/* Startsidan */}
-      {!launcher && !firstAppHome && (
-      <section className="rounded-[10px] border border-line-soft px-4 py-4">
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-          <h4 className="text-[15px] font-extrabold">Startsida</h4>
-          <p className="text-[13px] text-muted">Hem-appen. Dit går enheten tillbaka när ingen använder den, och med knappen längst till vänster.</p>
-        </div>
-        <div className="mt-3 grid gap-4 @2xl:grid-cols-[2fr_1fr_1fr]">
-          {homeUrl && (
-            <div className="flex min-w-0 flex-col gap-1.5">
-              <label htmlFor={`f-${homeUrl.meta.key}`} className={LABEL}>Adress</label>
-              <FieldControl {...homeUrl} invalid={!!homeUrl.problem} />
-              {homeUrl.problem && <p className="text-[12.5px] font-semibold text-bad-ink">{homeUrl.problem}</p>}
-            </div>
-          )}
-          {homeLabel && (
-            <div className="flex min-w-0 flex-col gap-1.5">
-              <label htmlFor={`f-${homeLabel.meta.key}`} className={LABEL}>Namn på knappen</label>
-              <FieldControl {...homeLabel} invalid={!!homeLabel.problem} />
-              {homeLabel.problem && <p className="text-[12.5px] font-semibold text-bad-ink">{homeLabel.problem}</p>}
-            </div>
-          )}
-          {homeIcon && (
-            <div className="flex min-w-0 flex-col gap-1.5">
-              <label htmlFor="home-icon" className={LABEL}>Ikon</label>
-              <IconSelect id="home-icon" value={homeIconName} inherited={homeIcon.inherited || homeIcon.value === null} onChange={homeIcon.onChange} />
-            </div>
-          )}
-        </div>
-      </section>
-      )}
-
       {/* Tjänster / Fler webbappar */}
       <section className="rounded-[10px] border border-line-soft px-4 py-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-baseline gap-x-3">
-            <h4 className="text-[15px] font-extrabold">{launcher || firstAppHome ? "Tjänster" : "Fler webbappar"}</h4>
+            <h4 className="text-[15px] font-extrabold">Tjänster</h4>
             <span className={`text-[13px] ${rows.length > max ? "font-bold text-bad-ink" : "text-muted"}`}>
               {rows.length} av {max}
             </span>
@@ -681,18 +669,34 @@ export function AppsEditor({
             onClick={() => commit([...rows, { ...EMPTY_APP, id: nextId++, adv: false }])}
             className="h-9 rounded-lg border-2 border-kth-blue bg-white px-3.5 text-[13.5px] font-bold text-kth-blue hover:bg-select disabled:opacity-40"
           >
-            {launcher || firstAppHome ? "+ Lägg till tjänst" : "+ Lägg till app"}
+            + Lägg till tjänst
           </button>
         </div>
+        {!launcher && legacyHome && (
+          <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg bg-warn-bg px-3.5 py-3 text-[13px] text-warn-ink">
+            <span className="min-w-0 flex-1">
+              <b>Startsidan ligger kvar i det gamla formatet</b> (START_URL {legacyUrl.replace(/^https:\/\//, "")}). Enheten visar den som första flik, men den går inte att
+              redigera här förrän den flyttats in bland tjänsterna.
+            </span>
+            <button
+              type="button"
+              onClick={moveLegacyHome}
+              disabled={rows.length >= max}
+              className="h-9 rounded-lg border-2 border-kth-blue bg-white px-3 text-[13px] font-bold text-kth-blue hover:bg-select disabled:opacity-40"
+            >
+              Flytta in som första tjänst
+            </button>
+          </div>
+        )}
         {apps.inherited && rows.length > 0 && (
           <p className="mt-2 text-[12.5px] text-muted">Ärvt värde. En ändring här sätter apparna för just den här nivån.</p>
         )}
 
         {rows.length === 0 ? (
           <div className="mt-3 rounded-[10px] border border-dashed border-field px-4 py-6 text-center text-sm text-muted">
-            {launcher || firstAppHome
-              ? "Inga tjänster. Lägg till minst en, annars har förstasidan inget att visa."
-              : "Inga fler appar. Enheten visar bara startsidan, som i dag."}
+            {legacyHome
+              ? "Inga tjänster utöver startsidan ovan. Flytta in den som första tjänst."
+              : "Inga tjänster. Lägg till minst en, annars har enheten inget att visa."}
           </div>
         ) : (
           <div ref={listRef} className="mt-3 flex flex-col" style={{ gap: GAP }}>
@@ -985,22 +989,19 @@ export function AppsEditor({
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
           <h4 className="text-[15px] font-extrabold">Så ser ramen ut</h4>
           <p className="text-[13px] text-muted">
-            {firstAppHome
+            {homeTabs.length > 1
               ? "Första tjänsten är vald. De övriga ligger som flikar."
-              : rows.length
-                ? "Hem-appen är vald. Ramen visas alltid när det finns fler än en app."
-                : "Med bara startsidan visas ramen som i dag: Tillbaka och Hem när besökaren lämnat appen."}
+              : "Med en tjänst visas Tillbaka och startknappen när besökaren lämnat tjänsten."}
           </p>
         </div>
-        {rows.length > 0 && (() => {
+        {homeTabs.length > 0 && (() => {
           // Tvåspråkig som i kioskerna: svenska fet, engelska mindre under (namn_en; saknas det bara svenska).
           // Ikonen till vänster, eller ovanför texten när det är fler än fem knappar.
-          const tabs = firstAppHome
-            ? rows.map((r, i) => ({ id: r.id, sv: r.name.trim() || "Utan namn", en: r.nameEn.trim(), icon: r.icon, home: i === 0 }))
-            : [
-                { id: 0, sv: homeName, en: homeLabel?.value?.trim() ? "" : "Home", icon: homeIconName, home: true },
-                ...rows.map((r) => ({ id: r.id, sv: r.name.trim() || "Utan namn", en: r.nameEn.trim(), icon: r.icon, home: false })),
-              ];
+          // Flera tjänster: flikar, den första är hem. En tjänst: startknappen (START_LABEL/START_ICON).
+          const tabs =
+            homeTabs.length > 1
+              ? homeTabs
+              : [{ id: -1, sv: homeName, en: homeLabel?.value?.trim() ? "" : "Home", icon: homeIconName, home: true }];
           const stacked = tabs.length + 1 > 5;
           const button = `flex min-w-0 rounded-[10px] border-2 px-2 ${stacked ? "h-[76px] flex-col items-center justify-center gap-1 text-center" : "h-14 items-center justify-center gap-2"}`;
           const label = (sv: string, en: string) => (

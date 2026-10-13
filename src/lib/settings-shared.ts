@@ -71,11 +71,9 @@ export function validateValue(meta: Pick<CatalogEntry, "type" | "options">, valu
 
 // --- APPS: the Android tablets' extra web apps ---
 
-/** HOME_MODE=app: the tablet shows the home app (START_URL) and at most this many more */
-export const MAX_APPS = 5;
 /** HOME_MODE=launcher: at most this many services on the first page, LAUNCHER_PER_PAGE (2–12) at a time */
 export const MAX_APPS_LAUNCHER = 36;
-/** The Linux kiosk with the first service as home: at most this many tabs */
+/** HOME_MODE=app: the first service is home, at most this many tabs (PubLiKiosk 3.20, the Linux kiosk) */
 export const MAX_APPS_TABS = 6;
 
 /** The icons the tablet has (Lucide names), with their names in the admin */
@@ -359,27 +357,22 @@ export function settingWarnings(
   if (appsMeta) {
     const apps = parseApps(value(appsMeta.key));
     const launcher = catalog.has("HOME_MODE") && (value("HOME_MODE") ?? catalog.get("HOME_MODE")!.defaultValue) === "launcher";
-    // Android har en egen startsida (START_URL); på Linux-kiosken är tjänsterna allt
-    const ownStart = catalog.has("START_URL");
-    if (launcher && apps.length === 0)
-      warnings.push({
-        key: appsMeta.key,
-        message: ownStart
-          ? "Förstasidan har inga tjänster. Enheten visar då startsidan, som med En app."
-          : "Kiosken har inga tjänster. Lägg till minst en.",
-      });
+    // Äldre Android-inställning: PubLiKiosk lägger START_URL först om adressen saknas i APPS
+    const legacyStart = (value("START_URL") ?? "").trim();
+    const tabCount = apps.length + (legacyStart && !apps.some((a) => a.url.trim() === legacyStart || a.urlEn.trim() === legacyStart) ? 1 : 0);
+    // Startsidan i START_URL används inte med förstasida
+    if ((launcher ? apps.length : tabCount) === 0)
+      warnings.push({ key: appsMeta.key, message: "Enheten har inga tjänster. Lägg till minst en." });
     if (platform === "android" && (value(appsMeta.key) ?? "").trim().startsWith("["))
       warnings.push({
         key: appsMeta.key,
         message: "Någon text innehåller | , \" eller en radbrytning. Då sparas apparna i ett format som enheterna läser från PubLiKiosk 3.14.0. Äldre appar visar inga appar.",
       });
-    if (!ownStart && !launcher && apps.length > MAX_APPS_TABS)
+    if (!launcher && tabCount > MAX_APPS_TABS)
       warnings.push({
         key: appsMeta.key,
-        message: `När första tjänsten är hem visar kiosken högst ${MAX_APPS_TABS} tjänster som flikar. De sista hoppas över; med förstasida visas alla.`,
+        message: `När första tjänsten är hem visar enheten högst ${MAX_APPS_TABS} tjänster som flikar${tabCount > apps.length ? ", startsidan i START_URL inräknad" : ""}. De sista hoppas över; med förstasida visas alla.`,
       });
-    if (ownStart && !launcher && apps.length > MAX_APPS)
-      warnings.push({ key: appsMeta.key, message: `Med En app visar enheten högst ${MAX_APPS} appar utöver startsidan. Den sista hoppas över.` });
   }
   const resource = (value("RESOURCE_ID") ?? "").trim();
   if (type === "guestcomputer" && catalog.has("RESOURCE_ID") && (!resource || resource === "x"))
