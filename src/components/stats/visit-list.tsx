@@ -43,6 +43,8 @@ export function VisitList({
   if (visits.length === 0) return <p className="text-sm text-muted">Inga besök under perioden.</p>;
   // Bara kioskerna (Android) räknar sidor
   const showPages = visits.some((v) => v.pages !== null);
+  // Tjänsterna rapporteras av kioskerna (PubLiKiosk, Linux-kiosken)
+  const showApps = visits.some((v) => v.apps.length > 0);
   return (
     <div>
       {/* Mobil: en rad per besök */}
@@ -58,6 +60,7 @@ export function VisitList({
                 {(v.reason && REASONS[v.reason]) ?? v.reason ?? "–"}
                 {v.pages !== null && ` · ${v.pages} ${v.pages === 1 ? "sida" : "sidor"}`}
               </span>
+              {v.apps.length > 0 && <span className="block truncate text-[12.5px] text-muted">{appsText(v.apps)}</span>}
             </span>
             <span className="shrink-0 tabular-nums">{formatDuration(v.seconds)}</span>
           </li>
@@ -72,7 +75,8 @@ export function VisitList({
               <th scope="col" className="py-2 pr-3">Tid</th>
               <th scope="col" className="py-2 pr-3 text-right">Längd</th>
               <th scope="col" className="py-2 pr-3">Slutade</th>
-              {showPages && <th scope="col" className="py-2 text-right">Sidor</th>}
+              {showPages && <th scope="col" className="py-2 pr-3 text-right">Sidor</th>}
+              {showApps && <th scope="col" className="py-2">Tjänster</th>}
             </tr>
           </thead>
           <tbody>
@@ -89,7 +93,8 @@ export function VisitList({
                 </td>
                 <td className="py-2 pr-3 text-right tabular-nums">{formatDuration(v.seconds)}</td>
                 <td className="py-2 pr-3 text-muted">{(v.reason && REASONS[v.reason]) ?? v.reason ?? "–"}</td>
-                {showPages && <td className="py-2 text-right tabular-nums text-muted">{v.pages ?? "–"}</td>}
+                {showPages && <td className="py-2 pr-3 text-right tabular-nums text-muted">{v.pages ?? "–"}</td>}
+                {showApps && <td className="py-2 text-muted">{v.apps.length ? appsText(v.apps) : "–"}</td>}
               </tr>
             ))}
           </tbody>
@@ -107,4 +112,9 @@ export function VisitList({
       </div>
     </div>
   );
+}
+
+/** "Biblioteket 1 min · Kartor 40 s" */
+function appsText(apps: { name: string; seconds: number }[]): string {
+  return apps.map((a) => `${a.name} ${formatDuration(a.seconds)}`).join(" · ");
 }

@@ -5,10 +5,12 @@ import {
   firstVisitAt,
   heatmap,
   perDay,
+  perApp,
   perDevice,
   previousPeriod,
   summary,
   visitList,
+  type AppRow,
   type Period,
   type StatsFilter,
   type Summary,
@@ -98,7 +100,7 @@ export async function UsageView({
   pageQuery: string;
 }) {
   const before = previousPeriod(period);
-  const [now, prev, cells, days, lengths, devices, first, list] = await Promise.all([
+  const [now, prev, cells, days, lengths, devices, first, list, apps] = await Promise.all([
     summary(period, filter),
     summary(before, filter),
     heatmap(period, filter),
@@ -107,12 +109,23 @@ export async function UsageView({
     showDevices ? perDevice(period, filter) : Promise.resolve([]),
     firstVisitAt(),
     visitList(period, filter, shown),
+    perApp(period, filter),
   ]);
+  const pagePath = filter.host ? `/computers/${filter.host}/usage` : "/stats";
+  /** Link that filters the page on a service (or shows all again), keeping the other filters */
+  const appHref = (url: string | null) => {
+    const q = new URLSearchParams(pageQuery);
+    q.delete("antal");
+    if (url) q.set("tjanst", url);
+    else q.delete("tjanst");
+    const s = q.toString();
+    return s ? `${pagePath}?${s}` : pagePath;
+  };
   const more = new URLSearchParams(pageQuery);
   more.set("antal", String(shown + VISIT_PAGE));
   const moreHref =
     list.total > list.visits.length && shown < VISIT_MAX
-      ? `${filter.host ? `/computers/${filter.host}/usage` : "/stats"}?${more.toString()}`
+      ? `${pagePath}?${more.toString()}`
       : null;
 
   if (!first) {
@@ -165,6 +178,19 @@ export async function UsageView({
         </StatPanel>
       </div>
 
+      {(apps.length > 0 || filter.app) && (
+        <StatPanel
+          title="Tjänster"
+          hint={
+            filter.app
+              ? "Sidan visar bara besök där den markerade tjänsten användes."
+              : "Besök där tjänsten användes, och tiden i den. Klicka på en tjänst för att visa bara dess besök."
+          }
+        >
+          <AppTable apps={apps} active={filter.app} href={appHref} />
+        </StatPanel>
+      )}
+
       {showDevices && devices.length > 0 && (
         <StatPanel
           title="Per enhet"
@@ -177,6 +203,43 @@ export async function UsageView({
       <StatPanel title="Besök" hint="Varje besök under perioden, senaste först.">
         <VisitList visits={list.visits} total={list.total} showDevice={!filter.host} moreHref={moreHref} />
       </StatPanel>
+    </div>
+  );
+}
+
+function AppTable({ apps, active, href }: { apps: AppRow[]; active?: string; href: (url: string | null) => string }) {
+  const max = Math.max(1, ...apps.map((a) => a.visits));
+  return (
+    <div className="flex flex-col gap-1">
+      {active && (
+        <Link href={href(null)} className="mb-1 self-start text-[13px] font-bold text-kth-blue underline underline-offset-2">
+          Visa alla tjänster
+        </Link>
+      )}
+      <ul className="flex flex-col">
+        {apps.map((a) => {
+          const on = a.url !== null && a.url === active;
+          const row = (
+            <>
+              <span className="flex min-w-0 flex-col">
+                <span className={`truncate ${on ? "font-extrabold text-kth-navy" : "font-semibold"}`}>{a.name}</span>
+                {a.url === null && <span className="text-[11.5px] text-muted">besök från äldre versioner, utan uppgift om tjänst</span>}
+              </span>
+              <span className="hidden h-2 overflow-hidden rounded-full bg-page sm:block" aria-hidden="true">
+                <span className={`block h-full rounded-full ${a.url === null ? "bg-field" : "bg-kth-blue"}`} style={{ width: `${Math.round((a.visits / max) * 100)}%` }} />
+              </span>
+              <span className="text-right tabular-nums">{num(a.visits)} besök</span>
+              <span className="text-right tabular-nums text-muted">{a.url === null ? "–" : hours(a.seconds)}</span>
+            </>
+          );
+          const cls = `grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 rounded-lg px-2 py-2 text-[13.5px] sm:grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)_auto_auto] ${on ? "bg-select" : ""}`;
+          return (
+            <li key={a.url ?? "okand"}>
+              {a.url === null ? <div className={cls}>{row}</div> : <Link href={href(on ? null : a.url)} className={`${cls} hover:bg-page`}>{row}</Link>}
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

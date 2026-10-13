@@ -187,9 +187,27 @@ model Visit {
   /// Platform and profile when the visit happened, so old statistics stay right after a change
   platform  String
   profile   String?
+  /// The services (APPS) used during the visit; none from kiosks before they reported it
+  apps      VisitApp[]
 
   @@unique([host, startedAt])
   @@index([startedAt])
+}
+
+/// Time per service (an entry in APPS) during one visit. Only the configured service, never the
+/// pages the visitor went to. Removed with the visit.
+model VisitApp {
+  host      String
+  startedAt DateTime
+  visit     Visit    @relation(fields: [host, startedAt], references: [host, startedAt], onDelete: Cascade)
+  /// The service's address in APPS: groups the statistics and survives a renamed service
+  url       String
+  /// The service's name when the visit happened
+  name      String
+  seconds   Int
+
+  @@id([host, startedAt, url])
+  @@index([url])
 }
 
 /// How long a device was running per day (Swedish date), from its heartbeats. The denominator of

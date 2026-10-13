@@ -41,7 +41,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/stats">) {
       />
       <UsageView
         period={period}
-        filter={{ platform, profile }}
+        filter={{ platform, profile, app: one(sp.tjanst) || undefined }}
         query={query}
         showDevices
         profileLabels={options.labels}

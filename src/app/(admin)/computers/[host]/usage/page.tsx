@@ -26,7 +26,7 @@ export default async function ComputerUsagePage({ params, searchParams }: PagePr
         from={period.from}
         to={lastDay}
       />
-      <UsageView period={period} filter={{ host }} query="" showDevices={false}
+      <UsageView period={period} filter={{ host, app: one(sp.tjanst) || undefined }} query="" showDevices={false}
         profileLabels={options.labels}
         visits={visitLimit(one(sp.antal))}
         pageQuery={pageQuery}

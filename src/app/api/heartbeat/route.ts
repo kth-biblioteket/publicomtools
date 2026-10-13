@@ -95,6 +95,12 @@ export async function POST(request: Request) {
       })),
       skipDuplicates: true,
     }),
+    db.visitApp.createMany({
+      data: visits.flatMap((v) =>
+        (v.apps ?? []).map((a) => ({ host: status.host, startedAt: new Date(v.start * 1000), url: a.url, name: a.name, seconds: a.s })),
+      ),
+      skipDuplicates: true,
+    }),
     db.$executeRaw`
       INSERT INTO "DeviceDay" ("host", "day", "onlineSeconds", "platform", "profile")
       VALUES (${status.host}, ${swedishDay(now)}::date, ${onlineSeconds}, ${platform}, ${profile})

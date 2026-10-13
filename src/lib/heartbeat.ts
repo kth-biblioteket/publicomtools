@@ -56,6 +56,11 @@ export const heartbeatSchema = z.object({
         end: z.number().int().positive(),
         reason: z.string().max(20).optional(),
         pages: z.number().int().min(0).max(10000).optional(),
+        /** Seconds per service (the address and name in APPS) during the visit; kiosks from PubLiKiosk 3.22 / publicom 2026-10 */
+        apps: z
+          .array(z.object({ url: z.string().min(1).max(500), name: z.string().max(100), s: z.number().int().min(0) }))
+          .max(36)
+          .optional(),
       }),
     )
     .max(500)
@@ -75,7 +80,26 @@ export type ReportedVisit = NonNullable<HeartbeatStatus["visits"]>[number];
 /** The reported visits that make sense: end after start, at most 12 hours, not in the future. */
 export function plausibleVisits(visits: ReportedVisit[] | undefined, now: Date): ReportedVisit[] {
   const nowSeconds = Math.floor(now.getTime() / 1000) + 300; // device clocks may be a little ahead
-  return (visits ?? []).filter(
-    (v) => v.end >= v.start && v.end - v.start <= MAX_VISIT_SECONDS && v.end <= nowSeconds,
-  );
+  return (visits ?? [])
+    .filter((v) => v.end >= v.start && v.end - v.start <= MAX_VISIT_SECONDS && v.end <= nowSeconds)
+    .map((v) => ({ ...v, apps: visitApps(v) }));
+}
+
+/**
+ * The services of a visit, one per address (summed), never more time in all than the visit (+5 s
+ * for rounding on the device): a larger sum is scaled down, so the statistics never show more
+ * time in the services than in the visits.
+ */
+export function visitApps(v: ReportedVisit): { url: string; name: string; s: number }[] {
+  const byUrl = new Map<string, { url: string; name: string; s: number }>();
+  for (const a of v.apps ?? []) {
+    const url = a.url.trim();
+    if (!url) continue;
+    const prev = byUrl.get(url);
+    byUrl.set(url, { url, name: a.name.trim() || prev?.name || url, s: (prev?.s ?? 0) + a.s });
+  }
+  const list = [...byUrl.values()].filter((a) => a.s > 0);
+  const total = list.reduce((n, a) => n + a.s, 0);
+  const max = v.end - v.start + 5;
+  return total > max ? list.map((a) => ({ ...a, s: Math.floor((a.s * max) / total) })) : list;
 }

@@ -88,6 +88,8 @@ export type StatsFilter = {
   platform?: string;
   profile?: string;
   host?: string;
+  /** Visits that used this service (its address in APPS) */
+  app?: string;
 };
 
 function where(p: Period, f: StatsFilter, alias: "v" | "d") {
@@ -100,6 +102,9 @@ function where(p: Period, f: StatsFilter, alias: "v" | "d") {
   if (f.profile === "none") parts.push(Prisma.sql`${col("profile")} IS NULL`);
   else if (f.profile) parts.push(Prisma.sql`${col("profile")} = ${f.profile}`);
   if (f.host) parts.push(Prisma.sql`${col("host")} = ${f.host}`);
+  // Igångtiden (DeviceDay) gäller enheten, inte en tjänst: tjänstfiltret begränsar bara besöken
+  if (f.app && alias === "v")
+    parts.push(Prisma.sql`EXISTS (SELECT 1 FROM "VisitApp" a WHERE a."host" = v."host" AND a."startedAt" = v."startedAt" AND a."url" = ${f.app})`);
   return Prisma.join(parts, " AND ");
 }
 
@@ -303,6 +308,35 @@ export async function filterOptions(): Promise<{
   };
 }
 
+export type AppRow = {
+  /** The service's address; null = visits without the information (kiosks before they reported it) */
+  url: string | null;
+  name: string;
+  visits: number;
+  seconds: number;
+};
+
+/** Visits and time per service, most visits first; visits without services last as one row */
+export async function perApp(p: Period, f: StatsFilter): Promise<AppRow[]> {
+  const rows = await db.$queryRaw<{ url: string; name: string; visits: bigint; seconds: bigint }[]>`
+    SELECT a."url",
+           (array_agg(a."name" ORDER BY a."startedAt" DESC))[1] AS name,
+           count(*) AS visits, sum(a."seconds") AS seconds
+    FROM "VisitApp" a JOIN "Visit" v ON v."host" = a."host" AND v."startedAt" = a."startedAt"
+    WHERE ${where(p, f, "v")}
+    GROUP BY a."url"
+    ORDER BY visits DESC, seconds DESC`;
+  const [unknown] = f.app
+    ? [{ visits: BigInt(0) }]
+    : await db.$queryRaw<{ visits: bigint }[]>`
+        SELECT count(*) AS visits FROM "Visit" v
+        WHERE ${where(p, f, "v")} AND NOT EXISTS (SELECT 1 FROM "VisitApp" a WHERE a."host" = v."host" AND a."startedAt" = v."startedAt")`;
+  const list: AppRow[] = rows.map((r) => ({ url: r.url, name: r.name, visits: Number(r.visits), seconds: Number(r.seconds) }));
+  // Bara när någon tjänst alls finns: annars är det inte en kiosk med tjänster (gästdatorer, sökdatorer)
+  if (list.length && Number(unknown.visits)) list.push({ url: null, name: "Okänd tjänst", visits: Number(unknown.visits), seconds: 0 });
+  return list;
+}
+
 export type VisitRow = {
   id: string;
   host: string;
@@ -312,6 +346,7 @@ export type VisitRow = {
   seconds: number;
   reason: string | null;
   pages: number | null;
+  apps: { name: string; seconds: number }[];
 };
 
 /** The visits of the period, newest first: the first `limit`, and how many there are in all */
@@ -325,13 +360,17 @@ export async function visitList(
     ...(f.platform ? { platform: f.platform } : {}),
     ...(f.profile === "none" ? { profile: null } : f.profile ? { profile: f.profile } : {}),
     ...(f.host ? { host: f.host } : {}),
+    ...(f.app ? { apps: { some: { url: f.app } } } : {}),
   };
   const [rows, total] = await Promise.all([
     db.visit.findMany({
       where,
       orderBy: { startedAt: "desc" },
       take: limit,
-      include: { computer: { select: { label: true, computerName: true } } },
+      include: {
+        computer: { select: { label: true, computerName: true } },
+        apps: { select: { name: true, seconds: true }, orderBy: { seconds: "desc" } },
+      },
     }),
     db.visit.count({ where }),
   ]);
@@ -346,6 +385,7 @@ export async function visitList(
       seconds: v.seconds,
       reason: v.reason,
       pages: v.pages,
+      apps: v.apps,
     })),
   };
 }
