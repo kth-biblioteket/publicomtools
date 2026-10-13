@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
   APP_ICONS,
@@ -676,7 +677,8 @@ export function AppsEditor({
           <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg bg-warn-bg px-3.5 py-3 text-[13px] text-warn-ink">
             <span className="min-w-0 flex-1">
               <b>Startsidan ligger kvar i det gamla formatet</b> (START_URL {legacyUrl.replace(/^https:\/\//, "")}). Enheten visar den som första flik, men den går inte att
-              redigera här förrän den flyttats in bland tjänsterna.
+              redigera här förrän den flyttats in bland tjänsterna. Alla nivåer på en gång:{" "}
+              <Link href="/config/android-home" className="font-bold underline underline-offset-2">Startsidan blir första tjänst</Link>.
             </span>
             <button
               type="button"
