@@ -4,6 +4,9 @@
  * imports here.
  */
 
+import dynamicIconImports from "lucide-react/dynamicIconImports";
+import type { IconName } from "lucide-react/dynamic";
+
 /** apps: the Android tablets' extra web apps (APPS), edited with the apps editor */
 export type KeyType = "int" | "bool" | "string" | "csv" | "url" | "enum" | "apps";
 
@@ -76,7 +79,15 @@ export const MAX_APPS_LAUNCHER = 36;
 /** HOME_MODE=app: the first service is home, at most this many tabs (PubLiKiosk 3.20, the Linux kiosk) */
 export const MAX_APPS_TABS = 6;
 
-/** The icons the tablet has (Lucide names), with their names in the admin */
+/**
+ * Every Lucide icon (lucide-react, pinned to the same version as the kiosks' Lucide), by name.
+ * Old names Lucide keeps as aliases (circle-help, building-2 …) are included.
+ */
+export const ICON_NAMES = Object.keys(dynamicIconImports) as IconName[];
+const iconSet = new Set<string>(ICON_NAMES);
+export const isIconName = (name: string): name is IconName => iconSet.has(name);
+
+/** Suggested icons, first in the icon picker, with their Swedish names in the admin */
 export const APP_ICONS = [
   { value: "house", label: "Hus" },
   { value: "search", label: "Sök" },
@@ -217,7 +228,7 @@ export function appProblems(a: AppEntry): Partial<Record<keyof AppEntry, string>
   if (!a.name.trim()) out.name = "Skriv ett namn på knappen.";
   if (!/^https:\/\/[^\s/]+/.test(a.url.trim())) out.url = "Adressen måste börja med https://";
   else if (/\s/.test(a.url.trim())) out.url = "Adressen får inte innehålla mellanslag.";
-  if (a.icon && !APP_ICONS.some((i) => i.value === a.icon)) out.icon = `Okänd ikon: ${a.icon}`;
+  if (a.icon && !isIconName(a.icon)) out.icon = `Okänd ikon: ${a.icon}`;
   if (/\s/.test(a.scope.trim())) out.scope = "Området får inte innehålla mellanslag.";
   const en = (a.urlEn ?? "").trim();
   if (en && !/^https:\/\/[^\s/]+/.test(en)) out.urlEn = "Den engelska adressen måste börja med https://";

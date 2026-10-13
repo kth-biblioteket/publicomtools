@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   APP_ICONS,
   appProblems,
+  ICON_NAMES,
   EMPTY_APP,
   hostAllowed,
   hostOf,
@@ -171,6 +172,9 @@ function ModeCard({ selected, title, text, picture, onPick }: { selected: boolea
   );
 }
 
+/** At most this many hits in the icon search (each icon is loaded when shown) */
+const ICON_HITS = 120;
+
 function IconSelect({
   id,
   value,
@@ -184,20 +188,78 @@ function IconSelect({
   allowNone?: boolean;
   onChange: (value: string) => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const boxRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => !boxRef.current?.contains(e.target as Node) && setOpen(false);
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [open]);
+
+  const label = (name: string) => APP_ICONS.find((i) => i.value === name)?.label ?? name;
+  // Söker i Lucides engelska namn och i de föreslagnas svenska namn
+  const q = query.trim().toLowerCase();
+  const hits = q
+    ? [...new Set([...APP_ICONS.filter((i) => i.label.toLowerCase().includes(q)).map((i) => i.value as string), ...ICON_NAMES.filter((n) => n.includes(q.replace(/\s+/g, "-")))])]
+    : APP_ICONS.map((i) => i.value as string);
+  const pick = (name: string) => {
+    onChange(name);
+    setOpen(false);
+    setQuery("");
+  };
+
   return (
-    <div
-      className={`flex h-[38px] items-center gap-2 rounded-lg border px-2.5 ${inherited ? "border-dashed border-field bg-[#f8f9fa] text-muted" : "border-field bg-white"}`}
-    >
-      <AppIcon name={value} className="text-select-ink" />
-      <select id={id} value={value} onChange={(e) => onChange(e.target.value)} className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none">
-        {allowNone && <option value="">Ingen ikon</option>}
-        {value && !APP_ICONS.some((i) => i.value === value) && <option value={value}>{value}</option>}
-        {APP_ICONS.map((i) => (
-          <option key={i.value} value={i.value}>
-            {i.label}
-          </option>
-        ))}
-      </select>
+    <div ref={boxRef} className="relative" onKeyDown={(e) => e.key === "Escape" && open && (e.stopPropagation(), setOpen(false))}>
+      <button
+        id={id}
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className={`flex h-[38px] w-full items-center gap-2 rounded-lg border px-2.5 text-left text-sm ${inherited ? "border-dashed border-field bg-[#f8f9fa] text-muted" : "border-field bg-white"}`}
+      >
+        <AppIcon name={value} className="text-select-ink" />
+        <span className="min-w-0 flex-1 truncate">{value ? label(value) : "Ingen ikon"}</span>
+        <span aria-hidden="true" className="text-muted">▾</span>
+      </button>
+      {open && (
+        <div className="absolute left-0 z-30 mt-1 flex w-[min(360px,calc(100vw-32px))] flex-col gap-2 rounded-xl border border-line bg-white p-3 shadow-lg">
+          <input
+            autoFocus
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Sök bland alla ikoner, t.ex. coffee, door, wifi"
+            aria-label="Sök ikon"
+            className="h-9 w-full rounded-lg border border-field px-2.5 text-sm"
+          />
+          <p className="text-[12px] text-muted">
+            {q ? (hits.length ? `${Math.min(hits.length, ICON_HITS)} av ${hits.length} träffar` : "Inga träffar. Lucides namn är på engelska.") : `Föreslagna. Sök bland alla ${ICON_NAMES.length} på engelska.`}
+          </p>
+          <div className="grid max-h-[260px] grid-cols-6 gap-1 overflow-y-auto" role="listbox" aria-label="Ikoner">
+            {allowNone && !q && (
+              <button type="button" role="option" aria-selected={!value} title="Ingen ikon" onClick={() => pick("")} className={`flex aspect-square items-center justify-center rounded-lg text-[11px] text-muted hover:bg-select ${!value ? "bg-select ring-2 ring-kth-blue" : ""}`}>
+                Ingen
+              </button>
+            )}
+            {hits.slice(0, ICON_HITS).map((name) => (
+              <button
+                key={name}
+                type="button"
+                role="option"
+                aria-selected={value === name}
+                title={label(name)}
+                aria-label={label(name)}
+                onClick={() => pick(name)}
+                className={`flex aspect-square items-center justify-center rounded-lg text-ink hover:bg-select ${value === name ? "bg-select ring-2 ring-kth-blue" : ""}`}
+              >
+                <AppIcon name={name} className="size-6" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
