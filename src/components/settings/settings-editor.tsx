@@ -47,6 +47,7 @@ const HOME_KEYS = [
   "START_URL",
   "APP_SCOPE",
   "START_LABEL",
+  "START_LABEL_EN",
   "START_ICON",
 ];
 
@@ -249,6 +250,7 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
           homeUrl={field("START_URL")}
           appScope={field("APP_SCOPE")}
           homeLabel={field("START_LABEL")}
+          homeLabelEn={field("START_LABEL_EN")}
           homeIcon={field("START_ICON")}
           homeMode={field("HOME_MODE")}
           launcherTitle={field("LAUNCHER_TITLE")}

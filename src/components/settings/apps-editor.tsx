@@ -215,6 +215,7 @@ export function AppsEditor({
   homeUrl,
   appScope,
   homeLabel,
+  homeLabelEn,
   homeIcon,
   homeMode,
   launcherTitle,
@@ -244,6 +245,8 @@ export function AppsEditor({
   homeUrl?: EditorField;
   appScope?: EditorField;
   homeLabel?: EditorField;
+  /** START_LABEL_EN: the start button's English line; empty with an own START_LABEL = no English line */
+  homeLabelEn?: EditorField;
   homeIcon?: EditorField;
   /** Missing in an older catalog: then always one app as home */
   homeMode?: EditorField;
@@ -301,7 +304,7 @@ export function AppsEditor({
       ? {
           ...EMPTY_APP,
           name: homeLabel?.value?.trim() || "Hem",
-          nameEn: homeLabel?.value?.trim() ? "" : "Home",
+          nameEn: homeLabel?.value?.trim() ? (homeLabelEn?.value?.trim() ?? "") : "Home",
           icon: homeIcon?.value ?? homeIcon?.meta.defaultValue ?? "house",
           scope: appScope?.value?.trim() ?? "",
           url: legacyUrl,
@@ -654,6 +657,13 @@ export function AppsEditor({
           </div>
           <div className="mt-3 grid gap-4 @xl:grid-cols-2">
             {homeLabel && <LiveText field={homeLabel} label="Namn på knappen" placeholder={launcher ? "Tomt: Startsida (Home page på engelska)" : "Tomt: Hem (Home på engelska)"} />}
+            {homeLabelEn && (
+              <LiveText
+                field={homeLabelEn}
+                label="Namn på knappen (English)"
+                placeholder={homeLabel?.value?.trim() ? "Tomt: ingen engelsk rad" : launcher ? "Tomt: Home page" : "Tomt: Home"}
+              />
+            )}
             {homeIcon && (
               <div className="flex min-w-0 flex-col gap-1.5">
                 <label htmlFor="home-icon" className={LABEL}>Ikon</label>
@@ -1012,7 +1022,7 @@ export function AppsEditor({
           const tabs =
             homeTabs.length > 1
               ? homeTabs
-              : [{ id: -1, sv: homeName, en: homeLabel?.value?.trim() ? "" : "Home", icon: homeIconName, home: true }];
+              : [{ id: -1, sv: homeName, en: homeLabel?.value?.trim() ? (homeLabelEn?.value?.trim() ?? "") : "Home", icon: homeIconName, home: true }];
           const stacked = tabs.length + 1 > 5;
           const button = `flex min-w-0 rounded-[10px] border-2 px-2 ${stacked ? "h-[76px] flex-col items-center justify-center gap-1 text-center" : "h-14 items-center justify-center gap-2"}`;
           const label = (sv: string, en: string) => (
