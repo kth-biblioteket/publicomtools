@@ -636,15 +636,24 @@ export function AppsEditor({
         </section>
       )}
 
-      {/* Startknappen: tillbaka till början, i båda lägena */}
-      {(homeLabel || homeIcon) && (
+      {/* Startknappen: tillbaka till början. Med flera tjänster som flikar är första fliken hem i stället */}
+      {(homeLabel || homeIcon) && !launcher && homeTabs.length > 1 && (
+        <p className="rounded-[10px] border border-line-soft px-4 py-3 text-[13px] text-muted">
+          <b className="text-ink">Hem är första tjänsten.</b> Ändra dess namn och ikon i listan nedan. Startknappen används bara med förstasida eller med en enda tjänst.
+        </p>
+      )}
+      {(homeLabel || homeIcon) && (launcher || homeTabs.length <= 1) && (
         <section className="rounded-[10px] border border-line-soft px-4 py-4">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
             <h4 className="text-[15px] font-extrabold">Startknappen</h4>
-            <p className="text-[13px] text-muted">Knappen i navigeringen som tar besökaren tillbaka till början.</p>
+            <p className="text-[13px] text-muted">
+              {launcher
+                ? "Knappen i ramen som tar besökaren tillbaka till förstasidan."
+                : "Knappen i ramen som tar besökaren tillbaka till tjänsten, när enheten bara har en."}
+            </p>
           </div>
           <div className="mt-3 grid gap-4 @xl:grid-cols-2">
-            {homeLabel && <LiveText field={homeLabel} label="Namn på knappen" placeholder="Tomt: Startsida (Home på engelska)" />}
+            {homeLabel && <LiveText field={homeLabel} label="Namn på knappen" placeholder={launcher ? "Tomt: Startsida (Home page på engelska)" : "Tomt: Hem (Home på engelska)"} />}
             {homeIcon && (
               <div className="flex min-w-0 flex-col gap-1.5">
                 <label htmlFor="home-icon" className={LABEL}>Ikon</label>
