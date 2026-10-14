@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   activeList,
+  nextChange,
   parseSchedule,
   parseSignPages,
   serializeSchedule,
@@ -31,23 +32,25 @@ export type SignageProps = {
   uploadUrl: string;
 };
 
-const INPUT = "h-9 rounded-lg border border-field bg-white px-2.5 text-sm";
-const LABEL = "text-[13px] font-bold";
-const BTN = "h-9 rounded-lg border-2 border-kth-blue bg-white px-3 text-[13px] font-bold text-kth-blue hover:bg-select disabled:opacity-40";
-const ICON_BTN = "size-7 shrink-0 rounded-md text-muted hover:bg-page disabled:opacity-30";
+const SECTION = "flex flex-col gap-3 rounded-xl border border-[#d9dde2] bg-white px-5 py-[18px]";
+const OUTLINE_BTN = "h-9 shrink-0 rounded-lg border-2 border-kth-blue bg-white px-3 text-[13px] font-bold text-kth-blue hover:bg-select disabled:opacity-40";
+const BOX = "h-9 rounded-lg border border-[#c4cad2] bg-white text-[13.5px]";
+const ARROW = "size-[26px] shrink-0 rounded text-[15px] text-[#5a6270] hover:bg-page disabled:opacity-30";
+const LINK = "text-[13px] font-bold text-kth-blue";
 const DAYS = ["M", "T", "O", "T", "F", "L", "S"];
 const DAY_NAMES = ["Mån", "Tis", "Ons", "Tor", "Fre", "Lör", "Sön"];
 // En färg per spellista (i ordning); text i kontrast mot färgen
 const COLORS = [
-  { bg: "#004791", fg: "#fff" },
-  { bg: "#000061", fg: "#fff" },
+  { bg: "#004791", fg: "#ffffff" },
+  { bg: "#000061", fg: "#ffffff" },
   { bg: "#b9d6f2", fg: "#000061" },
   { bg: "#e0a82e", fg: "#3a2600" },
-  { bg: "#6e2b8b", fg: "#fff" },
-  { bg: "#1f7a4d", fg: "#fff" },
+  { bg: "#6e2b8b", fg: "#ffffff" },
+  { bg: "#1f7a4d", fg: "#ffffff" },
   { bg: "#c4cad2", fg: "#1c1f24" },
 ];
-const HOUR_PX = 14;
+const HATCH = "repeating-linear-gradient(45deg,#f4f5f7 0 6px,#eceef1 6px 12px)";
+const HOUR_PX = 21;
 
 const toMin = (t: string | undefined, fallback: number) => (t ? Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5)) : fallback);
 const move = <T,>(list: T[], i: number, d: number) => {
@@ -55,11 +58,14 @@ const move = <T,>(list: T[], i: number, d: number) => {
   [next[i], next[i + d]] = [next[i + d], next[i]];
   return next;
 };
+const pagesText = (n: number) => `${n} ${n === 1 ? "sida" : "sidor"}`;
+const sthlm = (d: Date, o: Intl.DateTimeFormatOptions) => d.toLocaleString("sv-SE", { timeZone: "Europe/Stockholm", ...o });
+const shortDate = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("sv-SE", { day: "numeric", month: "short" }).replace(".", "");
 
 /**
- * Skylt: what a sign shows and when, the same on Linux and Android. Playlists and a schedule
- * (SIGN_SCHEDULE), the standard list for when nothing in the schedule applies (SIGN_PAGES), the
- * time per page and scripts. Rows are web pages or files from the media library.
+ * Skylt: what a sign shows and when, the same on Linux and Android (design "Skylt i admin").
+ * Playlists and a schedule (SIGN_SCHEDULE), the standard list for when nothing in the schedule
+ * applies (SIGN_PAGES), the time per page and scripts. Rows are web pages or library files.
  */
 export function SignageEditor({
   schedule,
@@ -77,7 +83,9 @@ export function SignageEditor({
   signage: SignageProps;
 }) {
   const [media, setMedia] = useState(signage.media);
-  const sched = parseSchedule(schedule?.value ?? null);
+  const addToLibrary = (items: SignMedia[]) => setMedia((m) => [...items.filter((x) => !m.some((y) => y.id === x.id)), ...m]);
+  const scheduleText = schedule?.value ?? null;
+  const sched = useMemo(() => parseSchedule(scheduleText), [scheduleText]);
   const std = parseSignPages(pages.value);
   const writeSchedule = (next: Schedule) => {
     if (!schedule) return;
@@ -91,16 +99,24 @@ export function SignageEditor({
     else pages.onClear();
   };
 
-  // Visas nu, med samma regler som kioskerna; bara i webbläsaren (useMinute)
-  const now = useMinute();
-  const active = now ? activeList(sched, now) : null;
-
   const names = Object.keys(sched.lists);
   const color = (name: string) => COLORS[Math.max(0, names.indexOf(name)) % COLORS.length];
   const [open, setOpen] = useState<string | null>(names[0] ?? null);
   const openList = open && open in sched.lists ? open : (names[0] ?? null);
-  const overlaps = slotOverlaps(sched);
   const fallback = platform === "android" ? "startsidan" : "första Startsidan";
+
+  // Visas nu och nästa byte, med samma regler som kioskerna; bara i webbläsaren (useMinute)
+  const now = useMinute();
+  const active = now ? activeList(sched, now) : null;
+  const next = useMemo(() => (now ? nextChange(sched, now) : null), [sched, now]);
+  const describe = (a: ReturnType<typeof activeList>) =>
+    a.kind === "list" ? a.name : a.kind === "off" ? "svart skärm" : std.length ? "standardlistan" : fallback;
+  const count = (a: ReturnType<typeof activeList>) => (a.kind === "list" ? sched.lists[a.name].length : a.kind === "standard" ? std.length : 0);
+  const sameDay = (a: Date, b: Date) => sthlm(a, { dateStyle: "short" }) === sthlm(b, { dateStyle: "short" });
+  const nextText =
+    next && now
+      ? `byter till ${describe(next.to)} ${sameDay(next.at, now) ? "" : `på ${sthlm(next.at, { weekday: "long" })} `}kl ${sthlm(next.at, { hour: "2-digit", minute: "2-digit" })}`
+      : null;
 
   const patchSlot = (i: number, p: Partial<Slot>) => {
     const slot = { ...sched.slots[i], ...p };
@@ -110,9 +126,8 @@ export function SignageEditor({
   const addList = () => {
     let n = names.length + 1;
     while (`Spellista ${n}` in sched.lists) n++;
-    const name = `Spellista ${n}`;
-    writeSchedule({ ...sched, lists: { ...sched.lists, [name]: [] } });
-    setOpen(name);
+    writeSchedule({ ...sched, lists: { ...sched.lists, [`Spellista ${n}`]: [] } });
+    setOpen(`Spellista ${n}`);
   };
   const renameList = (from: string, to: string) => {
     const name = to.trim();
@@ -129,42 +144,39 @@ export function SignageEditor({
     writeSchedule({ ...sched, lists, slots: sched.slots.filter((s) => s.list !== name) });
     setOpen(null);
   };
-
-  const nowText = !active
-    ? "…"
-    : active.kind === "list"
-      ? `${active.name} · ${sched.lists[active.name].length} ${sched.lists[active.name].length === 1 ? "sida" : "sidor"}`
-      : active.kind === "off"
-        ? "Svart skärm (inget i schemat gäller)"
-        : std.length
-          ? `Standardlistan · ${std.length} ${std.length === 1 ? "sida" : "sidor"}`
-          : `Ingen sida: skylten visar ${fallback}`;
+  const overlaps = slotOverlaps(sched);
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl bg-kth-navy px-4 py-3 text-white">
-        <span className="text-[11.5px] font-bold uppercase tracking-wider text-kth-light-blue">Visas nu</span>
-        <span className="text-[15px] font-extrabold">{nowText}</span>
-        {now && (
-          <span className="text-[13px] text-kth-light-blue">
-            {now.toLocaleDateString("sv-SE", { weekday: "long", timeZone: "Europe/Stockholm" })}{" "}
-            {now.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Stockholm" })}
+    <div className="@container flex flex-col gap-3.5">
+      <div className="flex items-baseline gap-2.5">
+        <h3 className="text-[19px] font-extrabold text-kth-navy">Skylt</h3>
+        <span className="text-[13px] text-[#5a6270]">Vad skärmen visar och när</span>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 rounded-xl bg-kth-navy px-[18px] py-3.5 text-white">
+        <span className="text-[12px] font-bold uppercase tracking-[.06em] text-kth-light-blue">Visas nu</span>
+        <span className="text-[17px] font-extrabold">
+          {active ? (active.kind === "list" ? active.name : active.kind === "off" ? "Svart skärm" : std.length ? "Standardlistan" : `Ingen sida (${fallback})`) : "…"}
+        </span>
+        {active && now && (
+          <span className="text-[14px] text-kth-light-blue">
+            {[`${sthlm(now, { weekday: "long" })} ${sthlm(now, { hour: "2-digit", minute: "2-digit" })}`, count(active) ? `${pagesText(count(active))} i tur och ordning` : null, nextText]
+              .filter(Boolean)
+              .join(" · ")}
           </span>
         )}
       </div>
 
       {schedule && (
-        <section className="flex flex-col gap-3 rounded-[10px] border border-line-soft px-4 py-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
+        <section className={SECTION}>
+          <div className="flex items-baseline justify-between gap-3">
             <div>
               <h4 className="text-[15px] font-extrabold">Schema</h4>
-              <p className="mt-0.5 text-[13px] leading-snug text-muted">
-                Vilken spellista som visas när. Tider med datum går före veckans tider, annars gäller den översta som passar.
-              </p>
+              <p className="mt-[3px] text-[13px] text-[#5a6270]">Vilken spellista som visas när. Datumrader går före veckorader, annars gäller den översta som passar.</p>
             </div>
             <button
               type="button"
-              className={BTN}
+              className={OUTLINE_BTN}
               disabled={!names.length}
               title={names.length ? undefined : "Skapa en spellista först"}
               onClick={() => writeSchedule({ ...sched, slots: [...sched.slots, { list: names[0], days: [1, 2, 3, 4, 5], from: "08:00", to: "17:00" }] })}
@@ -172,96 +184,45 @@ export function SignageEditor({
               + Lägg till tid
             </button>
           </div>
-          {sched.slots.length === 0 && <p className="text-[13px] text-muted">Inget schema: skylten visar standardlistan hela tiden.</p>}
-          {sched.slots.map((slot, i) => {
-            const problem = slotProblem(slot, sched.lists);
-            const hidden = overlaps.find(([, b]) => b === i);
-            return (
-              <div key={i} className="flex flex-col gap-1.5 rounded-lg border border-line bg-white p-2.5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="size-3 shrink-0 rounded-[3px]" style={{ background: color(slot.list).bg }} aria-hidden="true" />
-                  <select aria-label={`Tid ${i + 1}, spellista`} value={slot.list} onChange={(e) => patchSlot(i, { list: e.target.value })} className={`${INPUT} min-w-[140px]`}>
-                    {!(slot.list in sched.lists) && <option value={slot.list}>{slot.list || "Välj…"}</option>}
-                    {names.map((n) => <option key={n} value={n}>{n}</option>)}
-                  </select>
-                  <span className="flex gap-1" role="group" aria-label={`Tid ${i + 1}, veckodagar`}>
-                    {DAYS.map((d, j) => {
-                      const day = j + 1;
-                      const on = !slot.days || slot.days.includes(day);
-                      return (
-                        <button
-                          key={j}
-                          type="button"
-                          aria-pressed={on}
-                          aria-label={DAY_NAMES[j]}
-                          onClick={() => {
-                            const cur = slot.days ?? [1, 2, 3, 4, 5, 6, 7];
-                            const next = on ? cur.filter((x) => x !== day) : [...cur, day].sort();
-                            patchSlot(i, { days: next.length === 7 ? undefined : next });
-                          }}
-                          className={`size-8 rounded-md text-[12.5px] font-bold ${on ? "bg-kth-blue text-white" : "border border-field bg-white text-muted"}`}
-                        >
-                          {d}
-                        </button>
-                      );
-                    })}
-                  </span>
-                  <span className="flex items-center gap-1 text-sm text-muted">
-                    <input type="time" aria-label={`Tid ${i + 1}, från`} value={slot.from ?? ""} onChange={(e) => patchSlot(i, { from: e.target.value || undefined })} className={`${INPUT} w-[104px]`} />
-                    –
-                    <input
-                      type="time"
-                      aria-label={`Tid ${i + 1}, till`}
-                      value={slot.to === "24:00" ? "" : (slot.to ?? "")}
-                      onChange={(e) => patchSlot(i, { to: e.target.value || undefined })}
-                      className={`${INPUT} w-[104px]`}
-                    />
-                  </span>
-                  <span className="flex-1" />
-                  <button type="button" aria-label="Flytta upp" disabled={i === 0} onClick={() => writeSchedule({ ...sched, slots: move(sched.slots, i, -1) })} className={ICON_BTN}>↑</button>
-                  <button type="button" aria-label="Flytta ner" disabled={i === sched.slots.length - 1} onClick={() => writeSchedule({ ...sched, slots: move(sched.slots, i, 1) })} className={ICON_BTN}>↓</button>
-                  <button type="button" aria-label={`Ta bort tid ${i + 1}`} onClick={() => writeSchedule({ ...sched, slots: sched.slots.filter((_, j) => j !== i) })} className={`${ICON_BTN} text-base`}>×</button>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 pl-5 text-[13px] text-muted">
-                  <label className="inline-flex items-center gap-1.5">
-                    <input
-                      type="checkbox"
-                      checked={!!slot.dates}
-                      onChange={(e) => {
-                        const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Stockholm" });
-                        patchSlot(i, { dates: e.target.checked ? [today, today] : undefined });
-                      }}
-                    />
-                    Bara vissa datum
-                  </label>
-                  {slot.dates && (
-                    <>
-                      <input type="date" aria-label={`Tid ${i + 1}, första datum`} value={slot.dates[0]} onChange={(e) => patchSlot(i, { dates: [e.target.value, slot.dates![1]] })} className={INPUT} />
-                      –
-                      <input type="date" aria-label={`Tid ${i + 1}, sista datum`} value={slot.dates[1]} onChange={(e) => patchSlot(i, { dates: [slot.dates![0], e.target.value] })} className={INPUT} />
-                    </>
-                  )}
-                  {!slot.from && !slot.to && <span>Hela dagen</span>}
-                </div>
-                {problem && <p className="pl-5 text-[12.5px] font-semibold text-bad-ink">Används inte: {problem}.</p>}
-                {!problem && hidden && (
-                  <p className="pl-5 text-[12.5px] font-semibold text-warn-ink">Krockar med tid {hidden[0] + 1}, som ligger över och gäller då.</p>
-                )}
+          {sched.slots.length === 0 ? (
+            <p className="text-[13px] text-[#5a6270]">Inget schema: skylten visar standardlistan hela tiden.</p>
+          ) : (
+            <>
+              <div className="hidden gap-2.5 px-0.5 text-[12px] font-bold text-[#5a6270] @3xl:grid @3xl:grid-cols-[150px_234px_140px_minmax(0,1fr)_84px]">
+                <span>Spellista</span>
+                <span>Dagar</span>
+                <span>Tid</span>
+                <span>Datum</span>
+                <span />
               </div>
-            );
-          })}
-          {sched.slots.length > 0 && <WeekView schedule={sched} color={color} />}
+              {sched.slots.map((slot, i) => (
+                <SlotRow
+                  key={i}
+                  i={i}
+                  slot={slot}
+                  sched={sched}
+                  names={names}
+                  color={color}
+                  overlapWith={overlaps.find(([, b]) => b === i)?.[0]}
+                  onPatch={(p) => patchSlot(i, p)}
+                  onMove={(d) => writeSchedule({ ...sched, slots: move(sched.slots, i, d) })}
+                  onRemove={() => writeSchedule({ ...sched, slots: sched.slots.filter((_, j) => j !== i) })}
+                />
+              ))}
+              <WeekView schedule={sched} color={color} />
+            </>
+          )}
         </section>
       )}
 
       {schedule && (
-        <section className="flex flex-col gap-3 rounded-[10px] border border-line-soft px-4 py-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
+        <section className={SECTION}>
+          <div className="flex items-baseline justify-between gap-3">
             <div>
               <h4 className="text-[15px] font-extrabold">Spellistor</h4>
-              <p className="mt-0.5 text-[13px] leading-snug text-muted">Sidor som visas i tur och ordning. Tomma sekunder: Tid per sida.</p>
+              <p className="mt-[3px] text-[13px] text-[#5a6270]">Sidor som visas i tur och ordning. Sekunder tomt: Tid per sida.</p>
             </div>
-            <button type="button" className={BTN} onClick={addList}>+ Ny spellista</button>
+            <button type="button" className={OUTLINE_BTN} onClick={addList}>+ Ny spellista</button>
           </div>
           {names.length > 0 && (
             <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Spellistor">
@@ -272,27 +233,23 @@ export function SignageEditor({
                   role="tab"
                   aria-selected={openList === n}
                   onClick={() => setOpen(n)}
-                  className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-bold ${openList === n ? "border-2 border-kth-blue bg-select text-kth-navy" : "border border-field bg-white text-[#3d444d]"}`}
+                  className={`inline-flex h-8 items-center gap-[7px] rounded-full px-3 text-[13px] font-bold ${openList === n ? "border-2 border-kth-blue bg-kth-light-blue text-kth-navy" : "border border-[#c4cad2] bg-white text-[#3d444d]"}`}
                 >
                   <span className="size-2.5 rounded-[3px]" style={{ background: color(n).bg }} aria-hidden="true" />
                   {n}
-                  <span className="font-medium opacity-75">{sched.lists[n].length}</span>
+                  <span className="font-medium opacity-75">{pagesText(sched.lists[n].length)}</span>
                 </button>
               ))}
             </div>
           )}
           {openList && (
-            <div className="flex flex-col gap-2 rounded-lg bg-page p-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <ListName key={openList} name={openList} onRename={(to) => renameList(openList, to)} taken={names} />
-                <span className="flex-1" />
-                <button type="button" className="text-[12.5px] font-bold text-bad-ink" onClick={() => removeList(openList)}>Ta bort listan</button>
-              </div>
+            <div className="flex flex-col gap-1.5 rounded-[10px] bg-[#f6f8fa] p-3">
+              <ListHeader key={openList} name={openList} taken={names} onRename={(to) => renameList(openList, to)} onRemove={() => removeList(openList)} />
               <PageList
                 pages={sched.lists[openList]}
                 onChange={(next) => writeSchedule({ ...sched, lists: { ...sched.lists, [openList]: next } })}
                 media={media}
-                onUploaded={(items) => setMedia((m) => [...items.filter((x) => !m.some((y) => y.id === x.id)), ...m])}
+                onUploaded={addToLibrary}
                 signage={signage}
                 label={openList}
               />
@@ -302,121 +259,295 @@ export function SignageEditor({
         </section>
       )}
 
-      <section className="flex flex-col gap-3 rounded-[10px] border border-line-soft px-4 py-4">
+      <section className="grid gap-x-6 gap-y-3.5 rounded-xl border border-[#d9dde2] bg-white px-5 py-[18px] @2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
         <div>
           <h4 className="text-[15px] font-extrabold">{schedule ? "När inget i schemat gäller" : "Sidor"}</h4>
-          <p className="mt-0.5 text-[13px] leading-snug text-muted">
-            {schedule ? "Standardlistan visas, t.ex. på söndagar och sena kvällar. " : ""}
+          <p className="mt-[3px] text-[13px] text-[#5a6270]">
+            {schedule
+              ? "Standardlistan visas, t.ex. på söndagar och sena kvällar. Släck skärmen i stället om den inte ska visa något då."
+              : "Sidorna som visas i tur och ordning."}{" "}
             {std.length ? "" : `Tom lista: skylten visar ${fallback}.`}
           </p>
         </div>
-        <PageList
-          pages={std}
-          onChange={writeStd}
-          media={media}
-          onUploaded={(items) => setMedia((m) => [...items.filter((x) => !m.some((y) => y.id === x.id)), ...m])}
-          signage={signage}
-          label="Standardlistan"
-        />
-        {pages.problem && <p className="text-[12.5px] font-semibold text-bad-ink">{pages.problem}</p>}
-        {schedule && (
-          <label className="inline-flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={sched.off} onChange={(e) => writeSchedule({ ...sched, off: e.target.checked })} />
-            Svart skärm i stället när inget i schemat gäller
-          </label>
+        <div className="flex min-w-0 flex-col gap-2">
+          <PageList pages={std} onChange={writeStd} media={media} onUploaded={addToLibrary} signage={signage} label="Standardlistan" />
+          {pages.problem && <p className="text-[12.5px] font-semibold text-bad-ink">{pages.problem}</p>}
+          {schedule && (
+            <button
+              type="button"
+              role="switch"
+              aria-checked={sched.off}
+              onClick={() => writeSchedule({ ...sched, off: !sched.off })}
+              className="flex items-center gap-2.5 self-start text-[14px]"
+            >
+              <span className={`relative h-6 w-10 rounded-full transition-colors ${sched.off ? "bg-kth-blue" : "bg-[#c4cad2]"}`}>
+                <span className={`absolute top-[3px] size-[18px] rounded-full bg-white transition-[left] ${sched.off ? "left-[19px]" : "left-[3px]"}`} />
+              </span>
+              Svart skärm när inget gäller
+            </button>
+          )}
+        </div>
+        {seconds && (
+          <>
+            <div>
+              <label htmlFor={`f-${seconds.meta.key}`} className="text-[15px] font-extrabold">Tid per sida</label>
+              <p className="mt-[3px] text-[13px] text-[#5a6270]">När en sida inte har egna sekunder (5–3600).</p>
+            </div>
+            <div className="max-w-[260px]">
+              <FieldControl {...seconds} invalid={!!seconds.problem} />
+              {seconds.problem && <p className="mt-1 text-[12.5px] font-semibold text-bad-ink">{seconds.problem}</p>}
+            </div>
+          </>
+        )}
+        {js && (
+          <>
+            <div>
+              <label htmlFor={`f-${js.meta.key}`} className="text-[15px] font-extrabold">Sidorna får köra JavaScript</label>
+              <p className="mt-[3px] text-[13px] text-[#5a6270]">På som standard. Delresurser bara från tillåtna webbplatser.</p>
+            </div>
+            <div className="flex h-9 items-center">
+              <FieldControl {...js} invalid={!!js.problem} />
+            </div>
+          </>
         )}
       </section>
-
-      {(seconds || js) && (
-        <section className="grid gap-4 rounded-[10px] border border-line-soft px-4 py-4 @2xl:grid-cols-2">
-          {seconds && (
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor={`f-${seconds.meta.key}`} className={LABEL}>{seconds.meta.label}</label>
-              <FieldControl {...seconds} invalid={!!seconds.problem} />
-              {seconds.meta.help && <p className="text-[12px] leading-snug text-muted">{seconds.meta.help}</p>}
-            </div>
-          )}
-          {js && (
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor={`f-${js.meta.key}`} className={LABEL}>{js.meta.label}</label>
-              <div className="flex h-[38px] items-center"><FieldControl {...js} invalid={!!js.problem} /></div>
-              {js.meta.help && <p className="text-[12px] leading-snug text-muted">{js.meta.help}</p>}
-            </div>
-          )}
-        </section>
-      )}
     </div>
   );
 }
 
-function ListName({ name, onRename, taken }: { name: string; onRename: (to: string) => void; taken: string[] }) {
-  const [v, setV] = useState(name);
-  const clash = v.trim() !== name && taken.includes(v.trim());
-  const commit = () => (v.trim() && !clash ? onRename(v) : setV(name));
+/** One time in the schedule, on one row as in the design: list, days, time, dates, order */
+function SlotRow({
+  i,
+  slot,
+  sched,
+  names,
+  color,
+  overlapWith,
+  onPatch,
+  onMove,
+  onRemove,
+}: {
+  i: number;
+  slot: Slot;
+  sched: Schedule;
+  names: string[];
+  color: (n: string) => { bg: string; fg: string };
+  overlapWith?: number;
+  onPatch: (p: Partial<Slot>) => void;
+  onMove: (d: number) => void;
+  onRemove: () => void;
+}) {
+  const problem = slotProblem(slot, sched.lists);
+  const [editDates, setEditDates] = useState(false);
+  const today = () => new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Stockholm" });
+  const DATE = "h-[30px] rounded-md border border-[#c4cad2] px-1.5 text-[12.5px]";
   return (
-    <span className="flex flex-col">
-      <input
-        aria-label="Spellistans namn"
-        value={v}
-        maxLength={40}
-        onChange={(e) => setV(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => e.key === "Enter" && commit()}
-        className={`${INPUT} w-[220px] font-bold`}
-      />
-      {clash && <span className="text-[12px] font-semibold text-bad-ink">Det namnet finns redan.</span>}
-    </span>
+    <div className="flex flex-col gap-1.5 rounded-[10px] border border-[#e6e9ed] px-2.5 py-2">
+      <div className="flex flex-wrap items-center gap-2.5 @3xl:grid @3xl:grid-cols-[150px_234px_140px_minmax(0,1fr)_84px]">
+        <span className="flex h-[34px] items-center gap-2 rounded-lg border border-[#c4cad2] pl-2.5 pr-1">
+          <span className="size-2.5 shrink-0 rounded-[3px]" style={{ background: color(slot.list).bg }} aria-hidden="true" />
+          <select aria-label={`Tid ${i + 1}, spellista`} value={slot.list} onChange={(e) => onPatch({ list: e.target.value })} className="h-full min-w-0 flex-1 bg-transparent text-[14px] font-semibold outline-none">
+            {!(slot.list in sched.lists) && <option value={slot.list}>{slot.list || "Välj…"}</option>}
+            {names.map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </span>
+        <span className="flex gap-1" role="group" aria-label={`Tid ${i + 1}, veckodagar`}>
+          {DAYS.map((d, j) => {
+            const day = j + 1;
+            const on = !slot.days || slot.days.includes(day);
+            return (
+              <button
+                key={j}
+                type="button"
+                aria-pressed={on}
+                aria-label={DAY_NAMES[j]}
+                onClick={() => {
+                  const cur = slot.days ?? [1, 2, 3, 4, 5, 6, 7];
+                  const next = on ? cur.filter((x) => x !== day) : [...cur, day].sort();
+                  onPatch({ days: next.length === 7 ? undefined : next });
+                }}
+                className={`size-[30px] rounded-[7px] text-[12.5px] font-bold ${on ? "bg-kth-blue text-white" : "border border-[#c4cad2] bg-white text-[#6b7380]"}`}
+              >
+                {d}
+              </button>
+            );
+          })}
+        </span>
+        <span className="flex items-center gap-1 font-mono text-[13px]">
+          <TimeInput label={`Tid ${i + 1}, från`} value={slot.from} placeholder="00:00" onChange={(v) => onPatch({ from: v })} />
+          –
+          <TimeInput label={`Tid ${i + 1}, till`} value={slot.to} placeholder="24:00" onChange={(v) => onPatch({ to: v })} />
+        </span>
+        <span className="min-w-0 text-[13px]">
+          <button
+            type="button"
+            aria-expanded={editDates}
+            onClick={() => {
+              if (!slot.dates) onPatch({ dates: [today(), today()] });
+              setEditDates((e) => !e || !slot.dates);
+            }}
+            className={`whitespace-nowrap text-left underline decoration-dotted underline-offset-2 hover:text-kth-blue ${slot.dates ? "text-ink" : "text-[#8a929d]"}`}
+          >
+            {slot.dates ? `${shortDate(slot.dates[0])}${slot.dates[1] !== slot.dates[0] ? ` – ${shortDate(slot.dates[1])}` : ""}` : "Alla datum"}
+          </button>
+        </span>
+        <span className="flex gap-0.5">
+          <button type="button" aria-label="Flytta upp" disabled={i === 0} onClick={() => onMove(-1)} className={ARROW}>↑</button>
+          <button type="button" aria-label="Flytta ner" disabled={i === sched.slots.length - 1} onClick={() => onMove(1)} className={ARROW}>↓</button>
+          <button type="button" aria-label={`Ta bort tid ${i + 1}`} onClick={onRemove} className={ARROW}>×</button>
+        </span>
+      </div>
+      {editDates && slot.dates && (
+        <div className="flex flex-wrap items-center gap-1.5 text-[13px] text-[#5a6270]">
+          Från
+          <input type="date" aria-label={`Tid ${i + 1}, första datum`} value={slot.dates[0]} onChange={(e) => onPatch({ dates: [e.target.value, slot.dates![1]] })} className={DATE} />
+          till och med
+          <input type="date" aria-label={`Tid ${i + 1}, sista datum`} value={slot.dates[1]} onChange={(e) => onPatch({ dates: [slot.dates![0], e.target.value] })} className={DATE} />
+          <button type="button" className="ml-1 font-bold text-kth-blue" onClick={() => setEditDates(false)}>Klar</button>
+          <button
+            type="button"
+            className="font-bold text-kth-blue"
+            onClick={() => {
+              onPatch({ dates: undefined });
+              setEditDates(false);
+            }}
+          >
+            Alla datum
+          </button>
+        </div>
+      )}
+      {problem && <p className="text-[12.5px] font-semibold text-bad-ink">Används inte: {problem}.</p>}
+      {!problem && overlapWith !== undefined && <p className="text-[12.5px] font-semibold text-warn-ink">Krockar med tid {overlapWith + 1}, som ligger över och gäller då.</p>}
+    </div>
   );
 }
 
-/** Mon–Sun × 00–24 with the weekly times as blocks; date rows listed above */
+/** HH:MM, committed when it's a whole time or emptied (empty = from midnight / to midnight) */
+function TimeInput({ label, value, placeholder, onChange }: { label: string; value?: string; placeholder: string; onChange: (v: string | undefined) => void }) {
+  const [v, setV] = useState(value ?? "");
+  const [seen, setSeen] = useState(value);
+  if (value !== seen) {
+    setSeen(value);
+    setV(value ?? "");
+  }
+  const commit = () => {
+    const t = v.trim().replace(/^(\d):/, "0$1:").replace(/^(\d\d)(\d\d)$/, "$1:$2").replace(/^(\d\d?)$/, (h) => `${h.padStart(2, "0")}:00`);
+    if (!t) onChange(undefined);
+    else if (/^([01]\d|2[0-3]):[0-5]\d$|^24:00$/.test(t)) onChange(t);
+    else setV(value ?? "");
+  };
+  return (
+    <input
+      aria-label={label}
+      value={v}
+      placeholder={placeholder}
+      inputMode="numeric"
+      maxLength={5}
+      onChange={(e) => setV(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => e.key === "Enter" && commit()}
+      className="h-[30px] w-[60px] rounded-md border border-[#c4cad2] px-1.5 text-center"
+    />
+  );
+}
+
+function ListHeader({ name, taken, onRename, onRemove }: { name: string; taken: string[]; onRename: (to: string) => void; onRemove: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [v, setV] = useState(name);
+  const clash = v.trim() !== name && taken.includes(v.trim());
+  const commit = () => {
+    if (v.trim() && !clash) onRename(v);
+    else setV(name);
+    setEditing(false);
+  };
+  return (
+    <div className="mb-0.5 flex flex-wrap items-center gap-2">
+      {editing ? (
+        <>
+          <input
+            autoFocus
+            aria-label="Spellistans namn"
+            value={v}
+            maxLength={40}
+            onChange={(e) => setV(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commit();
+              if (e.key === "Escape") {
+                setV(name);
+                setEditing(false);
+              }
+            }}
+            className="h-8 w-[220px] rounded-md border border-[#c4cad2] px-2 text-[14px] font-extrabold"
+          />
+          {clash && <span className="text-[12px] font-semibold text-bad-ink">Det namnet finns redan.</span>}
+        </>
+      ) : (
+        <>
+          <span className="text-[14px] font-extrabold">{name}</span>
+          <button type="button" className="text-[12.5px] font-bold text-kth-blue" onClick={() => setEditing(true)}>Byt namn</button>
+        </>
+      )}
+      <span className="flex-1" />
+      <button type="button" className="text-[12.5px] font-bold text-[#a1271d]" onClick={onRemove}>Ta bort listan</button>
+    </div>
+  );
+}
+
+/** Mon–Sun with the weekly times as blocks (07–22, wider if a time is outside); date rows in the legend */
 function WeekView({ schedule, color }: { schedule: Schedule; color: (n: string) => { bg: string; fg: string } }) {
   const usable = schedule.slots.map((s, i) => ({ s, i })).filter(({ s }) => !slotProblem(s, schedule.lists));
+  const weekly = usable.filter(({ s }) => !s.dates);
   const dated = usable.filter(({ s }) => s.dates);
+  const start = Math.min(7, ...weekly.map(({ s }) => Math.floor(toMin(s.from, 0) / 60)));
+  const end = Math.max(22, ...weekly.map(({ s }) => Math.ceil(toMin(s.to, 1440) / 60)));
+  const y = (min: number) => (min / 60 - start) * HOUR_PX + 6;
+  const height = (end - start) * HOUR_PX + 12;
+  const hours: number[] = [];
+  for (let h = start % 2 ? start + 1 : start + 2; h <= end; h += 2) hours.push(h);
   return (
-    <div className="flex flex-col gap-2">
-      <h5 className="text-[14px] font-extrabold">Veckan</h5>
-      {dated.length > 0 && (
-        <ul className="flex flex-col gap-1 text-[13px]">
+    <div className="mt-1.5 flex flex-col gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h5 className="text-[14px] font-extrabold">Veckan</h5>
+        <span className="flex flex-wrap gap-3.5 text-[12px] text-[#5a6270]">
+          <span className="flex items-center gap-[5px]">
+            <span className="size-3 rounded-[3px] border border-[#d0d5db]" style={{ background: HATCH }} aria-hidden="true" />
+            {schedule.off ? "Svart skärm" : "Standardlistan"}
+          </span>
           {dated.map(({ s, i }) => (
-            <li key={i} className="flex items-center gap-2">
-              <span className="size-3 rounded-[3px]" style={{ background: color(s.list).bg }} aria-hidden="true" />
-              <b>{s.list}</b> {s.dates![0] === s.dates![1] ? s.dates![0] : `${s.dates![0]} – ${s.dates![1]}`}
-              {s.from || s.to ? ` ${s.from ?? "00:00"}–${s.to ?? "24:00"}` : ""} <span className="text-muted">går före veckan</span>
-            </li>
+            <span key={i}>
+              Datum: {s.list} {shortDate(s.dates![0])}
+              {s.dates![1] !== s.dates![0] ? `–${shortDate(s.dates![1])}` : ""} går före veckan
+            </span>
           ))}
-        </ul>
-      )}
-      <div className="grid grid-cols-[34px_repeat(7,minmax(0,1fr))] gap-1 overflow-x-auto">
+        </span>
+      </div>
+      <div className="grid grid-cols-[44px_repeat(7,minmax(0,1fr))] gap-1">
         <span />
         {DAY_NAMES.map((d) => <span key={d} className="text-center text-[12px] font-bold text-[#3d444d]">{d}</span>)}
-        <div className="relative" style={{ height: 24 * HOUR_PX }}>
-          {[0, 4, 8, 12, 16, 20].map((h) => (
-            <span key={h} className="absolute right-1 font-mono text-[10px] text-faint" style={{ top: h * HOUR_PX - 5 }}>{String(h).padStart(2, "0")}</span>
+        <div className="relative" style={{ height }}>
+          {hours.map((h) => (
+            <span key={h} className="absolute right-1.5 font-mono text-[10.5px] text-[#6b7380]" style={{ top: y(h * 60) - 6 }}>{String(h).padStart(2, "0")}</span>
           ))}
         </div>
-        {DAY_NAMES.map((_, j) => {
+        {DAY_NAMES.map((name, j) => {
           const day = j + 1;
-          // Den övre raden vinner där tider krockar: rita nedifrån och upp så att den hamnar överst
-          const blocks = usable.filter(({ s }) => !s.dates && (!s.days || s.days.includes(day))).reverse();
+          // Den övre raden i schemat vinner där tider krockar: rita den sist så att den hamnar överst
+          const blocks = weekly.filter(({ s }) => !s.days || s.days.includes(day)).reverse();
           return (
-            <div
-              key={j}
-              className="relative overflow-hidden rounded-md border border-line"
-              style={{ height: 24 * HOUR_PX, background: "repeating-linear-gradient(45deg,#f4f5f7 0 6px,#eceef1 6px 12px)" }}
-              aria-label={DAY_NAMES[j]}
-            >
+            <div key={name} className="relative overflow-hidden rounded-lg border border-[#e0e4e9]" style={{ height, background: HATCH }} aria-label={name}>
               {blocks.map(({ s, i }) => {
                 const from = toMin(s.from, 0), to = toMin(s.to, 1440);
                 const c = color(s.list);
                 return (
                   <div
                     key={i}
-                    className="absolute inset-x-0.5 overflow-hidden rounded px-1 py-0.5 text-[11px] font-bold leading-tight"
-                    style={{ top: (from / 60) * HOUR_PX, height: Math.max(((to - from) / 60) * HOUR_PX, 10), background: c.bg, color: c.fg }}
-                    title={`${s.list} ${s.from ?? "00:00"}–${s.to ?? "24:00"}`}
+                    className="absolute inset-x-[3px] overflow-hidden rounded-md px-[7px] py-[5px] text-[12px] font-bold leading-tight"
+                    style={{ top: y(from), height: Math.max(((to - from) / 60) * HOUR_PX, 14), background: c.bg, color: c.fg }}
                   >
                     {s.list}
+                    <br />
+                    <span className="text-[11px] font-medium">{`${(s.from ?? "00:00").slice(0, 2)}–${(s.to ?? "24:00").slice(0, 2)}`}</span>
                   </div>
                 );
               })}
@@ -424,7 +555,6 @@ function WeekView({ schedule, color }: { schedule: Schedule; color: (n: string) 
           );
         })}
       </div>
-      <p className="text-[12px] text-muted">Randigt: standardlistan{schedule.off ? " (svart skärm)" : ""}.</p>
     </div>
   );
 }
@@ -460,34 +590,28 @@ function PageList({
   };
   const patch = (i: number, p: Partial<SignPage>) => setRows((r) => r.map((x, j) => (j === i ? { ...x, ...p } : x)));
   const byId = new Map(media.map((m) => [m.id, m]));
-  const addMedia = (m: SignMedia) =>
-    commit([
-      ...rows,
-      {
-        url: `${signage.viewBase}${m.id}?fit=cover`,
-        s: m.kind === "video" && m.durationMs ? Math.min(SIGN_SECONDS_MAX, Math.max(SIGN_SECONDS_MIN, Math.ceil(m.durationMs / 1000))) : null,
-        media: m.id,
-      },
-    ]);
+  const asPage = (m: SignMedia): SignPage => ({
+    url: `${signage.viewBase}${m.id}?fit=cover`,
+    s: m.kind === "video" && m.durationMs ? Math.min(SIGN_SECONDS_MAX, Math.max(SIGN_SECONDS_MIN, Math.ceil(m.durationMs / 1000))) : null,
+    media: m.id,
+  });
 
   return (
     <div className="flex flex-col gap-1.5">
-      {rows.length === 0 && <p className="text-[13px] text-muted">Inga sidor än.</p>}
       {rows.map((p, i) => {
         const m = p.media ? byId.get(p.media) : undefined;
-        const contain = p.url.includes("fit=contain");
         return (
           <div key={i} className="flex w-full min-w-0 flex-wrap items-center gap-1.5">
-            <span className="w-4 shrink-0 text-center text-xs font-semibold text-muted">{i + 1}</span>
+            <span className="w-4 shrink-0 text-center text-[12px] font-bold text-[#5a6270]">{i + 1}</span>
             {p.media ? (
-              <span className="flex min-w-[200px] flex-1 items-center gap-2 rounded-lg border border-field bg-white p-1 pr-2">
+              <span className={`${BOX} flex min-w-[120px] flex-1 items-center gap-2 py-0.5 pl-0.5 pr-1.5`}>
                 <MediaThumb item={m} id={p.media} fileBase={signage.fileBase} />
-                <span className="min-w-0 flex-1 truncate text-[13px]">{m ? m.name : "Filen finns inte längre"}</span>
+                <span className="min-w-0 flex-1 truncate">{m ? m.name : "Filen finns inte längre"}</span>
                 <select
                   aria-label={`${label}, sida ${i + 1}, storlek`}
-                  value={contain ? "contain" : "cover"}
+                  value={p.url.includes("fit=contain") ? "contain" : "cover"}
                   onChange={(e) => commit(rows.map((x, j) => (j === i ? { ...x, url: x.url.replace(/fit=(cover|contain)/, `fit=${e.target.value}`) } : x)))}
-                  className="h-7 rounded-md border border-field bg-white px-1.5 text-[12.5px]"
+                  className="h-7 rounded-md bg-transparent px-1 text-[12.5px] text-[#5a6270]"
                 >
                   <option value="cover">Fyll skärmen</option>
                   <option value="contain">Hela bilden</option>
@@ -502,7 +626,7 @@ function PageList({
                 onChange={(e) => patch(i, { url: e.target.value })}
                 onBlur={() => commit(rows)}
                 onKeyDown={(e) => e.key === "Enter" && commit(rows)}
-                className={`${INPUT} min-w-[200px] flex-1`}
+                className={`${BOX} min-w-[120px] flex-1 px-3`}
               />
             )}
             <input
@@ -515,35 +639,26 @@ function PageList({
               aria-label={`${label}, sida ${i + 1}, sekunder`}
               onChange={(e) => patch(i, { s: e.target.value === "" ? null : Math.round(Number(e.target.value)) })}
               onBlur={() => commit(rows)}
-              className={`${INPUT} w-[72px] shrink-0 px-2`}
+              className={`${BOX} w-16 shrink-0 px-2.5`}
             />
-            <button type="button" aria-label="Flytta upp" disabled={i === 0} onClick={() => commit(move(rows, i, -1))} className={ICON_BTN}>↑</button>
-            <button type="button" aria-label="Flytta ner" disabled={i === rows.length - 1} onClick={() => commit(move(rows, i, 1))} className={ICON_BTN}>↓</button>
-            <button type="button" aria-label={`Ta bort sida ${i + 1}`} onClick={() => commit(rows.filter((_, j) => j !== i))} className={`${ICON_BTN} text-base`}>×</button>
+            <span className="flex w-[84px] justify-around">
+              <button type="button" aria-label="Flytta upp" disabled={i === 0} onClick={() => commit(move(rows, i, -1))} className={ARROW}>↑</button>
+              <button type="button" aria-label="Flytta ner" disabled={i === rows.length - 1} onClick={() => commit(move(rows, i, 1))} className={ARROW}>↓</button>
+              <button type="button" aria-label={`Ta bort sida ${i + 1}`} onClick={() => commit(rows.filter((_, j) => j !== i))} className={ARROW}>×</button>
+            </span>
           </div>
         );
       })}
-      <div className="flex flex-wrap gap-3 pt-1">
-        <button type="button" onClick={() => setRows((r) => [...r, { url: "", s: null }])} className="text-[13px] font-bold text-kth-blue">+ Webbsida</button>
-        <button type="button" onClick={() => setPicking((p) => !p)} aria-expanded={picking} className="text-[13px] font-bold text-kth-blue">+ Bild, film eller pdf</button>
+      <div className="flex flex-wrap gap-4 py-0.5">
+        <button type="button" onClick={() => setRows((r) => [...r, { url: "", s: null }])} className={LINK}>+ Lägg till sida</button>
+        <button type="button" onClick={() => setPicking((p) => !p)} aria-expanded={picking} className={LINK}>+ Bild, film eller pdf</button>
       </div>
       {picking && (
         <MediaPicker
           media={media}
           signage={signage}
           onPick={(items) => {
-            commit([
-              ...rows,
-              ...items.map((m) => ({
-                url: `${signage.viewBase}${m.id}?fit=cover`,
-                s: m.kind === "video" && m.durationMs ? Math.min(SIGN_SECONDS_MAX, Math.max(SIGN_SECONDS_MIN, Math.ceil(m.durationMs / 1000))) : null,
-                media: m.id,
-              })),
-            ]);
-            setPicking(false);
-          }}
-          onPickOne={(m) => {
-            addMedia(m);
+            commit([...rows, ...items.map(asPage)]);
             setPicking(false);
           }}
           onUploaded={onUploaded}
@@ -554,7 +669,7 @@ function PageList({
 }
 
 function MediaThumb({ item, id, fileBase }: { item?: SignMedia; id: string; fileBase: string }) {
-  const cls = "h-10 w-16 shrink-0 rounded bg-kth-navy object-cover";
+  const cls = "h-8 w-12 shrink-0 rounded-md bg-kth-navy object-cover";
   if (!item) return <span className={`${cls} flex items-center justify-center bg-bad-bg text-[10px] font-semibold text-bad-ink`}>Saknas</span>;
   return item.kind === "video" ? (
     <video src={`${fileBase}${id}#t=0.5`} muted preload="metadata" className={cls} />
@@ -565,19 +680,7 @@ function MediaThumb({ item, id, fileBase }: { item?: SignMedia; id: string; file
 }
 
 /** The media library to pick from, and upload (a pdf adds all its pages, in order) */
-function MediaPicker({
-  media,
-  signage,
-  onPick,
-  onPickOne,
-  onUploaded,
-}: {
-  media: SignMedia[];
-  signage: SignageProps;
-  onPick: (items: SignMedia[]) => void;
-  onPickOne: (m: SignMedia) => void;
-  onUploaded: (items: SignMedia[]) => void;
-}) {
+function MediaPicker({ media, signage, onPick, onUploaded }: { media: SignMedia[]; signage: SignageProps; onPick: (items: SignMedia[]) => void; onUploaded: (items: SignMedia[]) => void }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -603,9 +706,9 @@ function MediaPicker({
     }
   };
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-line bg-white p-2.5">
+    <div className="flex flex-col gap-2 rounded-lg border border-[#d9dde2] bg-white p-2.5">
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" className={BTN} disabled={!!busy} onClick={() => inputRef.current?.click()}>
+        <button type="button" className={OUTLINE_BTN} disabled={!!busy} onClick={() => inputRef.current?.click()}>
           {busy ? `Laddar upp ${busy}…` : "Ladda upp…"}
         </button>
         <input
@@ -619,20 +722,20 @@ function MediaPicker({
             e.target.value = "";
           }}
         />
-        <span className="text-[12.5px] text-muted">Bild (JPEG, PNG, WebP), pdf (en sida per bild) eller film (MP4). Eller välj nedan.</span>
+        <span className="text-[12.5px] text-[#5a6270]">Bild, pdf (en sida per bild) eller film (MP4). Eller välj ur mediebiblioteket nedan.</span>
       </div>
       {error && <p role="alert" className="text-[12.5px] font-semibold text-bad-ink">{error}</p>}
       {media.length ? (
         <div className="grid max-h-[280px] grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-2 overflow-y-auto">
           {media.map((m) => (
-            <button key={m.id} type="button" onClick={() => onPickOne(m)} className="flex flex-col gap-1 rounded-lg border border-line p-1.5 text-left hover:border-kth-blue">
+            <button key={m.id} type="button" onClick={() => onPick([m])} className="flex flex-col gap-1 rounded-lg border border-[#d9dde2] p-1.5 text-left hover:border-kth-blue">
               <MediaThumb item={m} id={m.id} fileBase={signage.fileBase} />
               <span className="truncate text-[12px]">{m.name}</span>
             </button>
           ))}
         </div>
       ) : (
-        <p className="text-[13px] text-muted">Mediebiblioteket är tomt. Ladda upp en fil.</p>
+        <p className="text-[13px] text-[#5a6270]">Mediebiblioteket är tomt. Ladda upp en fil.</p>
       )}
     </div>
   );

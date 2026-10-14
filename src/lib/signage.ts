@@ -210,3 +210,17 @@ export function slotOverlaps(s: Schedule): [number, number][] {
     }
   return out;
 }
+
+const activeKey = (a: ReturnType<typeof activeList>) => (a.kind === "list" ? `list:${a.name}` : a.kind);
+
+/** When what the sign shows changes next (within a week), and to what; null if never */
+export function nextChange(s: Schedule, now: Date): { at: Date; to: ReturnType<typeof activeList> } | null {
+  const start = Math.floor(now.getTime() / 60_000) * 60_000;
+  const current = activeKey(activeList(s, new Date(start)));
+  for (let m = 1; m <= 8 * 24 * 60; m++) {
+    const at = new Date(start + m * 60_000);
+    const a = activeList(s, at);
+    if (activeKey(a) !== current) return { at, to: a };
+  }
+  return null;
+}

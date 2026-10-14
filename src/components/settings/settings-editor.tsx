@@ -9,6 +9,7 @@ import { Chip } from "@/components/ui/chip";
 import { SearchIcon } from "@/components/ui/icons";
 import { SIGN_KEYS, SIGN_PAGES_KEY, SIGN_SCHEDULE_KEY } from "@/lib/signage";
 import { SignageEditor, type SignageProps } from "./signage-editor";
+import { TypeBlock } from "./type-block";
 import { AppsEditor, type EditorField } from "./apps-editor";
 import { FieldControl } from "./field-control";
 import { KeyPicker } from "./key-picker";
@@ -73,6 +74,8 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
   const [onlyOwn, setOnlyOwn] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [allTypes, setAllTypes] = useState(false);
+  /** Skylt: the other settings are folded away under the sign block until asked for */
+  const [showRest, setShowRest] = useState(false);
   /** Keys brought into view with "Ändra en inställning…" */
   const [pinned, setPinned] = useState<string[]>([]);
   const [mode, setMode] = useState<"form" | "text">("form");
@@ -171,8 +174,13 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
       signage ? signKey : undefined,
       (k) => SIGN_KEYS.includes(k.key),
     );
+  // Typkorten och (för en skylt) skyltblocket står överst, som i designen; de tas ur grupperna
+  const signageTop = !!signage && computerType === "signage";
+  const onTop = (k: CatalogEntry) =>
+    k.key === typeMeta?.key ||
+    (signageTop && (SIGN_KEYS.includes(k.key) || k.key === appsKey?.key || (data.platform === "android" && HOME_KEYS.includes(k.key))));
   const groups = data.groups
-    .map((g) => ({ ...g, keys: combine(data.catalog.filter((k) => k.group === g.id && visible(k))) }))
+    .map((g) => ({ ...g, keys: combine(data.catalog.filter((k) => k.group === g.id && visible(k) && !onTop(k))) }))
     .filter((g) => g.keys.length);
   const unknownKeys = Object.keys(data.own).filter((k) => !meta.has(k) && (!needle || k.toLowerCase().includes(needle)));
   const ownCount = new Set([...Object.keys(data.own), ...Object.keys(drafts)].filter(isOwn)).size;
@@ -335,6 +343,33 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
     );
   };
 
+  /** Whether the keys are set here, inherited or drafted, with Ångra / back to inherited */
+  const keyStatus = (keys: string[]) => {
+    const drafted = keys.filter((h) => h in drafts);
+    const own = keys.filter((h) => ownNow(h) !== null);
+    const from = keys.find((h) => inherited[h]);
+    if (!drafted.length && !own.length && !from) return null;
+    return (
+      <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-muted">
+        {drafted.length > 0 && <Chip tone="draft">Osparad</Chip>}
+        {own.length > 0 ? (
+          <>
+            <Chip tone="own">{kind === "base" ? "Satt" : kind === "profile" ? "Satt i profilen" : "Satt här"}</Chip>
+            <button type="button" className={LINK} onClick={() => own.forEach((h) => reset(h))}>
+              {from ? "Använd det ärvda" : "Ta bort"}
+            </button>
+          </>
+        ) : from ? (
+          <Chip>Från {sourceText(inherited[from].source)}</Chip>
+        ) : null}
+        {drafted.length > 0 && (
+          <button type="button" className={LINK} onClick={() => update((d) => drafted.forEach((h) => delete d[h]))}>
+            Ångra
+          </button>
+        )}
+      </div>
+    );
+  };
   const signRow = (first: boolean) => {
     const keys = SIGN_KEYS.filter((h) => meta.has(h));
     const drafted = keys.filter((h) => h in drafts);
@@ -571,6 +606,37 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
         </section>
       )}
 
+      {typeMeta && field(typeMeta.key) && <TypeBlock field={field(typeMeta.key)!} footer={keyStatus([typeMeta.key])} />}
+
+      {signageTop && (
+        <section className="rounded-xl border border-[#d9dde2] bg-white p-5">
+          <SignageEditor
+            schedule={field(SIGN_SCHEDULE_KEY)}
+            pages={field(SIGN_PAGES_KEY)!}
+            seconds={field("SIGN_SECONDS")}
+            js={field("SIGN_JS")}
+            platform={data.platform}
+            signage={signage!}
+          />
+          {SIGN_KEYS.map((h) => warningFor(h)).filter(Boolean).map((w) => (
+            <p key={w} className="mt-3 rounded-md bg-warn-bg px-2.5 py-1.5 text-[12.5px] font-semibold text-warn-ink">{w}</p>
+          ))}
+          <div className="mt-3">{keyStatus(SIGN_KEYS.filter((h) => meta.has(h)))}</div>
+        </section>
+      )}
+
+      {signageTop && !showRest && (
+        <p className="text-[13.5px] text-[#5a6270]">
+          {groups.map((g) => g.label).join(", ")}
+          {groups.length ? " · " : ""}
+          {hiddenTypes > 0 && !allTypes ? `${hiddenTypes} inställningar som inte används ${typeLabel} är dolda. ` : ""}
+          <button type="button" className="font-bold text-kth-blue" onClick={() => setShowRest(true)}>
+            Visa {groups.length ? "övriga inställningar" : "alla"}
+          </button>
+        </p>
+      )}
+
+      {(!signageTop || showRest) && (<>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
         <div className="relative w-full sm:w-72">
           <SearchIcon className="absolute left-3 top-[11px] text-muted" />
@@ -704,6 +770,8 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
           </div>
         </div>
       )}
+
+      </>)}
 
       {draftCount > 0 && (
         <div className="sticky bottom-0 z-20 -mx-4 flex flex-wrap items-center gap-3 border-t border-line bg-white px-4 py-3.5 shadow-[0_-6px_20px_rgba(0,0,0,.06)] sm:-mx-8 sm:px-8 lg:-mx-10 lg:px-10">

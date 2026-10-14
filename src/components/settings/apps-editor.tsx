@@ -25,7 +25,6 @@ import { AppIcon } from "@/components/ui/app-icons";
 // får BASE_PATH även här i webbläsaren
 import kthLogoWhite from "@/components/ui/kth-logo-white.svg";
 import { FieldControl } from "./field-control";
-import { ModeCard } from "./mode-cards";
 import { useMinute } from "./use-minute";
 
 /** One setting as the editor shows it (the same as a row in the settings form gets) */
@@ -336,7 +335,6 @@ export function AppsEditor({
   const launcher = mode === "launcher";
   // Skylt (PubLiKiosk HOME_MODE=signage): sidorna i SIGN_PAGES i tur och ordning, inga tjänster
   const signage = mode === "signage";
-  const hasSignage = !!homeMode?.meta.options.some((o) => o.value === "signage");
   // Första tjänsten är hem på båda plattformarna (PubLiKiosk 3.20, Linux-kiosken); START_LABEL/START_ICON
   // är startknappen som tar besökaren tillbaka till början. 36 på förstasidan (flera sidor), sex som flikar.
   const max = launcher ? MAX_APPS_LAUNCHER : MAX_APPS_TABS;
@@ -443,12 +441,6 @@ export function AppsEditor({
     };
   }, [anyDrag]);
 
-  const pickMode = (next: "app" | "launcher" | "signage") => {
-    if (!homeMode) return;
-    // Standardläget (En app) sätts inte uttryckligen: det är vad enheten gör utan inställning
-    if (next === (homeMode.meta.defaultValue ?? "app") && !homeMode.inherited) homeMode.onClear();
-    else homeMode.onChange(next);
-  };
   // Förhandsvisningen på svenska eller engelska, med appens fallback: tom engelsk text → den svenska →
   // standardtexten på engelska (LauncherScreen.pick)
   const [english, setEnglish] = useState(false);
@@ -496,61 +488,6 @@ export function AppsEditor({
     // @container: rutnäten följer redigerarens och kortens bredd, inte fönstrets (med sidomenyn
     // och inställningsgrupperna bredvid blev korten trånga i ett halvbrett fönster)
     <div className="@container flex flex-col gap-4">
-      {/* Börja med */}
-      {homeMode && (
-        <section className="rounded-[10px] border border-line-soft px-4 py-4">
-          <h4 className="text-[15px] font-extrabold">Börja med</h4>
-          <div className={`mt-3 grid gap-3 ${hasSignage ? "@4xl:grid-cols-3" : "@2xl:grid-cols-2"}`}>
-            <ModeCard
-              selected={launcher}
-              title="Förstasida med tjänster"
-              text="Besökaren väljer bland stora kort. Alla tjänster är jämställda."
-              onPick={() => pickMode("launcher")}
-              picture={
-                <span className="grid flex-1 grid-cols-2 grid-rows-2 gap-1">
-                  {[0, 1, 2, 3].map((i) => <span key={i} className="rounded-[3px] bg-kth-light-blue" />)}
-                </span>
-              }
-            />
-            <ModeCard
-              selected={!launcher && !signage}
-              title="Första tjänsten är hem"
-              text="Första tjänsten öppnas direkt. De övriga ligger som flikar i navigeringen."
-              onPick={() => pickMode("app")}
-              picture={
-                <span className="flex flex-1 flex-col justify-between">
-                  <span className="h-1.5 w-3/5 rounded-[3px] bg-line" />
-                  <span className="h-1.5 w-4/5 rounded-[3px] bg-line-soft" />
-                  <span className="h-2.5 rounded-[3px] bg-kth-blue" />
-                </span>
-              }
-            />
-            {hasSignage && (
-              <ModeCard
-                selected={signage}
-                title="Skylt"
-                text="Sidor i tur och ordning i helskärm. Inget går att trycka på."
-                onPick={() => pickMode("signage")}
-                picture={
-                  <span className="flex flex-1 items-center gap-1">
-                    <span className="h-full flex-1 rounded-[3px] bg-kth-blue" />
-                    <span className="h-4/5 w-2 rounded-[3px] bg-kth-light-blue" />
-                  </span>
-                }
-              />
-            )}
-          </div>
-          <p className="mt-3 text-[13px] leading-snug text-muted">
-            {signage
-              ? "Sidorna och när de visas ställs in under Skylt längre ner. Startknappen och tjänsterna används inte och visas därför inte."
-              : launcher
-                ? "Efter inaktivitet går enheten tillbaka till förstasidan med ny session. Har den bara en tjänst går den direkt in i den."
-                : "Efter inaktivitet går enheten tillbaka till första tjänsten med ny session."}
-          </p>
-          {homeMode.problem && <p className="mt-1.5 text-[12.5px] font-semibold text-bad-ink">{homeMode.problem}</p>}
-        </section>
-      )}
-
       {/* Skylt: sidorna ställs in under Skylt; startknappen, tjänsterna och ramen används inte */}
       {!signage && (
         <>

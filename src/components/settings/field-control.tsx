@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { joinList, previewUrl, splitList, type CatalogEntry } from "@/lib/settings-shared";
-import { ModeCard } from "./mode-cards";
 
 const INPUT = "h-[38px] w-full rounded-lg border px-3 text-sm";
 
@@ -281,8 +280,6 @@ export function FieldControl(props: Props) {
     );
   }
 
-  if (meta.key === "COMPUTER_TYPE" && meta.type === "enum") return <TypeCards id={id} {...props} />;
-
   const withImages = meta.options.some((o) => o.preview);
   if (meta.type === "enum" && withImages) return <ImageChoice id={id} {...props} />;
   if (meta.type === "csv" && meta.options.length) return <ImageList id={id} {...props} />;
@@ -312,71 +309,3 @@ export function FieldControl(props: Props) {
 }
 
 
-/** What each computer type is for, and a small picture, as the cards in "Börja med" on Android */
-const TYPE_CARDS: Record<string, { title?: string; text: string; picture: React.ReactNode }> = {
-  searchcomputer: {
-    text: "Söka och låna. Grupprumsdatorer är sökdatorer med bokning.",
-    picture: (
-      <span className="flex flex-1 flex-col justify-center gap-1.5">
-        <span className="h-2.5 rounded-[3px] border border-field bg-white" />
-        <span className="h-1.5 w-3/4 rounded-[3px] bg-line" />
-        <span className="h-1.5 w-1/2 rounded-[3px] bg-line-soft" />
-      </span>
-    ),
-  },
-  guestcomputer: {
-    text: "Inloggning med gästkonto eller bibliotekskonto.",
-    picture: (
-      <span className="flex flex-1 flex-col items-center justify-center gap-1">
-        <span className="h-1.5 w-3/5 rounded-[3px] bg-line" />
-        <span className="h-1.5 w-3/5 rounded-[3px] bg-line" />
-        <span className="h-2.5 w-2/5 rounded-[3px] bg-kth-blue" />
-      </span>
-    ),
-  },
-  signage: {
-    text: "Sidor i tur och ordning i helskärm. Inget går att trycka på.",
-    picture: (
-      <span className="flex flex-1 items-center gap-1">
-        <span className="h-full flex-1 rounded-[3px] bg-kth-blue" />
-        <span className="h-4/5 w-2 rounded-[3px] bg-kth-light-blue" />
-      </span>
-    ),
-  },
-  kiosk: {
-    title: "Kiosk",
-    text: "Pekskärm med förstasida och tjänster.",
-    picture: (
-      <span className="grid flex-1 grid-cols-2 grid-rows-2 gap-1">
-        {[0, 1, 2, 3].map((i) => <span key={i} className="rounded-[3px] bg-kth-light-blue" />)}
-      </span>
-    ),
-  },
-};
-
-/** COMPUTER_TYPE as cards (Linux): the same kind of choice as "Börja med" on the Android devices */
-function TypeCards({ id, meta, value, inherited, onChange, onClear }: Props & { id: string }) {
-  const current = value ?? meta.defaultValue;
-  const pick = (v: string) => {
-    // Standardtypen sätts inte uttryckligen, som Börja med (pickMode i apps-editor)
-    if (v === meta.defaultValue && !inherited) onClear();
-    else onChange(v);
-  };
-  return (
-    <div id={id} role="group" aria-label={meta.label} className="grid gap-2.5 @2xl:grid-cols-2">
-      {meta.options.map((o) => {
-        const card = TYPE_CARDS[o.value];
-        return (
-          <ModeCard
-            key={o.value}
-            selected={current === o.value}
-            title={card?.title ?? o.label}
-            text={card?.text ?? ""}
-            picture={card?.picture ?? <span className="flex-1 rounded-[3px] bg-line-soft" />}
-            onPick={() => pick(o.value)}
-          />
-        );
-      })}
-    </div>
-  );
-}

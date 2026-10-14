@@ -29,6 +29,7 @@ export default async function ProfileSettingsPage({ params }: PageProps<"/config
         </Link>
         <h1 className="flex flex-wrap items-baseline gap-3 text-[26px] font-extrabold tracking-tight">
           {label}
+          <span className="inline-flex h-6 items-center self-center rounded-md bg-[#eceef1] px-[9px] text-[12.5px] font-bold text-[#3d444d]">{data.platform === "android" ? "Android" : "Linux"}</span>
           <span className="font-mono text-sm font-medium text-faint">{name}</span>
         </h1>
         {layer?.description && <p className="text-sm text-muted">{layer.description}</p>}
