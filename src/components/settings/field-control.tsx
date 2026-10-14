@@ -73,9 +73,13 @@ function TextField({ id, meta, value, inherited, invalid, onChange, onClear }: P
 function TagField({ id, meta, value, inherited, onChange }: Props & { id: string }) {
   const items = value ? splitList(value, meta.separator) : [];
   const [text, setText] = useState("");
-  const add = () => {
-    const parts = splitList(text, meta.separator === " " ? " " : ",").filter((p) => !items.includes(p));
+  const addParts = (raw: string) => {
+    // Komma, och radbrytningar från en inklistrad lista med en per rad (mellanslag också i listor med mellanslag)
+    const parts = [...new Set(raw.split(meta.separator === " " ? /[\s,]+/ : /[,\r\n]+/).map((p) => p.trim()).filter(Boolean))].filter((p) => !items.includes(p));
     if (parts.length) onChange(joinList([...items, ...parts], meta.separator));
+  };
+  const add = () => {
+    addParts(text);
     setText("");
   };
   return (
@@ -100,6 +104,14 @@ function TagField({ id, meta, value, inherited, onChange }: Props & { id: string
         value={text}
         onChange={(e) => setText(e.target.value)}
         onBlur={add}
+        onPaste={(e) => {
+          // En input på en rad slår ihop inklistrade rader: dela upp listan själv
+          const pasted = e.clipboardData.getData("text");
+          if (!/[\r\n,]/.test(pasted)) return;
+          e.preventDefault();
+          addParts(text + pasted);
+          setText("");
+        }}
         onKeyDown={(e) => {
           if (e.key === "Enter" || (e.key === "," && meta.separator === ",")) {
             e.preventDefault();
