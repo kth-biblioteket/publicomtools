@@ -165,13 +165,22 @@ export function scheduleProblem(value: string, platform?: string): string | null
   return null;
 }
 
+// Ett format för alla anrop: att skapa ett Intl.DateTimeFormat är dyrt
+let stockholmFormat: Intl.DateTimeFormat | null = null;
+
 /** Day (1–7, mån–sön), minutes since midnight and ISO date in Stockholm */
 export function stockholmNow(now: Date): { day: number; min: number; date: string } {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Stockholm", weekday: "short", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
-      .formatToParts(now)
-      .map((p) => [p.type, p.value]),
-  );
+  stockholmFormat ??= new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Europe/Stockholm",
+    weekday: "short",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+  const parts = Object.fromEntries(stockholmFormat.formatToParts(now).map((p) => [p.type, p.value]));
   const day = ["mån", "tis", "ons", "tors", "fre", "lör", "sön"].findIndex((d) => parts.weekday.toLowerCase().startsWith(d.slice(0, 3))) + 1;
   return { day, min: Number(parts.hour) * 60 + Number(parts.minute), date: `${parts.year}-${parts.month}-${parts.day}` };
 }
@@ -213,14 +222,26 @@ export function slotOverlaps(s: Schedule): [number, number][] {
 
 const activeKey = (a: ReturnType<typeof activeList>) => (a.kind === "list" ? `list:${a.name}` : a.kind);
 
-/** When what the sign shows changes next (within a week), and to what; null if never */
+/**
+ * When what the sign shows changes next (within about a week), and to what; null if never. Only
+ * the minutes where something can change are checked: midnight and each usable slot's from/to.
+ */
 export function nextChange(s: Schedule, now: Date): { at: Date; to: ReturnType<typeof activeList> } | null {
+  const usable = s.slots.filter((slot) => !slotProblem(slot, s.lists));
+  if (!usable.length) return null;
+  const bounds = [...new Set([0, ...usable.flatMap((slot) => [slot.from, slot.to].filter((t): t is string => !!t).map((t) => minutes(t) % 1440))])].sort((a, b) => a - b);
   const start = Math.floor(now.getTime() / 60_000) * 60_000;
   const current = activeKey(activeList(s, new Date(start)));
-  for (let m = 1; m <= 8 * 24 * 60; m++) {
-    const at = new Date(start + m * 60_000);
-    const a = activeList(s, at);
-    if (activeKey(a) !== current) return { at, to: a };
-  }
+  const startMin = stockholmNow(new Date(start)).min;
+  // Minuter framåt till varje gräns, dag för dag (sommartid kan flytta en gräns en timme, men
+  // varje kandidat räknas om med activeList vid sin verkliga tidpunkt)
+  for (let day = 0; day <= 8; day++)
+    for (const b of bounds) {
+      const ahead = day * 1440 + b - startMin;
+      if (ahead <= 0) continue;
+      const at = new Date(start + ahead * 60_000);
+      const a = activeList(s, at);
+      if (activeKey(a) !== current) return { at, to: a };
+    }
   return null;
 }
