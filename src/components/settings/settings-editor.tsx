@@ -74,6 +74,8 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
   const [onlyOwn, setOnlyOwn] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [allTypes, setAllTypes] = useState(false);
+  /** Grundinställningarna: vilken typs inställningar som visas (bara en vy, null = alla) */
+  const [baseFilter, setBaseFilter] = useState<string | null>(null);
   /** Skylt: the other settings are folded away under the sign block until asked for */
   const [showRest, setShowRest] = useState(false);
   /** Keys brought into view with "Ändra en inställning…" */
@@ -144,9 +146,9 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
   const isOwn = (key: string) => ownNow(key) !== null;
   // Typen avgör vilka nycklar som har betydelse (katalogens types): Linux COMPUTER_TYPE, Android
   // HOME_MODE (app, launcher, signage), i det sammanslagna lagret med utkast. Grundinställningarna
-  // gäller alla typer och visar allt.
+  // gäller alla typer: där väljer korten bara vad som visas (baseFilter).
   const typeMeta = meta.get(TYPE_KEY[data.platform] ?? "COMPUTER_TYPE");
-  const computerType = kind === "base" || !typeMeta ? null : (shown(typeMeta.key) ?? typeMeta.defaultValue);
+  const computerType = !typeMeta ? null : kind === "base" ? baseFilter : (shown(typeMeta.key) ?? typeMeta.defaultValue);
   const typeOption = typeMeta?.options.find((o) => o.value === computerType)?.label ?? computerType;
   // "av skylt" (Linux: datortypen) eller "med Förstasida med tjänster" (Android: Börja med)
   const typeLabel = data.platform === "android" ? `med ${typeOption}` : `av ${typeOption?.toLowerCase()}`;
@@ -163,7 +165,7 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
   const hiddenAdvanced = data.catalog.filter((k) => k.advanced && relevant(k) && !isOwn(k.key) && !(k.key in drafts)).length;
   const hiddenTypes = data.catalog.filter((k) => !relevant(k) && !pinned.includes(k.key)).length;
   /** Values set in this layer for keys the chosen type doesn't use (left from another type) */
-  const strayKeys = computerType ? data.catalog.filter((k) => !relevant(k) && !k.computerOnly && ownNow(k.key) !== null && k.key !== typeMeta?.key) : [];
+  const strayKeys = computerType && kind !== "base" ? data.catalog.filter((k) => !relevant(k) && !k.computerOnly && ownNow(k.key) !== null && k.key !== typeMeta?.key) : [];
   /** Values in a profile or the base settings for keys that belong to a single computer */
   const misplaced = kind === "host" ? [] : data.catalog.filter((k) => k.computerOnly && ownNow(k.key) !== null);
   // The apps editor (APPS, type apps) takes the place of the home app's rows: one block where the
@@ -395,6 +397,7 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
           js={field("SIGN_JS")}
           platform={data.platform}
           signage={signage!}
+          heading={false}
         />
         {keys.map((h) => warningFor(h)).filter(Boolean).map((w) => (
           <p key={w} className="rounded-md bg-warn-bg px-2.5 py-1.5 text-[12.5px] font-semibold text-warn-ink">{w}</p>
@@ -614,7 +617,13 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
         </section>
       )}
 
-      {typeMeta && field(typeMeta.key) && <TypeBlock field={field(typeMeta.key)!} footer={keyStatus([typeMeta.key])} />}
+      {typeMeta && field(typeMeta.key) && (
+        <TypeBlock
+          field={field(typeMeta.key)!}
+          footer={keyStatus([typeMeta.key])}
+          filter={kind === "base" ? { value: baseFilter, onPick: setBaseFilter } : undefined}
+        />
+      )}
 
       {signageTop && (
         <section className="rounded-xl border border-[#d9dde2] bg-white p-5">

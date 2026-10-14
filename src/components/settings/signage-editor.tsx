@@ -74,7 +74,10 @@ export function SignageEditor({
   js,
   platform,
   signage,
+  heading = true,
 }: {
+  /** The block's own "Skylt" heading; off where the settings group already has it */
+  heading?: boolean;
   schedule?: EditorField;
   pages: EditorField;
   seconds?: EditorField;
@@ -148,10 +151,12 @@ export function SignageEditor({
 
   return (
     <div className="@container flex flex-col gap-3.5">
-      <div className="flex items-baseline gap-2.5">
-        <h3 className="text-[19px] font-extrabold text-kth-navy">Skylt</h3>
-        <span className="text-[13px] text-[#5a6270]">Vad skärmen visar och när</span>
-      </div>
+      {heading && (
+        <div className="flex items-baseline gap-2.5">
+          <h3 className="text-[19px] font-extrabold text-kth-navy">Skylt</h3>
+          <span className="text-[13px] text-[#5a6270]">Vad skärmen visar och när</span>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 rounded-xl bg-kth-navy px-[18px] py-3.5 text-white">
         <span className="text-[12px] font-bold uppercase tracking-[.06em] text-kth-light-blue">Visas nu</span>
