@@ -48,7 +48,7 @@ export const PROFILE_KEY = "__profile";
  */
 export function validateValue(meta: Pick<CatalogEntry, "type" | "options"> & { key?: string }, value: string, platform?: string): string | null {
   if (platform !== "android" && /[\r\n]/.test(value)) return "Får inte innehålla radbrytningar.";
-  if (meta.key === SIGN_PAGES_KEY) return signPagesProblem(value);
+  if (meta.key === SIGN_PAGES_KEY) return signPagesProblem(value, platform);
   switch (meta.type) {
     case "int":
       return /^-?\d+$/.test(value) ? null : "Skriv ett heltal.";
@@ -113,7 +113,10 @@ export function serializeSignPages(pages: SignPage[]): string {
   return pages.length ? JSON.stringify(pages.map((p) => (p.s === null ? { url: p.url } : { url: p.url, s: p.s }))) : "";
 }
 
-function signPagesProblem(value: string): string | null {
+/** PubLiKiosk shows at most this many pages (its catalog) */
+const SIGN_PAGES_MAX_ANDROID = 36;
+
+function signPagesProblem(value: string, platform?: string): string | null {
   const v = value.trim();
   if (!v) return null;
   if (v.startsWith("[")) {
@@ -124,6 +127,7 @@ function signPagesProblem(value: string): string | null {
     }
   }
   const pages = parseSignPages(v);
+  if (platform === "android" && pages.length > SIGN_PAGES_MAX_ANDROID) return `Högst ${SIGN_PAGES_MAX_ANDROID} sidor.`;
   for (const [i, p] of pages.entries()) {
     if (!/^https:\/\/[^\s/]+/.test(p.url)) return `Sida ${i + 1}: adressen måste börja med https://.`;
     if (p.s !== null && (!Number.isInteger(p.s) || p.s < SIGN_SECONDS_MIN || p.s > SIGN_SECONDS_MAX))

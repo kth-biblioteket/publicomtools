@@ -55,6 +55,9 @@ function kindOf(target: string): Kind {
   return target === "base" || target.startsWith("base:") ? "base" : target.startsWith("profile:") ? "profile" : "host";
 }
 
+/** The key whose value is the "type" the catalog's types refer to, per platform */
+const TYPE_KEY: Record<string, string> = { linux: "COMPUTER_TYPE", android: "HOME_MODE" };
+
 export function SettingsEditor({ data, title }: { data: SettingsData; title: string }) {
   const router = useRouter();
   const kind = kindOf(data.target);
@@ -134,11 +137,14 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
   // --- which rows to show ---
   const needle = q.trim().toLowerCase();
   const isOwn = (key: string) => ownNow(key) !== null;
-  // Datortypen (COMPUTER_TYPE i det sammanslagna lagret, med utkast) avgör vilka nycklar som har
-  // betydelse (katalogens types). Grundinställningarna gäller alla typer och visar allt.
-  const typeMeta = meta.get("COMPUTER_TYPE");
-  const computerType = kind === "base" || !typeMeta ? null : (shown("COMPUTER_TYPE") ?? typeMeta.defaultValue);
-  const typeLabel = typeMeta?.options.find((o) => o.value === computerType)?.label.toLowerCase() ?? computerType;
+  // Typen avgör vilka nycklar som har betydelse (katalogens types): Linux COMPUTER_TYPE, Android
+  // HOME_MODE (app, launcher, signage), i det sammanslagna lagret med utkast. Grundinställningarna
+  // gäller alla typer och visar allt.
+  const typeMeta = meta.get(TYPE_KEY[data.platform] ?? "COMPUTER_TYPE");
+  const computerType = kind === "base" || !typeMeta ? null : (shown(typeMeta.key) ?? typeMeta.defaultValue);
+  const typeOption = typeMeta?.options.find((o) => o.value === computerType)?.label ?? computerType;
+  // "av skylt" (Linux: datortypen) eller "med Förstasida med tjänster" (Android: Börja med)
+  const typeLabel = data.platform === "android" ? `med ${typeOption}` : `av ${typeOption?.toLowerCase()}`;
   const relevant = (k: CatalogEntry) => !computerType || !k.types.length || k.types.includes(computerType);
   const visible = (k: CatalogEntry) =>
     (showAdvanced || !k.advanced || isOwn(k.key) || k.key in drafts || pinned.includes(k.key)) &&
@@ -340,7 +346,7 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
           {k.advanced && <span className="ml-1.5 align-middle"><Chip tone="it">IT</Chip></span>}
           {!relevant(k) && (
             <span className="ml-1.5 align-middle">
-              <Chip tone="gray">Används inte av {typeLabel}</Chip>
+              <Chip tone="gray">Används inte {typeLabel}</Chip>
             </span>
           )}
           <span className="ml-1.5 font-mono text-[11px] text-faint">{k.key}</span>
@@ -535,7 +541,7 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
         {computerType && (hiddenTypes > 0 || allTypes) && (
           <label className="inline-flex items-center gap-2 text-[13.5px]">
             <input type="checkbox" checked={allTypes} onChange={(e) => setAllTypes(e.target.checked)} />
-            Visa inställningar för alla datortyper{!allTypes ? ` (${hiddenTypes})` : ""}
+            Visa {data.platform === "android" ? "inställningar för alla lägen" : "inställningar för alla datortyper"}{!allTypes ? ` (${hiddenTypes})` : ""}
           </label>
         )}
         <div className="flex flex-wrap items-center gap-3 lg:ml-auto">
@@ -629,9 +635,9 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
             {!allTypes && hiddenTypes > 0 && (
               <div className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-white px-5 py-3.5 text-sm text-muted">
                 <span className="flex-1">
-                  {hiddenTypes} inställningar som inte används av {typeLabel} är dolda.
+                  {hiddenTypes} inställningar som inte används {typeLabel} är dolda.
                 </span>
-                <button type="button" className={LINK} onClick={() => setAllTypes(true)}>Visa alla datortyper</button>
+                <button type="button" className={LINK} onClick={() => setAllTypes(true)}>Visa alla</button>
               </div>
             )}
             {!showAdvanced && hiddenAdvanced > 0 && (

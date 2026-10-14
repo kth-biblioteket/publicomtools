@@ -344,7 +344,11 @@ export function AppsEditor({
    */
   allowedSites?: { label: string; key: string; value: string | null };
 }) {
-  const launcher = (homeMode?.value ?? homeMode?.meta.defaultValue ?? "app") === "launcher";
+  const mode = homeMode?.value ?? homeMode?.meta.defaultValue ?? "app";
+  const launcher = mode === "launcher";
+  // Skylt (PubLiKiosk HOME_MODE=signage): sidorna i SIGN_PAGES i tur och ordning, inga tjänster
+  const signage = mode === "signage";
+  const hasSignage = !!homeMode?.meta.options.some((o) => o.value === "signage");
   // Första tjänsten är hem på båda plattformarna (PubLiKiosk 3.20, Linux-kiosken); START_LABEL/START_ICON
   // är startknappen som tar besökaren tillbaka till början. 36 på förstasidan (flera sidor), sex som flikar.
   const max = launcher ? MAX_APPS_LAUNCHER : MAX_APPS_TABS;
@@ -451,11 +455,11 @@ export function AppsEditor({
     };
   }, [anyDrag]);
 
-  const pickMode = (mode: "app" | "launcher") => {
+  const pickMode = (next: "app" | "launcher" | "signage") => {
     if (!homeMode) return;
     // Standardläget (En app) sätts inte uttryckligen: det är vad enheten gör utan inställning
-    if (mode === (homeMode.meta.defaultValue ?? "app") && !homeMode.inherited) homeMode.onClear();
-    else homeMode.onChange(mode);
+    if (next === (homeMode.meta.defaultValue ?? "app") && !homeMode.inherited) homeMode.onClear();
+    else homeMode.onChange(next);
   };
   // Förhandsvisningen på svenska eller engelska, med appens fallback: tom engelsk text → den svenska →
   // standardtexten på engelska (LauncherScreen.pick)
@@ -506,7 +510,7 @@ export function AppsEditor({
       {homeMode && (
         <section className="rounded-[10px] border border-line-soft px-4 py-4">
           <h4 className="text-[15px] font-extrabold">Börja med</h4>
-          <div className="mt-3 grid gap-3 @2xl:grid-cols-2">
+          <div className={`mt-3 grid gap-3 ${hasSignage ? "@4xl:grid-cols-3" : "@2xl:grid-cols-2"}`}>
             <ModeCard
               selected={launcher}
               title="Förstasida med tjänster"
@@ -519,7 +523,7 @@ export function AppsEditor({
               }
             />
             <ModeCard
-              selected={!launcher}
+              selected={!launcher && !signage}
               title="Första tjänsten är hem"
               text="Första tjänsten öppnas direkt. De övriga ligger som flikar i navigeringen."
               onPick={() => pickMode("app")}
@@ -531,11 +535,27 @@ export function AppsEditor({
                 </span>
               }
             />
+            {hasSignage && (
+              <ModeCard
+                selected={signage}
+                title="Skylt"
+                text="Sidor i tur och ordning i helskärm. Inget går att trycka på."
+                onPick={() => pickMode("signage")}
+                picture={
+                  <span className="flex flex-1 items-center gap-1">
+                    <span className="h-full flex-1 rounded-[3px] bg-kth-blue" />
+                    <span className="h-4/5 w-2 rounded-[3px] bg-kth-light-blue" />
+                  </span>
+                }
+              />
+            )}
           </div>
           <p className="mt-3 text-[13px] leading-snug text-muted">
-            {launcher
-              ? "Efter inaktivitet går enheten tillbaka till förstasidan med ny session. Har den bara en tjänst går den direkt in i den."
-              : "Efter inaktivitet går enheten tillbaka till första tjänsten med ny session."}
+            {signage
+              ? "Sidorna och tiden ställs in under Skylt längre ner. Tjänsterna nedan används inte."
+              : launcher
+                ? "Efter inaktivitet går enheten tillbaka till förstasidan med ny session. Har den bara en tjänst går den direkt in i den."
+                : "Efter inaktivitet går enheten tillbaka till första tjänsten med ny session."}
           </p>
           {homeMode.problem && <p className="mt-1.5 text-[12.5px] font-semibold text-bad-ink">{homeMode.problem}</p>}
         </section>
