@@ -409,7 +409,9 @@ export function settingWarnings(
       message: "Statusrapport var: datorn förstår 1–60 minuter och använder 5 för andra värden.",
     });
   const appsMeta = [...catalog.values()].find((k) => k.type === "apps");
-  if (appsMeta) {
+  // En skylt (Linux COMPUTER_TYPE, Android HOME_MODE) har inga tjänster: varningarna om dem gäller inte
+  const sign = (k: string) => catalog.has(k) && (value(k) ?? catalog.get(k)!.defaultValue) === "signage";
+  if (appsMeta && !sign("COMPUTER_TYPE") && !sign("HOME_MODE")) {
     const apps = parseApps(value(appsMeta.key));
     const launcher = catalog.has("HOME_MODE") && (value("HOME_MODE") ?? catalog.get("HOME_MODE")!.defaultValue) === "launcher";
     // Äldre Android-inställning: PubLiKiosk lägger START_URL först om adressen saknas i APPS

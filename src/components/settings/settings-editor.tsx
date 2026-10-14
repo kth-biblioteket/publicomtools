@@ -214,7 +214,8 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
       .filter(([, p]) => p)
   ) as Record<string, string>;
   const issues = { ...serverIssues, ...clientIssues };
-  const warnings = settingWarnings(shown, meta, data.platform);
+  // Bara varningar för inställningar som gäller den valda typen (de andra visas inte)
+  const warnings = settingWarnings(shown, meta, data.platform).filter((w) => !meta.has(w.key) || relevant(meta.get(w.key)!));
   const warningFor = (key: string) => warnings.find((w) => w.key === key)?.message;
 
   const save = () => {
