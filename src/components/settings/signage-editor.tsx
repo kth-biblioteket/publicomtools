@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
   activeList,
   parseSchedule,
@@ -17,6 +17,7 @@ import {
 } from "@/lib/signage";
 import type { EditorField } from "./apps-editor";
 import { FieldControl } from "./field-control";
+import { useMinute } from "./use-minute";
 
 /** A file in the media library as the editor needs it (src/lib/media.ts MediaItem) */
 export type SignMedia = { id: string; name: string; kind: "image" | "video"; durationMs: number | null };
@@ -90,13 +91,9 @@ export function SignageEditor({
     else pages.onClear();
   };
 
-  // Visas nu: räknas om varje halvminut, med samma regler som kioskerna
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 30_000);
-    return () => clearInterval(t);
-  }, []);
-  const active = activeList(sched, now);
+  // Visas nu, med samma regler som kioskerna; bara i webbläsaren (useMinute)
+  const now = useMinute();
+  const active = now ? activeList(sched, now) : null;
 
   const names = Object.keys(sched.lists);
   const color = (name: string) => COLORS[Math.max(0, names.indexOf(name)) % COLORS.length];
@@ -133,8 +130,9 @@ export function SignageEditor({
     setOpen(null);
   };
 
-  const nowText =
-    active.kind === "list"
+  const nowText = !active
+    ? "…"
+    : active.kind === "list"
       ? `${active.name} · ${sched.lists[active.name].length} ${sched.lists[active.name].length === 1 ? "sida" : "sidor"}`
       : active.kind === "off"
         ? "Svart skärm (inget i schemat gäller)"
@@ -147,10 +145,12 @@ export function SignageEditor({
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl bg-kth-navy px-4 py-3 text-white">
         <span className="text-[11.5px] font-bold uppercase tracking-wider text-kth-light-blue">Visas nu</span>
         <span className="text-[15px] font-extrabold">{nowText}</span>
-        <span className="text-[13px] text-kth-light-blue">
-          {now.toLocaleDateString("sv-SE", { weekday: "long", timeZone: "Europe/Stockholm" })}{" "}
-          {now.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Stockholm" })}
-        </span>
+        {now && (
+          <span className="text-[13px] text-kth-light-blue">
+            {now.toLocaleDateString("sv-SE", { weekday: "long", timeZone: "Europe/Stockholm" })}{" "}
+            {now.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Stockholm" })}
+          </span>
+        )}
       </div>
 
       {schedule && (
@@ -228,7 +228,7 @@ export function SignageEditor({
                       type="checkbox"
                       checked={!!slot.dates}
                       onChange={(e) => {
-                        const today = now.toLocaleDateString("sv-SE", { timeZone: "Europe/Stockholm" });
+                        const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Stockholm" });
                         patchSlot(i, { dates: e.target.checked ? [today, today] : undefined });
                       }}
                     />

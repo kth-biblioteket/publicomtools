@@ -26,6 +26,7 @@ import { AppIcon } from "@/components/ui/app-icons";
 import kthLogoWhite from "@/components/ui/kth-logo-white.svg";
 import { FieldControl } from "./field-control";
 import { ModeCard } from "./mode-cards";
+import { useMinute } from "./use-minute";
 
 /** One setting as the editor shows it (the same as a row in the settings form gets) */
 export type EditorField = {
@@ -44,9 +45,11 @@ const INPUT = "h-[38px] w-full rounded-lg border bg-white px-3 text-sm";
 const LABEL = "text-[13px] font-bold";
 const GAP = 12;
 
-let nextId = 1;
-const toRows = (value: string | null): Row[] =>
-  parseApps(value).map((a) => ({ ...a, id: nextId++, adv: !!a.scope }));
+// Raderna numreras 1, 2, 3 … vid första renderingen, så att servern och webbläsaren ger samma id:n
+// (labels och fält kopplas med dem); senare rader (tillagda, Ångra) får nummer ur en egen serie
+let nextId = 1_000_000;
+const toRows = (value: string | null, initial = false): Row[] =>
+  parseApps(value).map((a, i) => ({ ...a, id: initial ? i + 1 : nextId++, adv: !!a.scope }));
 const toValue = (rows: Row[], json = false) => serializeApps(rows, json);
 
 /** A text setting that updates the preview as you type; emptied = not set here (the tablet's default text) */
@@ -340,7 +343,7 @@ export function AppsEditor({
   // Utan LAUNCHER_PER_PAGE (äldre katalog) visar förstasidan alla på en sida
   const pageSize = perPage ? Number(perPage.value ?? perPage.meta.defaultValue ?? 4) || 4 : MAX_APPS_LAUNCHER;
   const external = apps.value ?? "";
-  const [rows, setRows] = useState<Row[]>(() => toRows(apps.value));
+  const [rows, setRows] = useState<Row[]>(() => toRows(apps.value, true));
   // Ångra, Ångra alla or a save outside the editor: show the value it now has
   const [synced, setSynced] = useState(external);
   if (external !== synced) {
@@ -483,7 +486,9 @@ export function AppsEditor({
     if (!host || hostAllowed(host, allowed)) return null;
     return `${host} är inte en tillåten webbplats, så enheten hämtar inget därifrån. Lägg till den i ${allowedSites?.label ?? "Tillåtna webbplatser"} (${allowedSites?.key ?? "WHITE_LIST"}) eller som tjänst.`;
   };
-  const clockNow = new Date().toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
+  // Klockan i förhandsvisningen sätts i webbläsaren, så att servern och webbläsaren ritar samma sak
+  const minute = useMinute();
+  const clockNow = minute ? minute.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" }) : "";
   const homeName = homeLabel?.value?.trim() || "Hem";
   const homeIconName = homeIcon?.value ?? homeIcon?.meta.defaultValue ?? "house";
 
