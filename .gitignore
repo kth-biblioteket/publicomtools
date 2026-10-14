@@ -28,3 +28,6 @@ publicomtools.env
 next-env.d.ts
 
 /src/generated/prisma
+
+# Skyltarnas mediebibliotek i lokal utveckling (docker-compose-dev.yml)
+/.media/

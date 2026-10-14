@@ -44,6 +44,9 @@ FROM public.ecr.aws/docker/library/node:22.23.2-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
+# Skyltarnas mediebibliotek (MEDIA_DIR); på servern ersätts mappen av en bind mount av
+# /local/docker/publicomtools/media (ägd av uid 1001). pdftoppm delar upp pdf:er i bilder.
+RUN apk add --no-cache poppler-utils && mkdir -p /data/media && chown nextjs:nodejs /data/media
 
 # --chown on every COPY, not a trailing `chown -R /app`: a separate RUN that
 # touches every file rewrites them all into a new layer, doubling the image.

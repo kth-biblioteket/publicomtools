@@ -51,6 +51,8 @@ services:
     volumes:
       - .:/app
       - publicomtools-node-modules:/app/node_modules
+      # Skyltarnas mediebibliotek (MEDIA_DIR), utanför git
+      - ./.media:/data/media
     depends_on:
       publicomtools-db:
         condition: service_healthy

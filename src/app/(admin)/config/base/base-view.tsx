@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { baseTarget, PLATFORMS, PLATFORM_LABEL, type Platform } from "@/lib/platforms";
+import { signageProps } from "@/lib/media";
 import { getSettingsData } from "@/lib/settings";
 import { SettingsEditor } from "@/components/settings/settings-editor";
 import { Tabs } from "@/components/ui/tabs";
@@ -37,7 +38,12 @@ export async function BaseView({ platform }: { platform: Platform }) {
         </p>
       )}
       <Tabs label="Grundinställningar" tabs={[{ href, label: "Inställningar" }, { href: `/config/history/${target}`, label: "Historik" }]} />
-      <SettingsEditor key={JSON.stringify(data.own)} data={data} title={platform === "linux" ? "Grundinställningar" : `Grundinställningar ${PLATFORM_LABEL[platform]}`} />
+      <SettingsEditor
+        key={JSON.stringify(data.own)}
+        data={data}
+        title={platform === "linux" ? "Grundinställningar" : `Grundinställningar ${PLATFORM_LABEL[platform]}`}
+        signage={await signageProps(data.catalog)}
+      />
     </div>
   );
 }

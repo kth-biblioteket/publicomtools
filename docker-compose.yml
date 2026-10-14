@@ -28,6 +28,11 @@ services:
       BASE_PATH: ${PATHPREFIX}
     env_file:
       - publicomtools.env
+    # Skyltarnas mediebibliotek: en vanlig mapp på servern, så att serverns filbackup tar med den
+    # (Dockers egna volymer säkerhetskopieras inte). Skapa den före första start:
+    #   mkdir -p /local/docker/publicomtools/media && chown 1001:1001 /local/docker/publicomtools/media
+    volumes:
+      - "/local/docker/publicomtools/media:/data/media"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.publicomtools.rule=Host(`${DOMAIN_NAME}`) && PathPrefix(`${PATHPREFIX}`)"

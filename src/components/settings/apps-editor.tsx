@@ -25,6 +25,7 @@ import { AppIcon } from "@/components/ui/app-icons";
 // får BASE_PATH även här i webbläsaren
 import kthLogoWhite from "@/components/ui/kth-logo-white.svg";
 import { FieldControl } from "./field-control";
+import { ModeCard } from "./mode-cards";
 
 /** One setting as the editor shows it (the same as a row in the settings form gets) */
 export type EditorField = {
@@ -155,22 +156,6 @@ function InfoFieldRow({ field, n, hostWarning }: { field: EditorField; n: number
 }
 
 /** "Börja med": one of the two big choice cards */
-function ModeCard({ selected, title, text, picture, onPick }: { selected: boolean; title: string; text: string; picture: React.ReactNode; onPick: () => void }) {
-  return (
-    <button
-      type="button"
-      aria-pressed={selected}
-      onClick={onPick}
-      className={`flex items-center gap-4 rounded-xl border-2 px-4 py-3.5 text-left ${selected ? "border-kth-blue bg-[#f4f8fd]" : "border-line bg-white hover:border-field"}`}
-    >
-      <span className="flex h-16 w-[92px] shrink-0 rounded-lg border border-field p-1.5" aria-hidden="true">{picture}</span>
-      <span className="flex min-w-0 flex-col gap-1">
-        <span className="text-[16px] font-extrabold text-kth-navy">{title}</span>
-        <span className="text-[13px] leading-snug text-muted">{text}</span>
-      </span>
-    </button>
-  );
-}
 
 /** At most this many hits in the icon search (each icon is loaded when shown) */
 const ICON_HITS = 120;
@@ -552,7 +537,7 @@ export function AppsEditor({
           </div>
           <p className="mt-3 text-[13px] leading-snug text-muted">
             {signage
-              ? "Sidorna och tiden ställs in under Skylt längre ner. Tjänsterna nedan används inte."
+              ? "Sidorna och när de visas ställs in under Skylt längre ner. Startknappen och tjänsterna används inte och visas därför inte."
               : launcher
                 ? "Efter inaktivitet går enheten tillbaka till förstasidan med ny session. Har den bara en tjänst går den direkt in i den."
                 : "Efter inaktivitet går enheten tillbaka till första tjänsten med ny session."}
@@ -561,6 +546,9 @@ export function AppsEditor({
         </section>
       )}
 
+      {/* Skylt: sidorna ställs in under Skylt; startknappen, tjänsterna och ramen används inte */}
+      {!signage && (
+        <>
       {/* Förstasidans texter */}
       {launcher && (
         <section className="rounded-[10px] border border-line-soft px-4 py-4">
@@ -1131,6 +1119,9 @@ export function AppsEditor({
           );
         })()}
       </section>
+      )}
+
+        </>
       )}
 
       {apps.problem && <p className="text-[12.5px] font-semibold text-bad-ink">{apps.problem}</p>}

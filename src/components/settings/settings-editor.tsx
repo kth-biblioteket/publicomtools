@@ -7,6 +7,8 @@ import { saveSettingsAction } from "@/app/(admin)/settings-actions";
 import { formatValue, INFO_FIELD_KEYS, PROFILE_KEY, settingWarnings, validateValue, type CatalogEntry } from "@/lib/settings-shared";
 import { Chip } from "@/components/ui/chip";
 import { SearchIcon } from "@/components/ui/icons";
+import { SIGN_KEYS, SIGN_PAGES_KEY, SIGN_SCHEDULE_KEY } from "@/lib/signage";
+import { SignageEditor, type SignageProps } from "./signage-editor";
 import { AppsEditor, type EditorField } from "./apps-editor";
 import { FieldControl } from "./field-control";
 import { KeyPicker } from "./key-picker";
@@ -58,7 +60,7 @@ function kindOf(target: string): Kind {
 /** The key whose value is the "type" the catalog's types refer to, per platform */
 const TYPE_KEY: Record<string, string> = { linux: "COMPUTER_TYPE", android: "HOME_MODE" };
 
-export function SettingsEditor({ data, title }: { data: SettingsData; title: string }) {
+export function SettingsEditor({ data, title, signage }: { data: SettingsData; title: string; signage?: SignageProps }) {
   const router = useRouter();
   const kind = kindOf(data.target);
   const meta = useMemo(() => new Map(data.catalog.map((k) => [k.key, k])), [data.catalog]);
@@ -156,12 +158,19 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
   // The apps editor (APPS, type apps) takes the place of the home app's rows: one block where the
   // first of them would be
   const appsKey = data.catalog.find((k) => k.type === "apps");
-  const combine = (keys: CatalogEntry[]) => {
-    if (!appsKey) return keys;
-    const grouped = (k: CatalogEntry) => k.key === appsKey.key || HOME_KEYS.includes(k.key);
+  // Skylten (SIGN_*) likaså: ett block, skyltredigeraren, där den första av dem skulle stå
+  const signKey = meta.get(SIGN_PAGES_KEY);
+  const combineOne = (keys: CatalogEntry[], lead: CatalogEntry | undefined, grouped: (k: CatalogEntry) => boolean) => {
+    if (!lead) return keys;
     const at = keys.findIndex(grouped);
-    return at < 0 ? keys : [...keys.slice(0, at), appsKey, ...keys.slice(at).filter((k) => !grouped(k))];
+    return at < 0 ? keys : [...keys.slice(0, at), lead, ...keys.slice(at).filter((k) => !grouped(k))];
   };
+  const combine = (keys: CatalogEntry[]) =>
+    combineOne(
+      combineOne(keys, appsKey, (k) => k.key === appsKey?.key || HOME_KEYS.includes(k.key)),
+      signage ? signKey : undefined,
+      (k) => SIGN_KEYS.includes(k.key),
+    );
   const groups = data.groups
     .map((g) => ({ ...g, keys: combine(data.catalog.filter((k) => k.group === g.id && visible(k))) }))
     .filter((g) => g.keys.length);
@@ -326,9 +335,53 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
     );
   };
 
+  const signRow = (first: boolean) => {
+    const keys = SIGN_KEYS.filter((h) => meta.has(h));
+    const drafted = keys.filter((h) => h in drafts);
+    const own = keys.filter((h) => ownNow(h) !== null);
+    return (
+      <div key="signage" className={`flex flex-col gap-3 px-5 py-4 ${first ? "" : "border-t border-line-soft"} ${drafted.length ? "bg-draft" : ""}`}>
+        <div>
+          <span className="text-sm font-bold">Vad skylten visar och när</span>
+          <span className="ml-1.5 font-mono text-[11px] text-faint">{keys.join(" · ")}</span>
+        </div>
+        <SignageEditor
+          schedule={field(SIGN_SCHEDULE_KEY)}
+          pages={field(SIGN_PAGES_KEY)!}
+          seconds={field("SIGN_SECONDS")}
+          js={field("SIGN_JS")}
+          platform={data.platform}
+          signage={signage!}
+        />
+        {keys.map((h) => warningFor(h)).filter(Boolean).map((w) => (
+          <p key={w} className="rounded-md bg-warn-bg px-2.5 py-1.5 text-[12.5px] font-semibold text-warn-ink">{w}</p>
+        ))}
+        <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-muted">
+          {drafted.length > 0 && <Chip tone="draft">Osparad</Chip>}
+          {own.length > 0 ? (
+            <>
+              <Chip tone="own">{kind === "base" ? "Satt" : kind === "profile" ? "Satt i profilen" : "Satt här"}</Chip>
+              <button type="button" className={LINK} onClick={() => own.forEach((h) => reset(h))}>
+                {keys.some((h) => inherited[h]) ? "Använd det ärvda" : "Ta bort allt"}
+              </button>
+            </>
+          ) : keys.some((h) => inherited[h]) ? (
+            <Chip>Från {sourceText(inherited[keys.find((h) => inherited[h])!].source)}</Chip>
+          ) : null}
+          {drafted.length > 0 && (
+            <button type="button" className={LINK} onClick={() => update((d) => drafted.forEach((h) => delete d[h]))}>
+              Ångra
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   // --- a row ---
   const row = (k: CatalogEntry, first: boolean) => {
     if (k.type === "apps") return appsRow(k, first);
+    if (signage && k.key === SIGN_PAGES_KEY) return signRow(first);
     const own = ownNow(k.key);
     const inh = inherited[k.key];
     const drafted = k.key in drafts;
@@ -337,7 +390,8 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
     return (
       <div
         key={k.key}
-        className={`grid gap-x-6 gap-y-2 px-5 py-3.5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] ${first ? "" : "border-t border-line-soft"} ${drafted ? "bg-draft" : ""}`}
+        // Datortypen som kort tar hela bredden (som Börja med i appredigeraren)
+        className={`@container grid gap-x-6 gap-y-2 px-5 py-3.5 ${k.key === "COMPUTER_TYPE" ? "" : "md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]"} ${first ? "" : "border-t border-line-soft"} ${drafted ? "bg-draft" : ""}`}
       >
         <div>
           <label htmlFor={`f-${k.key}`} className="text-sm font-bold">

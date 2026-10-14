@@ -251,3 +251,19 @@ model GuestLogin {
   @@index([host, status])
   @@index([createdAt])
 }
+
+/// Skyltarnas mediebibliotek: bilder, filmer och pdf-sidor (som bilder). Filen ligger i MEDIA_DIR
+/// med id:t (sha256 av innehållet) som namn.
+model Media {
+  id         String   @id
+  name       String
+  mime       String
+  /// image | video
+  kind       String
+  bytes      Int
+  width      Int?
+  height     Int?
+  durationMs Int?
+  uploadedBy String
+  createdAt  DateTime @default(now())
+}

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { BookIcon, ChartIcon, HistoryIcon, LayersIcon, MenuIcon, MonitorIcon, SlidersIcon, UsersIcon, XIcon } from "@/components/ui/icons";
+import { BookIcon, ChartIcon, HistoryIcon, ImageIcon, LayersIcon, MenuIcon, MonitorIcon, SlidersIcon, UsersIcon, XIcon } from "@/components/ui/icons";
 
 type NavItem = { href: string; label: string; icon: React.ReactNode; match: (path: string) => boolean };
 
@@ -11,6 +11,7 @@ const MAIN: NavItem[] = [
   { href: "/", label: "Datorer", icon: <MonitorIcon />, match: (p) => p === "/" || p.startsWith("/computers") },
   { href: "/stats", label: "Statistik", icon: <ChartIcon />, match: (p) => p.startsWith("/stats") },
   { href: "/config", label: "Profiler", icon: <LayersIcon />, match: (p) => p === "/config" || p.startsWith("/config/profiles") || p.startsWith("/config/history/profile") },
+  { href: "/media", label: "Mediebibliotek", icon: <ImageIcon />, match: (p) => p.startsWith("/media") },
   { href: "/log", label: "Ändringslogg", icon: <HistoryIcon />, match: (p) => p.startsWith("/log") },
 ];
 const IT: NavItem[] = [

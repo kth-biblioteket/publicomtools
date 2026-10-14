@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/auth";
 import { notFound } from "next/navigation";
+import { signageProps } from "@/lib/media";
 import { getSettingsData } from "@/lib/settings";
 import { SettingsEditor } from "@/components/settings/settings-editor";
 
@@ -12,5 +13,5 @@ export default async function ComputerSettingsPage({ params }: PageProps<"/compu
   const data = await getSettingsData(`host:${host}`);
   if (!data) notFound();
   const name = data.computers.find((c) => c.host === host)?.name ?? host;
-  return <SettingsEditor key={JSON.stringify([data.own, data.profile])} data={data} title={name} />;
+  return <SettingsEditor key={JSON.stringify([data.own, data.profile])} data={data} title={name} signage={await signageProps(data.catalog)} />;
 }

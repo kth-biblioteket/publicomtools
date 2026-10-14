@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { signageProps } from "@/lib/media";
 import { getSettingsData } from "@/lib/settings";
 import { ProfileMeta } from "@/components/profiles/profile-meta";
 import { SettingsEditor } from "@/components/settings/settings-editor";
@@ -51,7 +52,7 @@ export default async function ProfileSettingsPage({ params }: PageProps<"/config
           { href: `/config/history/profile:${name}`, label: "Historik" },
         ]}
       />
-      <SettingsEditor key={JSON.stringify(data.own)} data={data} title={`Profil ${label}`} />
+      <SettingsEditor key={JSON.stringify(data.own)} data={data} title={`Profil ${label}`} signage={await signageProps(data.catalog)} />
     </div>
   );
 }

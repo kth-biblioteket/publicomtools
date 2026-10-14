@@ -6,6 +6,7 @@
 
 import dynamicIconImports from "lucide-react/dynamicIconImports.mjs";
 import type { IconName } from "lucide-react/dynamic";
+import { parseSchedule, parseSignPages, scheduleProblem, SIGN_PAGES_KEY, SIGN_SCHEDULE_KEY, signPagesProblem } from "./signage";
 
 /** apps: the Android tablets' extra web apps (APPS), edited with the apps editor */
 export type KeyType = "int" | "bool" | "string" | "csv" | "url" | "enum" | "apps";
@@ -49,6 +50,7 @@ export const PROFILE_KEY = "__profile";
 export function validateValue(meta: Pick<CatalogEntry, "type" | "options"> & { key?: string }, value: string, platform?: string): string | null {
   if (platform !== "android" && /[\r\n]/.test(value)) return "Får inte innehålla radbrytningar.";
   if (meta.key === SIGN_PAGES_KEY) return signPagesProblem(value, platform);
+  if (meta.key === SIGN_SCHEDULE_KEY) return scheduleProblem(value, platform);
   switch (meta.type) {
     case "int":
       return /^-?\d+$/.test(value) ? null : "Skriv ett heltal.";
@@ -73,67 +75,6 @@ export function validateValue(meta: Pick<CatalogEntry, "type" | "options"> & { k
     default:
       return null;
   }
-}
-
-// --- SIGN_PAGES: the pages a sign rotates between (the Linux kiosk shell, SIGN_SHELL) ---
-
-export const SIGN_PAGES_KEY = "SIGN_PAGES";
-/** s: seconds for this page; null = SIGN_SECONDS */
-export type SignPage = { url: string; s: number | null };
-export const SIGN_SECONDS_MIN = 5;
-export const SIGN_SECONDS_MAX = 3600;
-
-/** The kiosk reads a JSON list [{"url","s"}] or one page per line "adress|sekunder"; the editor writes JSON */
-export function parseSignPages(value: string | null): SignPage[] {
-  const v = (value ?? "").trim();
-  if (!v) return [];
-  if (v.startsWith("[")) {
-    try {
-      const list: unknown = JSON.parse(v);
-      if (Array.isArray(list))
-        return list.map((p) => {
-          const o = (p && typeof p === "object" ? p : {}) as { url?: unknown; s?: unknown };
-          return { url: typeof o.url === "string" ? o.url : "", s: typeof o.s === "number" ? o.s : null };
-        });
-    } catch {
-      /* not JSON: as lines below */
-    }
-  }
-  return v
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [url, sec] = line.split("|").map((x) => x.trim());
-      return { url, s: sec && /^\d+$/.test(sec) ? Number(sec) : null };
-    });
-}
-
-export function serializeSignPages(pages: SignPage[]): string {
-  return pages.length ? JSON.stringify(pages.map((p) => (p.s === null ? { url: p.url } : { url: p.url, s: p.s }))) : "";
-}
-
-/** PubLiKiosk shows at most this many pages (its catalog) */
-const SIGN_PAGES_MAX_ANDROID = 36;
-
-function signPagesProblem(value: string, platform?: string): string | null {
-  const v = value.trim();
-  if (!v) return null;
-  if (v.startsWith("[")) {
-    try {
-      if (!Array.isArray(JSON.parse(v))) return "Måste vara en lista.";
-    } catch {
-      return "Listan är inte giltig JSON.";
-    }
-  }
-  const pages = parseSignPages(v);
-  if (platform === "android" && pages.length > SIGN_PAGES_MAX_ANDROID) return `Högst ${SIGN_PAGES_MAX_ANDROID} sidor.`;
-  for (const [i, p] of pages.entries()) {
-    if (!/^https:\/\/[^\s/]+/.test(p.url)) return `Sida ${i + 1}: adressen måste börja med https://.`;
-    if (p.s !== null && (!Number.isInteger(p.s) || p.s < SIGN_SECONDS_MIN || p.s > SIGN_SECONDS_MAX))
-      return `Sida ${i + 1}: sekunderna måste vara ${SIGN_SECONDS_MIN}–${SIGN_SECONDS_MAX}.`;
-  }
-  return null;
 }
 
 // --- APPS: the Android tablets' extra web apps ---
@@ -429,6 +370,17 @@ export function settingWarnings(
       warnings.push({
         key: "SCREENSAVER_FILES",
         message: "Skärmsläckaren är på men inga bilder är valda. Datorn visar då bara KTH-bakgrunden.",
+      });
+  }
+  // En skylt utan sidor: varken standardlista eller någon spellista med sidor
+  const typeKey = catalog.has("COMPUTER_TYPE") ? "COMPUTER_TYPE" : "HOME_MODE";
+  const typeMeta = catalog.get(typeKey);
+  if (catalog.has(SIGN_PAGES_KEY) && typeMeta && (value(typeKey) ?? typeMeta.defaultValue) === "signage") {
+    const lists = Object.values(parseSchedule(value(SIGN_SCHEDULE_KEY)).lists);
+    if (!parseSignPages(value(SIGN_PAGES_KEY)).length && !lists.some((l) => l.length))
+      warnings.push({
+        key: SIGN_PAGES_KEY,
+        message: `Lägg till sidorna skylten ska visa. Utan sidor visar den ${platform === "android" ? "startsidan" : "första Startsidan"}.`,
       });
   }
   // A csv list with options (the screensaver images) is picked from the options; an older value

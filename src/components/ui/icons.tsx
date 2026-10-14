@@ -31,6 +31,9 @@ export const UsersIcon = (p: IconProps) => (
 export const BookIcon = (p: IconProps) => (
   <Svg {...p}><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" /></Svg>
 );
+export const ImageIcon = (p: IconProps) => (
+  <Svg {...p}><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21" /></Svg>
+);
 export const SearchIcon = (p: IconProps) => (
   <Svg {...p}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></Svg>
 );
