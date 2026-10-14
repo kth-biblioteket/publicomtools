@@ -153,11 +153,15 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
   const relevant = (k: CatalogEntry) => !computerType || !k.types.length || k.types.includes(computerType);
   const visible = (k: CatalogEntry) =>
     (showAdvanced || !k.advanced || isOwn(k.key) || k.key in drafts || pinned.includes(k.key)) &&
-    (allTypes || relevant(k) || isOwn(k.key) || k.key in drafts || pinned.includes(k.key)) &&
+    // Bara den valda typens inställningar, som typkorten lovar; satta värden för andra typer döljs
+    // också (de står kvar och nämns i en egen rad, se strayKeys)
+    (allTypes || relevant(k) || pinned.includes(k.key)) &&
     (!onlyOwn || isOwn(k.key) || k.key in drafts || pinned.includes(k.key)) &&
     (!needle || `${k.label} ${k.key} ${k.help ?? ""}`.toLowerCase().includes(needle));
   const hiddenAdvanced = data.catalog.filter((k) => k.advanced && relevant(k) && !isOwn(k.key) && !(k.key in drafts)).length;
-  const hiddenTypes = data.catalog.filter((k) => !relevant(k) && !isOwn(k.key) && !(k.key in drafts)).length;
+  const hiddenTypes = data.catalog.filter((k) => !relevant(k) && !pinned.includes(k.key)).length;
+  /** Values set in this layer for keys the chosen type doesn't use (left from another type) */
+  const strayKeys = computerType ? data.catalog.filter((k) => !relevant(k) && ownNow(k.key) !== null && k.key !== typeMeta?.key) : [];
   // The apps editor (APPS, type apps) takes the place of the home app's rows: one block where the
   // first of them would be
   const appsKey = data.catalog.find((k) => k.type === "apps");
@@ -623,6 +627,17 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
           ))}
           <div className="mt-3">{keyStatus(SIGN_KEYS.filter((h) => meta.has(h)))}</div>
         </section>
+      )}
+
+      {strayKeys.length > 0 && !allTypes && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-line bg-white px-5 py-3.5 text-[13.5px]">
+          <span className="min-w-[240px] flex-1 text-muted">
+            {kind === "profile" ? "Profilen" : kind === "host" ? "Datorn" : "Grundinställningarna"} har {strayKeys.length}{" "}
+            {strayKeys.length === 1 ? "värde" : "värden"} som inte används {typeLabel}: {strayKeys.map((k) => k.label).join(", ")}. De påverkar inget men står kvar.
+          </span>
+          <button type="button" className={LINK} onClick={() => setAllTypes(true)}>Visa</button>
+          <button type="button" className={LINK} onClick={() => strayKeys.forEach((k) => reset(k.key))}>Ta bort dem</button>
+        </div>
       )}
 
       {signageTop && !showRest && (
