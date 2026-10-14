@@ -156,12 +156,16 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
     // Bara den valda typens inställningar, som typkorten lovar; satta värden för andra typer döljs
     // också (de står kvar och nämns i en egen rad, se strayKeys)
     (allTypes || relevant(k) || pinned.includes(k.key)) &&
+    // Visningsnamn, resurs-id …: bara på datorns egen sida
+    (kind === "host" || !k.computerOnly) &&
     (!onlyOwn || isOwn(k.key) || k.key in drafts || pinned.includes(k.key)) &&
     (!needle || `${k.label} ${k.key} ${k.help ?? ""}`.toLowerCase().includes(needle));
   const hiddenAdvanced = data.catalog.filter((k) => k.advanced && relevant(k) && !isOwn(k.key) && !(k.key in drafts)).length;
   const hiddenTypes = data.catalog.filter((k) => !relevant(k) && !pinned.includes(k.key)).length;
   /** Values set in this layer for keys the chosen type doesn't use (left from another type) */
-  const strayKeys = computerType ? data.catalog.filter((k) => !relevant(k) && ownNow(k.key) !== null && k.key !== typeMeta?.key) : [];
+  const strayKeys = computerType ? data.catalog.filter((k) => !relevant(k) && !k.computerOnly && ownNow(k.key) !== null && k.key !== typeMeta?.key) : [];
+  /** Values in a profile or the base settings for keys that belong to a single computer */
+  const misplaced = kind === "host" ? [] : data.catalog.filter((k) => k.computerOnly && ownNow(k.key) !== null);
   // The apps editor (APPS, type apps) takes the place of the home app's rows: one block where the
   // first of them would be
   const appsKey = data.catalog.find((k) => k.type === "apps");
@@ -629,6 +633,16 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
         </section>
       )}
 
+      {misplaced.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-warn-ink/30 bg-warn-bg px-5 py-3.5 text-[13.5px] text-warn-ink">
+          <span className="min-w-[240px] flex-1">
+            {kind === "profile" ? "Profilen" : "Grundinställningarna"} har {misplaced.map((k) => `${k.label} (${ownNow(k.key)})`).join(", ")}, som bara ska sättas på
+            enskilda datorer. Det gäller nu alla datorer som inte har ett eget värde.
+          </span>
+          <button type="button" className={LINK} onClick={() => misplaced.forEach((k) => reset(k.key))}>Ta bort</button>
+        </div>
+      )}
+
       {strayKeys.length > 0 && !allTypes && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-line bg-white px-5 py-3.5 text-[13.5px]">
           <span className="min-w-[240px] flex-1 text-muted">
@@ -682,7 +696,7 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
         <div className="flex flex-wrap items-center gap-3 lg:ml-auto">
         {mode === "form" ? (
           <KeyPicker
-            catalog={data.catalog}
+            catalog={kind === "host" ? data.catalog : data.catalog.filter((k) => !k.computerOnly)}
             groups={data.groups}
             label={kind === "host" ? "Ändra en inställning för datorn" : "Ändra en inställning"}
             isOwn={(key) => isOwn(key)}

@@ -24,6 +24,9 @@ function asValues(json: unknown): ConfigValues {
   );
 }
 
+/** Computer-only even when the catalog doesn't say so yet (computerOnly, handoff 14 okt) */
+const COMPUTER_ONLY = ["COMPUTER_NAME", "RESOURCE_ID"];
+
 export async function getCatalog(platform: Platform): Promise<{ catalog: CatalogEntry[]; groups: Group[] }> {
   const [rows, meta] = await Promise.all([
     db.configKey.findMany({ where: { platform }, orderBy: [{ sortOrder: "asc" }, { key: "asc" }] }),
@@ -42,6 +45,8 @@ export async function getCatalog(platform: Platform): Promise<{ catalog: Catalog
     example: r.example,
     advanced: r.advanced,
     perComputer: r.perComputer,
+    // Visningsnamn och resurs-id hör alltid till den enskilda datorn, även innan katalogen märker dem
+    computerOnly: r.computerOnly || COMPUTER_ONLY.includes(r.key),
     types: r.types,
   }));
   const stored = Array.isArray(meta?.groups) ? (meta!.groups as Group[]) : [];
@@ -147,6 +152,7 @@ export async function saveSettings(target: Target, input: SaveInput, changedBy: 
   for (const [key, value] of Object.entries(input.set)) {
     const m = meta.get(key);
     if (!m) issues.push({ key, problem: "Inställningen finns inte i katalogen." });
+    else if (m.computerOnly && !isHost) issues.push({ key, problem: "Sätts bara på en enskild dator." });
     else {
       const problem = validateValue(m, value, data.platform);
       if (problem) issues.push({ key, problem });

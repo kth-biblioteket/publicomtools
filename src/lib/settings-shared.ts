@@ -26,6 +26,8 @@ export type CatalogEntry = {
   advanced: boolean;
   /** Belongs to the single computer (name, resource id …): kept when it changes profile */
   perComputer: boolean;
+  /** Only set on a single computer (name, resource id): not shown for profiles or base settings */
+  computerOnly: boolean;
   /** The computer types (COMPUTER_TYPE values) the key matters for; empty = all */
   types: string[];
 };
