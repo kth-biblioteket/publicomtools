@@ -42,6 +42,7 @@ export async function getCatalog(platform: Platform): Promise<{ catalog: Catalog
     example: r.example,
     advanced: r.advanced,
     perComputer: r.perComputer,
+    types: r.types,
   }));
   const stored = Array.isArray(meta?.groups) ? (meta!.groups as Group[]) : [];
   const groups = [...stored];

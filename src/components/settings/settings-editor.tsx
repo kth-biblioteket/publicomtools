@@ -67,6 +67,7 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
   const [q, setQ] = useState("");
   const [onlyOwn, setOnlyOwn] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [allTypes, setAllTypes] = useState(false);
   /** Keys brought into view with "Ändra en inställning…" */
   const [pinned, setPinned] = useState<string[]>([]);
   const [mode, setMode] = useState<"form" | "text">("form");
@@ -133,11 +134,19 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
   // --- which rows to show ---
   const needle = q.trim().toLowerCase();
   const isOwn = (key: string) => ownNow(key) !== null;
+  // Datortypen (COMPUTER_TYPE i det sammanslagna lagret, med utkast) avgör vilka nycklar som har
+  // betydelse (katalogens types). Grundinställningarna gäller alla typer och visar allt.
+  const typeMeta = meta.get("COMPUTER_TYPE");
+  const computerType = kind === "base" || !typeMeta ? null : (shown("COMPUTER_TYPE") ?? typeMeta.defaultValue);
+  const typeLabel = typeMeta?.options.find((o) => o.value === computerType)?.label.toLowerCase() ?? computerType;
+  const relevant = (k: CatalogEntry) => !computerType || !k.types.length || k.types.includes(computerType);
   const visible = (k: CatalogEntry) =>
     (showAdvanced || !k.advanced || isOwn(k.key) || k.key in drafts || pinned.includes(k.key)) &&
+    (allTypes || relevant(k) || isOwn(k.key) || k.key in drafts || pinned.includes(k.key)) &&
     (!onlyOwn || isOwn(k.key) || k.key in drafts || pinned.includes(k.key)) &&
     (!needle || `${k.label} ${k.key} ${k.help ?? ""}`.toLowerCase().includes(needle));
-  const hiddenAdvanced = data.catalog.filter((k) => k.advanced && !isOwn(k.key) && !(k.key in drafts)).length;
+  const hiddenAdvanced = data.catalog.filter((k) => k.advanced && relevant(k) && !isOwn(k.key) && !(k.key in drafts)).length;
+  const hiddenTypes = data.catalog.filter((k) => !relevant(k) && !isOwn(k.key) && !(k.key in drafts)).length;
   // The apps editor (APPS, type apps) takes the place of the home app's rows: one block where the
   // first of them would be
   const appsKey = data.catalog.find((k) => k.type === "apps");
@@ -329,6 +338,11 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
             {k.label}
           </label>
           {k.advanced && <span className="ml-1.5 align-middle"><Chip tone="it">IT</Chip></span>}
+          {!relevant(k) && (
+            <span className="ml-1.5 align-middle">
+              <Chip tone="gray">Används inte av {typeLabel}</Chip>
+            </span>
+          )}
           <span className="ml-1.5 font-mono text-[11px] text-faint">{k.key}</span>
           {k.help && <p className="mt-0.5 text-[13px] leading-snug text-muted">{k.help}</p>}
         </div>
@@ -518,6 +532,12 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
           <input type="checkbox" checked={showAdvanced} onChange={(e) => setShowAdvanced(e.target.checked)} />
           Visa tekniska inställningar{!showAdvanced && hiddenAdvanced ? ` (${hiddenAdvanced})` : ""}
         </label>
+        {computerType && (hiddenTypes > 0 || allTypes) && (
+          <label className="inline-flex items-center gap-2 text-[13.5px]">
+            <input type="checkbox" checked={allTypes} onChange={(e) => setAllTypes(e.target.checked)} />
+            Visa inställningar för alla datortyper{!allTypes ? ` (${hiddenTypes})` : ""}
+          </label>
+        )}
         <div className="flex flex-wrap items-center gap-3 lg:ml-auto">
         {mode === "form" ? (
           <KeyPicker
@@ -605,6 +625,14 @@ export function SettingsEditor({ data, title }: { data: SettingsData; title: str
                   ))}
                 </div>
               </section>
+            )}
+            {!allTypes && hiddenTypes > 0 && (
+              <div className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-white px-5 py-3.5 text-sm text-muted">
+                <span className="flex-1">
+                  {hiddenTypes} inställningar som inte används av {typeLabel} är dolda.
+                </span>
+                <button type="button" className={LINK} onClick={() => setAllTypes(true)}>Visa alla datortyper</button>
+              </div>
             )}
             {!showAdvanced && hiddenAdvanced > 0 && (
               <div className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-white px-5 py-3.5 text-sm text-muted">

@@ -35,6 +35,8 @@ export const catalogSchema = z
         advanced: z.boolean().optional(),
         /** Belongs to the single computer: kept when it changes profile */
         perComputer: z.boolean().optional(),
+        /** The computer types (COMPUTER_TYPE values) the key matters for; missing = all */
+        types: z.array(z.string().min(1)).optional(),
       })
     ),
   })
@@ -87,6 +89,7 @@ type StoredKey = {
   example: string | null;
   advanced: boolean;
   perComputer: boolean;
+  types: string[];
 };
 
 const FIELD_LABELS: Record<string, string> = {
@@ -101,6 +104,7 @@ const FIELD_LABELS: Record<string, string> = {
   example: "exempel",
   advanced: "teknisk",
   perComputer: "per dator",
+  types: "datortyper",
 };
 
 function comparable(k: StoredKey | CatalogKey) {
@@ -122,6 +126,7 @@ function comparable(k: StoredKey | CatalogKey) {
     example: k.example ?? null,
     advanced: !!k.advanced,
     perComputer: !!k.perComputer,
+    types: JSON.stringify([...(k.types ?? [])].sort()),
   };
 }
 
@@ -174,6 +179,7 @@ export async function applyCatalog(
         example: k.example ?? null,
         advanced: !!k.advanced,
         perComputer: !!k.perComputer,
+        types: k.types ?? [],
         sortOrder: i,
       };
       return db.configKey.upsert({

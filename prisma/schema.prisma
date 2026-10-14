@@ -124,6 +124,8 @@ model ConfigKey {
   advanced     Boolean @default(false)
   /// Belongs to the single computer (name, resource id …): kept when the computer changes profile
   perComputer  Boolean @default(false)
+  /// The computer types (COMPUTER_TYPE) the key matters for; empty = all. The admin hides the others.
+  types        String[] @default([])
   sortOrder    Int     @default(0)
 
   @@id([platform, key])
