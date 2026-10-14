@@ -12,7 +12,9 @@ export const SIGN_PAGES_KEY = "SIGN_PAGES";
 export const SIGN_SCHEDULE_KEY = "SIGN_SCHEDULE";
 export const SIGN_SECONDS_KEY = "SIGN_SECONDS";
 export const SIGN_JS_KEY = "SIGN_JS";
-export const SIGN_KEYS = [SIGN_SCHEDULE_KEY, SIGN_PAGES_KEY, SIGN_SECONDS_KEY, SIGN_JS_KEY];
+/** all (default): the pages' scripts, fonts, images and requests from any https address; allowed: only WHITE_LIST */
+export const SIGN_RESOURCES_KEY = "SIGN_RESOURCES";
+export const SIGN_KEYS = [SIGN_SCHEDULE_KEY, SIGN_PAGES_KEY, SIGN_SECONDS_KEY, SIGN_JS_KEY, SIGN_RESOURCES_KEY];
 
 /** s: seconds for this page, null = SIGN_SECONDS. media: the file in the media library (admin only) */
 export type SignPage = { url: string; s: number | null; media?: string };

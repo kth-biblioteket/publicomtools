@@ -395,6 +395,7 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
           pages={field(SIGN_PAGES_KEY)!}
           seconds={field("SIGN_SECONDS")}
           js={field("SIGN_JS")}
+          resources={field("SIGN_RESOURCES")}
           platform={data.platform}
           signage={signage!}
           heading={false}
@@ -632,6 +633,7 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
             pages={field(SIGN_PAGES_KEY)!}
             seconds={field("SIGN_SECONDS")}
             js={field("SIGN_JS")}
+            resources={field("SIGN_RESOURCES")}
             platform={data.platform}
             signage={signage!}
           />

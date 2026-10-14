@@ -72,6 +72,7 @@ export function SignageEditor({
   pages,
   seconds,
   js,
+  resources,
   platform,
   signage,
   heading = true,
@@ -82,6 +83,8 @@ export function SignageEditor({
   pages: EditorField;
   seconds?: EditorField;
   js?: EditorField;
+  /** SIGN_RESOURCES: where the pages' scripts, fonts, images and requests may come from */
+  resources?: EditorField;
   platform: string;
   signage: SignageProps;
 }) {
@@ -312,6 +315,17 @@ export function SignageEditor({
             </div>
             <div className="flex h-9 items-center">
               <FieldControl {...js} invalid={!!js.problem} />
+            </div>
+          </>
+        )}
+        {resources && (
+          <>
+            <div>
+              <label htmlFor={`f-${resources.meta.key}`} className="text-[15px] font-extrabold">{resources.meta.label}</label>
+              <p className="mt-[3px] text-[13px] text-[#5a6270]">Varifrån sidornas skript, typsnitt, bilder och anrop får hämtas. Själva sidorna är alltid de i listorna.</p>
+            </div>
+            <div className="max-w-[320px]">
+              <FieldControl {...resources} invalid={!!resources.problem} />
             </div>
           </>
         )}
