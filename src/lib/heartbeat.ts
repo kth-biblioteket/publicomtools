@@ -30,6 +30,19 @@ export const heartbeatSchema = z.object({
   configVersion: z.string().max(64).optional(),
   /** Minutes between heartbeats (HEARTBEAT_INTERVAL as the computer applies it) */
   intervalMinutes: z.number().int().min(1).max(60).optional(),
+  /**
+   * A requested "Hämta nya inställningar"/"Starta om" the computer is waiting to carry out, and why
+   * (publicom 2026-10, only while it waits): in_use = input in the last 2 minutes, logged_in = a
+   * booking or login is going on, interval = it did the same a few minutes ago.
+   */
+  pendingAction: z
+    .object({
+      mode: z.enum(["reload", "reboot"]),
+      since: z.string().max(40),
+      reason: z.string().max(40).optional(),
+      idleSeconds: z.number().int().min(0).optional(),
+    })
+    .optional(),
 
   // Android (PubLiKiosk)
   platform: z.enum(["linux", "android"]).optional(),

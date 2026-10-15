@@ -9,7 +9,7 @@ import { requestReloadAction } from "./actions";
  * computer with its next status report (every 5 minutes, or HEARTBEAT_INTERVAL); it applies the settings when
  * nobody is using it.
  */
-export function ReloadButton({ host, requestedAt, within }: { host: string; requestedAt: string | null; within: string }) {
+export function ReloadButton({ host, requestedAt, within, waiting }: { host: string; requestedAt: string | null; within: string; waiting?: string | null }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -17,7 +17,7 @@ export function ReloadButton({ host, requestedAt, within }: { host: string; requ
   if (requestedAt)
     return (
       <span className="text-[13px] text-muted">
-        Hämtning begärd kl {requestedAt}. Datorn gör det när ingen använder den.
+        Hämtning begärd kl {requestedAt}. {waiting ?? "Datorn gör det när ingen använder den."}
       </span>
     );
 

@@ -146,3 +146,28 @@ export function formatWhen(date: Date, now = new Date()): string {
   }
   return `${date.toLocaleDateString("sv-SE", { timeZone: TZ, day: "numeric", month: "short" })} kl ${time}`;
 }
+
+/** "11.35" in Stockholm */
+const clockOf = (iso: string) => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d.toLocaleTimeString("sv-SE", { timeZone: "Europe/Stockholm", hour: "2-digit", minute: "2-digit" }).replace(":", ".");
+};
+
+/**
+ * Why a requested reload or reboot hasn't happened yet, as the computer reported it in its latest
+ * status (pendingAction); null when it doesn't say (older versions, or it isn't waiting).
+ */
+export function waitingText(status: Pick<HeartbeatStatus, "pendingAction"> | null | undefined, mode: "reload" | "reboot"): string | null {
+  const p = status?.pendingAction;
+  if (!p || p.mode !== mode) return null;
+  const since = clockOf(p.since);
+  const why =
+    p.reason === "logged_in"
+      ? "någon är inloggad eller har en bokning igång"
+      : p.reason === "interval"
+        ? "det gjordes för några minuter sedan, så den väntar en stund"
+        : p.reason === "in_use"
+          ? `datorn används${p.idleSeconds !== undefined ? ` (senaste aktivitet för ${p.idleSeconds < 90 ? `${p.idleSeconds} s` : `${Math.round(p.idleSeconds / 60)} min`} sedan)` : ""}`
+          : "datorn används";
+  return `Väntar${since ? ` sedan ${since}` : ""}: ${why}.`;
+}

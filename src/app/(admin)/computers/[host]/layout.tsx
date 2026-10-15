@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { getComputerView } from "@/lib/computers";
-import { formatWithin, heartbeatInterval } from "@/lib/status";
+import { formatWithin, heartbeatInterval, waitingText } from "@/lib/status";
 import { HealthBadge } from "@/components/health-badge";
 import { Chip } from "@/components/ui/chip";
 import { ChevronLeftIcon } from "@/components/ui/icons";
@@ -50,6 +50,7 @@ export default async function ComputerLayout({ params, children }: LayoutProps<"
                 host={c.host}
                 requestedAt={c.reloadRequestedAt ? clock(c.reloadRequestedAt) : null}
                 within={formatWithin(heartbeatInterval(c.status))}
+                waiting={waitingText(c.status, "reload")}
               />
             </>
           )}
@@ -60,6 +61,7 @@ export default async function ComputerLayout({ params, children }: LayoutProps<"
               name={c.name}
               requestedAt={c.rebootRequestedAt ? clock(c.rebootRequestedAt) : null}
               within={formatWithin(heartbeatInterval(c.status))}
+              waiting={waitingText(c.status, "reboot")}
             />
           )}
           {c.configState === "legacy" && <Chip>Gamla configfiler</Chip>}

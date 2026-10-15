@@ -13,11 +13,14 @@ export function RebootButton({
   name,
   requestedAt,
   within,
+  waiting,
 }: {
   host: string;
   name: string;
   requestedAt: string | null;
   within: string;
+  /** Why the computer is still waiting, from its latest status report (waitingText) */
+  waiting?: string | null;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -25,7 +28,7 @@ export function RebootButton({
   const [pending, start] = useTransition();
 
   if (requestedAt)
-    return <span className="text-[13px] text-muted">Omstart begärd kl {requestedAt}. Datorn startar om när ingen använder den.</span>;
+    return <span className="text-[13px] text-muted">Omstart begärd kl {requestedAt}. {waiting ?? "Datorn startar om när ingen använder den."}</span>;
 
   return (
     <>
