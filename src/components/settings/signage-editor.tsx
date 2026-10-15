@@ -34,7 +34,7 @@ export type SignageProps = {
 
 const SECTION = "flex flex-col gap-3 rounded-xl border border-[#d9dde2] bg-white px-5 py-[18px]";
 // Ärvd från profilen eller grundinställningarna: streckad och tonad, som andra ärvda värden
-const SECTION_INHERITED = "flex flex-col gap-3 rounded-xl border border-dashed border-field bg-[#f8f9fa] px-5 py-[18px]";
+const SECTION_INHERITED = "flex flex-col gap-3 rounded-xl border-2 border-dashed border-[#aeb6c0] bg-[#f1f3f5] px-5 py-[18px]";
 const OUTLINE_BTN = "h-9 shrink-0 rounded-lg border-2 border-kth-blue bg-white px-3 text-[13px] font-bold text-kth-blue hover:bg-select disabled:opacity-40";
 const BOX = "h-9 rounded-lg border border-[#c4cad2] bg-white text-[13.5px]";
 const ARROW = "size-[26px] shrink-0 rounded text-[15px] text-[#5a6270] hover:bg-page disabled:opacity-30";
@@ -186,6 +186,7 @@ export function SignageEditor({
             <div>
               <h4 className="text-[15px] font-extrabold">Schema</h4>
               <p className="mt-[3px] text-[13px] text-[#5a6270]">Vilken spellista som visas när. Datumrader går före veckorader, annars gäller den översta som passar.</p>
+              {status && <div className="mt-2">{status([schedule.meta.key])}</div>}
             </div>
             <button
               type="button"
@@ -225,7 +226,6 @@ export function SignageEditor({
               <WeekView schedule={sched} color={color} />
             </>
           )}
-          {status?.([schedule.meta.key])}
         </section>
       )}
 
@@ -235,6 +235,7 @@ export function SignageEditor({
             <div>
               <h4 className="text-[15px] font-extrabold">Spellistor</h4>
               <p className="mt-[3px] text-[13px] text-[#5a6270]">Sidor som visas i tur och ordning. Sekunder tomt: Tid per sida.</p>
+              {status && <div className="mt-2">{status([schedule.meta.key])}</div>}
             </div>
             <button type="button" className={OUTLINE_BTN} onClick={addList}>+ Ny spellista</button>
           </div>
@@ -270,7 +271,6 @@ export function SignageEditor({
             </div>
           )}
           {schedule.problem && <p className="text-[12.5px] font-semibold text-bad-ink">{schedule.problem}</p>}
-          {status?.([schedule.meta.key])}
         </section>
       )}
 
@@ -283,11 +283,11 @@ export function SignageEditor({
               : "Sidorna som visas i tur och ordning."}{" "}
             {std.length ? "" : `Tom lista: skylten visar ${fallback}.`}
           </p>
+          {status && <div className="mt-2">{status([pages.meta.key])}</div>}
         </div>
-        <div className={`flex min-w-0 flex-col gap-2 ${pages.inherited ? "rounded-lg border border-dashed border-field bg-[#f8f9fa] p-2" : ""}`}>
+        <div className={`flex min-w-0 flex-col gap-2 ${pages.inherited ? "rounded-lg border-2 border-dashed border-[#aeb6c0] bg-[#f1f3f5] p-2" : ""}`}>
           <PageList pages={std} onChange={writeStd} media={media} onUploaded={addToLibrary} signage={signage} label="Standardlistan" />
           {pages.problem && <p className="text-[12.5px] font-semibold text-bad-ink">{pages.problem}</p>}
-          {status?.([pages.meta.key])}
           {schedule && (
             <button
               type="button"
