@@ -365,9 +365,9 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
         {drafted.length > 0 && <Chip tone="draft">Osparad</Chip>}
         {own.length > 0 ? (
           <>
-            <Chip tone="own">{kind === "base" ? "Satt" : kind === "profile" ? "Satt i profilen" : "Satt här"}</Chip>
+            <Chip tone="own">{kind === "base" ? "Satt" : kind === "profile" ? "Satt i profilen" : "Satt på datorn"}</Chip>
             <button type="button" className={LINK} onClick={() => own.forEach((h) => reset(h))}>
-              {from ? "Använd det ärvda" : "Ta bort"}
+              {from ? `Använd det från ${sourceText(inherited[from].source)}` : "Ta bort"}
             </button>
           </>
         ) : from ? (
@@ -384,7 +384,6 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
   const signRow = (first: boolean) => {
     const keys = SIGN_KEYS.filter((h) => meta.has(h));
     const drafted = keys.filter((h) => h in drafts);
-    const own = keys.filter((h) => ownNow(h) !== null);
     return (
       <div key="signage" className={`flex flex-col gap-3 px-5 py-4 ${first ? "" : "border-t border-line-soft"} ${drafted.length ? "bg-draft" : ""}`}>
         <div>
@@ -400,28 +399,11 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
           platform={data.platform}
           signage={signage!}
           heading={false}
+          status={keyStatus}
         />
         {keys.map((h) => warningFor(h)).filter(Boolean).map((w) => (
           <p key={w} className="rounded-md bg-warn-bg px-2.5 py-1.5 text-[12.5px] font-semibold text-warn-ink">{w}</p>
         ))}
-        <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-muted">
-          {drafted.length > 0 && <Chip tone="draft">Osparad</Chip>}
-          {own.length > 0 ? (
-            <>
-              <Chip tone="own">{kind === "base" ? "Satt" : kind === "profile" ? "Satt i profilen" : "Satt här"}</Chip>
-              <button type="button" className={LINK} onClick={() => own.forEach((h) => reset(h))}>
-                {keys.some((h) => inherited[h]) ? "Använd det ärvda" : "Ta bort allt"}
-              </button>
-            </>
-          ) : keys.some((h) => inherited[h]) ? (
-            <Chip>Från {sourceText(inherited[keys.find((h) => inherited[h])!].source)}</Chip>
-          ) : null}
-          {drafted.length > 0 && (
-            <button type="button" className={LINK} onClick={() => update((d) => drafted.forEach((h) => delete d[h]))}>
-              Ångra
-            </button>
-          )}
-        </div>
       </div>
     );
   };
@@ -637,11 +619,11 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
             resources={field("SIGN_RESOURCES")}
             platform={data.platform}
             signage={signage!}
+            status={keyStatus}
           />
           {SIGN_KEYS.map((h) => warningFor(h)).filter(Boolean).map((w) => (
             <p key={w} className="mt-3 rounded-md bg-warn-bg px-2.5 py-1.5 text-[12.5px] font-semibold text-warn-ink">{w}</p>
           ))}
-          <div className="mt-3">{keyStatus(SIGN_KEYS.filter((h) => meta.has(h)))}</div>
         </section>
       )}
 

@@ -33,6 +33,8 @@ export type SignageProps = {
 };
 
 const SECTION = "flex flex-col gap-3 rounded-xl border border-[#d9dde2] bg-white px-5 py-[18px]";
+// Ärvd från profilen eller grundinställningarna: streckad och tonad, som andra ärvda värden
+const SECTION_INHERITED = "flex flex-col gap-3 rounded-xl border border-dashed border-field bg-[#f8f9fa] px-5 py-[18px]";
 const OUTLINE_BTN = "h-9 shrink-0 rounded-lg border-2 border-kth-blue bg-white px-3 text-[13px] font-bold text-kth-blue hover:bg-select disabled:opacity-40";
 const BOX = "h-9 rounded-lg border border-[#c4cad2] bg-white text-[13.5px]";
 const ARROW = "size-[26px] shrink-0 rounded text-[15px] text-[#5a6270] hover:bg-page disabled:opacity-30";
@@ -76,7 +78,10 @@ export function SignageEditor({
   platform,
   signage,
   heading = true,
+  status,
 }: {
+  /** Per part: set here, inherited (from which layer) or unsaved, with the way back (settings-editor keyStatus) */
+  status?: (keys: string[]) => React.ReactNode;
   /** The block's own "Skylt" heading; off where the settings group already has it */
   heading?: boolean;
   schedule?: EditorField;
@@ -176,7 +181,7 @@ export function SignageEditor({
       </div>
 
       {schedule && (
-        <section className={SECTION}>
+        <section className={schedule.inherited ? SECTION_INHERITED : SECTION}>
           <div className="flex items-baseline justify-between gap-3">
             <div>
               <h4 className="text-[15px] font-extrabold">Schema</h4>
@@ -220,11 +225,12 @@ export function SignageEditor({
               <WeekView schedule={sched} color={color} />
             </>
           )}
+          {status?.([schedule.meta.key])}
         </section>
       )}
 
       {schedule && (
-        <section className={SECTION}>
+        <section className={schedule.inherited ? SECTION_INHERITED : SECTION}>
           <div className="flex items-baseline justify-between gap-3">
             <div>
               <h4 className="text-[15px] font-extrabold">Spellistor</h4>
@@ -264,6 +270,7 @@ export function SignageEditor({
             </div>
           )}
           {schedule.problem && <p className="text-[12.5px] font-semibold text-bad-ink">{schedule.problem}</p>}
+          {status?.([schedule.meta.key])}
         </section>
       )}
 
@@ -277,9 +284,10 @@ export function SignageEditor({
             {std.length ? "" : `Tom lista: skylten visar ${fallback}.`}
           </p>
         </div>
-        <div className="flex min-w-0 flex-col gap-2">
+        <div className={`flex min-w-0 flex-col gap-2 ${pages.inherited ? "rounded-lg border border-dashed border-field bg-[#f8f9fa] p-2" : ""}`}>
           <PageList pages={std} onChange={writeStd} media={media} onUploaded={addToLibrary} signage={signage} label="Standardlistan" />
           {pages.problem && <p className="text-[12.5px] font-semibold text-bad-ink">{pages.problem}</p>}
+          {status?.([pages.meta.key])}
           {schedule && (
             <button
               type="button"
@@ -304,6 +312,7 @@ export function SignageEditor({
             <div className="max-w-[260px]">
               <FieldControl {...seconds} invalid={!!seconds.problem} />
               {seconds.problem && <p className="mt-1 text-[12.5px] font-semibold text-bad-ink">{seconds.problem}</p>}
+              <div className="mt-1.5">{status?.([seconds.meta.key])}</div>
             </div>
           </>
         )}
@@ -311,10 +320,13 @@ export function SignageEditor({
           <>
             <div>
               <label htmlFor={`f-${js.meta.key}`} className="text-[15px] font-extrabold">Sidorna får köra JavaScript</label>
-              <p className="mt-[3px] text-[13px] text-[#5a6270]">På som standard. Delresurser bara från tillåtna webbplatser.</p>
+              <p className="mt-[3px] text-[13px] text-[#5a6270]">På som standard, eftersom skyltsidor oftast behöver skript.</p>
             </div>
-            <div className="flex h-9 items-center">
-              <FieldControl {...js} invalid={!!js.problem} />
+            <div className="flex flex-col gap-1.5">
+              <div className="flex h-9 items-center">
+                <FieldControl {...js} invalid={!!js.problem} />
+              </div>
+              {status?.([js.meta.key])}
             </div>
           </>
         )}
@@ -324,8 +336,9 @@ export function SignageEditor({
               <label htmlFor={`f-${resources.meta.key}`} className="text-[15px] font-extrabold">{resources.meta.label}</label>
               <p className="mt-[3px] text-[13px] text-[#5a6270]">Varifrån sidornas skript, typsnitt, bilder och anrop får hämtas. Själva sidorna är alltid de i listorna.</p>
             </div>
-            <div className="max-w-[320px]">
+            <div className="flex max-w-[320px] flex-col gap-1.5">
               <FieldControl {...resources} invalid={!!resources.problem} />
+              {status?.([resources.meta.key])}
             </div>
           </>
         )}
