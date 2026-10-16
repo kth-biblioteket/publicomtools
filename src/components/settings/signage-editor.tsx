@@ -2,8 +2,13 @@
 
 import { useMemo, useRef, useState } from "react";
 import {
+  activeAt,
   activeList,
+  addDays,
+  dateState,
+  dayBounds,
   nextChange,
+  pageOn,
   parseSchedule,
   parseSignPages,
   serializeSchedule,
@@ -12,6 +17,9 @@ import {
   SIGN_SECONDS_MIN,
   slotOverlaps,
   slotProblem,
+  stockholmNow,
+  weekday,
+  type DateState,
   type Schedule,
   type SignPage,
   type Slot,
@@ -63,6 +71,27 @@ const move = <T,>(list: T[], i: number, d: number) => {
 const pagesText = (n: number) => `${n} ${n === 1 ? "sida" : "sidor"}`;
 const sthlm = (d: Date, o: Intl.DateTimeFormatOptions) => d.toLocaleString("sv-SE", { timeZone: "Europe/Stockholm", ...o });
 const shortDate = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("sv-SE", { day: "numeric", month: "short" }).replace(".", "");
+const daysBetween = (from: string, to: string) => Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86_400_000);
+/** "20–31 okt", "1 dec–6 jan", "från 20 okt", "till 31 okt" */
+function rangeText(start?: string, end?: string): string {
+  if (start && end) return start.slice(0, 7) === end.slice(0, 7) ? `${Number(start.slice(8))}–${shortDate(end)}` : `${shortDate(start)}–${shortDate(end)}`;
+  if (start) return `från ${shortDate(start)}`;
+  return end ? `till ${shortDate(end)}` : "alltid";
+}
+/** A page's dates as the "Visas" button says it, after its state today */
+function datesText(start: string | undefined, end: string | undefined, state: DateState | null): string {
+  if (!start && !end) return "Alltid";
+  if (state === "coming") return `Börjar ${shortDate(start!)}${end ? ` · till ${shortDate(end)}` : ""}`;
+  if (state === "active") return end ? `Visas till ${shortDate(end)}` : `Visas sedan ${shortDate(start!)}`;
+  if (state === "expired") return `Slutade ${shortDate(end!)}`;
+  return rangeText(start, end).replace(/^./, (c) => c.toUpperCase());
+}
+const DATE_CHIP: Record<DateState, string> = {
+  always: "border border-dashed border-[#c4cad2] bg-white text-[#8a929d]",
+  active: "border border-[#1f7a4d] bg-[#e8f5ee] text-[#155c39]",
+  coming: "border-2 border-kth-blue bg-kth-light-blue text-kth-navy",
+  expired: "border border-[#d0d5db] bg-[#eceef1] text-[#5a6270]",
+};
 
 /**
  * Skylt: what a sign shows and when, the same on Linux and Android (design "Skylt i admin").
@@ -118,11 +147,29 @@ export function SignageEditor({
 
   // Visas nu och nästa byte, med samma regler som kioskerna; bara i webbläsaren (useMinute)
   const now = useMinute();
+  const today = now ? stockholmNow(now).date : null;
   const active = now ? activeList(sched, now) : null;
   const next = useMemo(() => (now ? nextChange(sched, now) : null), [sched, now]);
   const describe = (a: ReturnType<typeof activeList>) =>
-    a.kind === "list" ? a.name : a.kind === "off" ? "svart skärm" : std.length ? "standardlistan" : fallback;
-  const count = (a: ReturnType<typeof activeList>) => (a.kind === "list" ? sched.lists[a.name].length : a.kind === "standard" ? std.length : 0);
+    a.kind === "list" ? a.name : a.kind === "off" ? "svart skärm" : std.some((p) => !today || pageOn(p, today)) ? "standardlistan" : fallback;
+  const shownPages = (a: ReturnType<typeof activeList>) => (a.kind === "list" ? sched.lists[a.name] : a.kind === "standard" ? std : []);
+  // "3 av 5 sidor (2 har andra datum)" och nästa datumhändelse i den listan
+  const countText = (a: ReturnType<typeof activeList>) => {
+    const all = shownPages(a);
+    const on = today ? all.filter((p) => pageOn(p, today)).length : all.length;
+    if (!all.length || (!on && a.kind === "standard")) return null;
+    return on === all.length ? `${pagesText(on)} i tur och ordning` : `${on} av ${pagesText(all.length)} (${all.length - on} har andra datum)`;
+  };
+  const byId = new Map(media.map((m) => [m.id, m]));
+  const nameOf = (p: SignPage) => pageName(p, byId);
+  const dateEvent = (a: ReturnType<typeof activeList>) => {
+    if (!today) return null;
+    const events = shownPages(a).flatMap((p) => [
+      ...(p.start && p.start > today ? [{ date: p.start, text: `${nameOf(p)} börjar ${shortDate(p.start)}` }] : []),
+      ...(p.end && p.end >= today && (!p.start || p.start <= today) ? [{ date: p.end, text: `${nameOf(p)} visas till ${shortDate(p.end)}` }] : []),
+    ]);
+    return events.sort((x, y) => x.date.localeCompare(y.date))[0]?.text ?? null;
+  };
   const sameDay = (a: Date, b: Date) => sthlm(a, { dateStyle: "short" }) === sthlm(b, { dateStyle: "short" });
   const nextText =
     next && now
@@ -144,18 +191,43 @@ export function SignageEditor({
     const name = to.trim();
     if (!name || name === from || name in sched.lists) return;
     const lists = Object.fromEntries(Object.entries(sched.lists).map(([n, p]) => [n === from ? name : n, p]));
-    writeSchedule({ ...sched, lists, slots: sched.slots.map((s) => (s.list === from ? { ...s, list: name } : s)) });
+    const periods = Object.fromEntries(Object.entries(sched.periods).map(([n, p]) => [n === from ? name : n, p]));
+    writeSchedule({ ...sched, lists, periods, slots: sched.slots.map((s) => (s.list === from ? { ...s, list: name } : s)) });
     setOpen(name);
   };
   const removeList = (name: string) => {
     const used = sched.slots.filter((s) => s.list === name).length;
     if (used && !confirm(`${name} används i ${used} ${used === 1 ? "tid" : "tider"} i schemat. Ta bort listan och de tiderna?`)) return;
     const lists = { ...sched.lists };
+    const periods = { ...sched.periods };
     delete lists[name];
-    writeSchedule({ ...sched, lists, slots: sched.slots.filter((s) => s.list !== name) });
+    delete periods[name];
+    writeSchedule({ ...sched, lists, periods, slots: sched.slots.filter((s) => s.list !== name) });
     setOpen(null);
   };
+  const setPeriod = (name: string, period: [string, string] | undefined) => {
+    const periods = { ...sched.periods };
+    if (period) periods[name] = period;
+    else delete periods[name];
+    writeSchedule({ ...sched, periods });
+  };
+  const expired = (list: SignPage[]) => (today ? list.filter((p) => dateState(p.start, p.end, today) === "expired").length : 0);
   const overlaps = slotOverlaps(sched);
+  const hasDates = std.some((p) => p.start || p.end) || Object.keys(sched.periods).length > 0 || sched.slots.some((s) => s.dates) || Object.values(sched.lists).some((l) => l.some((p) => p.start || p.end));
+  const spellistor = useRef<HTMLElement>(null);
+  const openFromCalendar = (name: string) => {
+    setOpen(name);
+    spellistor.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+  // Saker som datumen gör oanvändbara: listor där alla sidor har slutat, tider vars lista har slutat gälla
+  const dateNotes = today
+    ? [
+        ...names.filter((n) => sched.lists[n].length && expired(sched.lists[n]) === sched.lists[n].length).map((n) => `Alla sidor i ${n} har slutat visas.`),
+        ...names
+          .filter((n) => sched.periods[n] && sched.periods[n][1] < today && sched.slots.some((s) => s.list === n))
+          .map((n) => `${n} slutade gälla ${shortDate(sched.periods[n][1])}, så tiderna som pekar på den används inte.`),
+      ]
+    : [];
 
   return (
     <div className="@container flex flex-col gap-3.5">
@@ -169,11 +241,19 @@ export function SignageEditor({
       <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 rounded-xl bg-kth-navy px-[18px] py-3.5 text-white">
         <span className="text-[12px] font-bold uppercase tracking-[.06em] text-kth-light-blue">Visas nu</span>
         <span className="text-[17px] font-extrabold">
-          {active ? (active.kind === "list" ? active.name : active.kind === "off" ? "Svart skärm" : std.length ? "Standardlistan" : `Ingen sida (${fallback})`) : "…"}
+          {active
+            ? active.kind === "list"
+              ? active.name
+              : active.kind === "off"
+                ? "Svart skärm"
+                : std.some((p) => !today || pageOn(p, today))
+                  ? "Standardlistan"
+                  : `Ingen sida (${fallback})`
+            : "…"}
         </span>
         {active && now && (
           <span className="text-[14px] text-kth-light-blue">
-            {[`${sthlm(now, { weekday: "long" })} ${sthlm(now, { hour: "2-digit", minute: "2-digit" })}`, count(active) ? `${pagesText(count(active))} i tur och ordning` : null, nextText]
+            {[`${sthlm(now, { weekday: "long" })} ${sthlm(now, { day: "numeric", month: "short" }).replace(".", "")} ${sthlm(now, { hour: "2-digit", minute: "2-digit" })}`, countText(active), nextText, dateEvent(active)]
               .filter(Boolean)
               .join(" · ")}
           </span>
@@ -199,7 +279,10 @@ export function SignageEditor({
             </button>
           </div>
           {sched.slots.length === 0 ? (
-            <p className="text-[13px] text-[#5a6270]">Inget schema: skylten visar standardlistan hela tiden.</p>
+            <>
+              <p className="text-[13px] text-[#5a6270]">Inget schema: skylten visar standardlistan hela tiden.</p>
+              {hasDates && today && <Calendar schedule={sched} std={std} today={today} color={color} nameOf={nameOf} onOpenList={openFromCalendar} />}
+            </>
           ) : (
             <>
               <div className="hidden gap-2.5 px-0.5 text-[12px] font-bold text-[#5a6270] @3xl:grid @3xl:grid-cols-[150px_234px_140px_minmax(0,1fr)_84px]">
@@ -223,43 +306,58 @@ export function SignageEditor({
                   onRemove={() => writeSchedule({ ...sched, slots: sched.slots.filter((_, j) => j !== i) })}
                 />
               ))}
-              <WeekView schedule={sched} color={color} />
+              {today ? <Calendar schedule={sched} std={std} today={today} color={color} nameOf={nameOf} onOpenList={openFromCalendar} /> : <WeekView schedule={sched} color={color} />}
             </>
           )}
         </section>
       )}
 
       {schedule && (
-        <section className={schedule.inherited ? SECTION_INHERITED : SECTION}>
+        <section ref={spellistor} className={`scroll-mt-4 ${schedule.inherited ? SECTION_INHERITED : SECTION}`}>
           <div className="flex items-baseline justify-between gap-3">
             <div>
               <h4 className="text-[15px] font-extrabold">Spellistor</h4>
-              <p className="mt-[3px] text-[13px] text-[#5a6270]">Sidor som visas i tur och ordning. Sekunder tomt: Tid per sida.</p>
+              <p className="mt-[3px] text-[13px] text-[#5a6270]">Sidor som visas i tur och ordning. En sida eller en hel lista kan ha datum: utanför dem hoppas den över. Sekunder tomt: Tid per sida.</p>
               {status && <div className="mt-2">{status([schedule.meta.key])}</div>}
             </div>
             <button type="button" className={OUTLINE_BTN} onClick={addList}>+ Ny spellista</button>
           </div>
           {names.length > 0 && (
             <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Spellistor">
-              {names.map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  role="tab"
-                  aria-selected={openList === n}
-                  onClick={() => setOpen(n)}
-                  className={`inline-flex h-8 items-center gap-[7px] rounded-full px-3 text-[13px] font-bold ${openList === n ? "border-2 border-kth-blue bg-kth-light-blue text-kth-navy" : "border border-[#c4cad2] bg-white text-[#3d444d]"}`}
-                >
-                  <span className="size-2.5 rounded-[3px]" style={{ background: color(n).bg }} aria-hidden="true" />
-                  {n}
-                  <span className="font-medium opacity-75">{pagesText(sched.lists[n].length)}</span>
-                </button>
-              ))}
+              {names.map((n) => {
+                const period = sched.periods[n];
+                const state = period && today ? dateState(period[0], period[1], today) : null;
+                return (
+                  <button
+                    key={n}
+                    type="button"
+                    role="tab"
+                    aria-selected={openList === n}
+                    onClick={() => setOpen(n)}
+                    className={`inline-flex h-8 items-center gap-[7px] rounded-full px-3 text-[13px] font-bold ${openList === n ? "border-2 border-kth-blue bg-kth-light-blue text-kth-navy" : "border border-[#c4cad2] bg-white text-[#3d444d]"} ${state === "expired" && openList !== n ? "opacity-55" : ""}`}
+                  >
+                    <span className="size-2.5 rounded-[3px]" style={{ background: color(n).bg }} aria-hidden="true" />
+                    {n}
+                    <span className="font-medium opacity-75">
+                      {period ? (state === "expired" ? `slutade ${shortDate(period[1])}` : rangeText(period[0], period[1])) : pagesText(sched.lists[n].length)}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           )}
           {openList && (
             <div className="flex flex-col gap-1.5 rounded-[10px] bg-[#f6f8fa] p-3">
-              <ListHeader key={openList} name={openList} taken={names} onRename={(to) => renameList(openList, to)} onRemove={() => removeList(openList)} />
+              <ListHeader
+                key={openList}
+                name={openList}
+                taken={names}
+                expired={expired(sched.lists[openList])}
+                onPurge={() => writeSchedule({ ...sched, lists: { ...sched.lists, [openList]: sched.lists[openList].filter((p) => !today || dateState(p.start, p.end, today) !== "expired") } })}
+                onRename={(to) => renameList(openList, to)}
+                onRemove={() => removeList(openList)}
+              />
+              <ListPeriod key={`p-${openList}`} period={sched.periods[openList]} today={today} onChange={(p) => setPeriod(openList, p)} />
               <PageList
                 pages={sched.lists[openList]}
                 onChange={(next) => writeSchedule({ ...sched, lists: { ...sched.lists, [openList]: next } })}
@@ -267,9 +365,11 @@ export function SignageEditor({
                 onUploaded={addToLibrary}
                 signage={signage}
                 label={openList}
+                today={today}
               />
             </div>
           )}
+          {dateNotes.map((n) => <p key={n} className="text-[12.5px] font-semibold text-warn-ink">{n}</p>)}
           {schedule.problem && <p className="text-[12.5px] font-semibold text-bad-ink">{schedule.problem}</p>}
         </section>
       )}
@@ -282,11 +382,12 @@ export function SignageEditor({
               ? "Standardlistan visas, t.ex. på söndagar och sena kvällar. Släck skärmen i stället om den inte ska visa något då."
               : "Sidorna som visas i tur och ordning."}{" "}
             {std.length ? "" : `Tom lista: skylten visar ${fallback}.`}
+            {std.length > 0 && today && !std.some((p) => pageOn(p, today)) ? `Ingen sida visas i dag: skylten visar ${fallback}.` : ""}
           </p>
           {status && <div className="mt-2">{status([pages.meta.key])}</div>}
         </div>
         <div className={`flex min-w-0 flex-col gap-2 ${pages.inherited ? "rounded-lg border-2 border-dashed border-[#aeb6c0] bg-[#f1f3f5] p-2" : ""}`}>
-          <PageList pages={std} onChange={writeStd} media={media} onUploaded={addToLibrary} signage={signage} label="Standardlistan" />
+          <PageList pages={std} onChange={writeStd} media={media} onUploaded={addToLibrary} signage={signage} label="Standardlistan" today={today} purge />
           {pages.problem && <p className="text-[12.5px] font-semibold text-bad-ink">{pages.problem}</p>}
           {schedule && (
             <button
@@ -483,7 +584,21 @@ function TimeInput({ label, value, placeholder, onChange }: { label: string; val
   );
 }
 
-function ListHeader({ name, taken, onRename, onRemove }: { name: string; taken: string[]; onRename: (to: string) => void; onRemove: () => void }) {
+function ListHeader({
+  name,
+  taken,
+  expired,
+  onPurge,
+  onRename,
+  onRemove,
+}: {
+  name: string;
+  taken: string[];
+  expired: number;
+  onPurge: () => void;
+  onRename: (to: string) => void;
+  onRemove: () => void;
+}) {
   const [editing, setEditing] = useState(false);
   const [v, setV] = useState(name);
   const clash = v.trim() !== name && taken.includes(v.trim());
@@ -521,13 +636,14 @@ function ListHeader({ name, taken, onRename, onRemove }: { name: string; taken: 
         </>
       )}
       <span className="flex-1" />
+      {expired > 0 && <button type="button" className="text-[12.5px] font-bold text-kth-blue" onClick={onPurge}>Ta bort utgångna ({expired})</button>}
       <button type="button" className="text-[12.5px] font-bold text-[#a1271d]" onClick={onRemove}>Ta bort listan</button>
     </div>
   );
 }
 
 /** Mon–Sun with the weekly times as blocks (07–22, wider if a time is outside); date rows in the legend */
-function WeekView({ schedule, color }: { schedule: Schedule; color: (n: string) => { bg: string; fg: string } }) {
+function WeekView({ schedule, color, heading = true }: { schedule: Schedule; color: (n: string) => { bg: string; fg: string }; heading?: boolean }) {
   const usable = schedule.slots.map((s, i) => ({ s, i })).filter(({ s }) => !slotProblem(s, schedule.lists));
   const weekly = usable.filter(({ s }) => !s.dates);
   const dated = usable.filter(({ s }) => s.dates);
@@ -540,7 +656,7 @@ function WeekView({ schedule, color }: { schedule: Schedule; color: (n: string) 
   return (
     <div className="mt-1.5 flex flex-col gap-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h5 className="text-[14px] font-extrabold">Veckan</h5>
+        {heading ? <h5 className="text-[14px] font-extrabold">Veckan</h5> : <span />}
         <span className="flex flex-wrap gap-3.5 text-[12px] text-[#5a6270]">
           <span className="flex items-center gap-[5px]">
             <span className="size-3 rounded-[3px] border border-[#d0d5db]" style={{ background: HATCH }} aria-hidden="true" />
@@ -599,6 +715,8 @@ function PageList({
   onUploaded,
   signage,
   label,
+  today,
+  purge = false,
 }: {
   pages: SignPage[];
   onChange: (next: SignPage[]) => void;
@@ -606,6 +724,10 @@ function PageList({
   onUploaded: (items: SignMedia[]) => void;
   signage: SignageProps;
   label: string;
+  /** Stockholm date in the browser (null on the server): the rows' date colors */
+  today: string | null;
+  /** Ta bort utgångna in the list's own link row (the standard list; playlists have it in the header) */
+  purge?: boolean;
 }) {
   // Adresser skrivs lokalt och sparas när fältet lämnas, så att varje tangent inte blir ett utkast
   const [rows, setRows] = useState(pages);
@@ -615,6 +737,8 @@ function PageList({
     setRows(pages);
   }
   const [picking, setPicking] = useState(false);
+  const [dating, setDating] = useState<number | null>(null);
+  const expired = today ? rows.filter((p) => dateState(p.start, p.end, today) === "expired").length : 0;
   const commit = (next: SignPage[]) => {
     setRows(next);
     setSeen(next);
@@ -629,11 +753,21 @@ function PageList({
   });
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="@container/pl flex flex-col gap-1.5">
+      {rows.length > 0 && (
+        <div className="hidden items-center gap-1.5 text-[12px] font-bold text-[#5a6270] @xl/pl:flex">
+          <span className="w-4" />
+          <span className="flex-1">Sida</span>
+          <span className="w-[170px]">Visas</span>
+          <span className="w-16">Sek</span>
+          <span className="w-[84px]" />
+        </div>
+      )}
       {rows.map((p, i) => {
         const m = p.media ? byId.get(p.media) : undefined;
+        const state = today ? dateState(p.start, p.end, today) : null;
         return (
-          <div key={i} className="flex w-full min-w-0 flex-wrap items-center gap-1.5">
+          <div key={i} className={`relative flex w-full min-w-0 flex-wrap items-center gap-1.5 ${state === "expired" ? "opacity-55" : ""}`}>
             <span className="w-4 shrink-0 text-center text-[12px] font-bold text-[#5a6270]">{i + 1}</span>
             {p.media ? (
               <span className={`${BOX} flex min-w-[120px] flex-1 items-center gap-2 py-0.5 pl-0.5 pr-1.5`}>
@@ -661,6 +795,15 @@ function PageList({
                 className={`${BOX} min-w-[120px] flex-1 px-3`}
               />
             )}
+            <button
+              type="button"
+              aria-expanded={dating === i}
+              aria-label={`${label}, sida ${i + 1}, visas: ${datesText(p.start, p.end, state)}`}
+              onClick={() => setDating(dating === i ? null : i)}
+              className={`flex h-9 w-[170px] shrink-0 items-center truncate rounded-lg px-2.5 text-left text-[12.5px] font-semibold ${DATE_CHIP[state ?? (p.start || p.end ? "coming" : "always")]}`}
+            >
+              {datesText(p.start, p.end, state)}
+            </button>
             <input
               type="number"
               min={SIGN_SECONDS_MIN}
@@ -678,12 +821,31 @@ function PageList({
               <button type="button" aria-label="Flytta ner" disabled={i === rows.length - 1} onClick={() => commit(move(rows, i, 1))} className={ARROW}>↓</button>
               <button type="button" aria-label={`Ta bort sida ${i + 1}`} onClick={() => commit(rows.filter((_, j) => j !== i))} className={ARROW}>×</button>
             </span>
+            {dating === i && (
+              <DatesPopover
+                title={`När visas ${p.media ? (m?.name ?? "filen") : pageName(p, byId)}?`}
+                subtitle={`Sida ${i + 1} i ${label}`}
+                start={p.start}
+                end={p.end}
+                today={today}
+                onCancel={() => setDating(null)}
+                onDone={(start, end) => {
+                  commit(rows.map((x, j) => (j === i ? withDates(x, start, end) : x)));
+                  setDating(null);
+                }}
+              />
+            )}
           </div>
         );
       })}
       <div className="flex flex-wrap gap-4 py-0.5">
         <button type="button" onClick={() => setRows((r) => [...r, { url: "", s: null }])} className={LINK}>+ Lägg till sida</button>
         <button type="button" onClick={() => setPicking((p) => !p)} aria-expanded={picking} className={LINK}>+ Bild, film eller pdf</button>
+        {purge && expired > 0 && (
+          <button type="button" onClick={() => commit(rows.filter((p) => dateState(p.start, p.end, today!) !== "expired"))} className={LINK}>
+            Ta bort utgångna ({expired})
+          </button>
+        )}
       </div>
       {picking && (
         <MediaPicker
@@ -769,6 +931,372 @@ function MediaPicker({ media, signage, onPick, onUploaded }: { media: SignMedia[
       ) : (
         <p className="text-[13px] text-[#5a6270]">Mediebiblioteket är tomt. Ladda upp en fil.</p>
       )}
+    </div>
+  );
+}
+
+/** A page with new dates (missing ones removed) */
+function withDates(p: SignPage, start?: string, end?: string): SignPage {
+  const next = { ...p, start, end };
+  if (!start) delete next.start;
+  if (!end) delete next.end;
+  return next;
+}
+
+/** What a row is called in texts: the file's name, or the address without https:// */
+function pageName(p: SignPage, byId: Map<string, SignMedia>): string {
+  if (p.media) return byId.get(p.media)?.name ?? "filen";
+  return p.url.replace(/^https?:\/\//, "").replace(/\/$/, "") || "sidan";
+}
+
+type DateMode = "always" | "from" | "to" | "between";
+const DATE_MODES: [DateMode, string][] = [
+  ["always", "Alltid"],
+  ["from", "Från ett datum"],
+  ["to", "Till ett datum"],
+  ["between", "Mellan två datum"],
+];
+const PILL = "inline-flex h-[30px] items-center rounded-full px-[11px] text-[12.5px]";
+const pill = (on: boolean) => `${PILL} ${on ? "bg-kth-blue font-bold text-white" : "border border-[#c4cad2] font-semibold"}`;
+const DATE_INPUT = "h-9 w-[150px] rounded-lg border border-[#c4cad2] bg-white px-2.5 text-[13.5px] text-ink";
+
+/** The small box under a page's Visas button: mode, the dates and quick choices */
+function DatesPopover({
+  title,
+  subtitle,
+  start,
+  end,
+  today,
+  onCancel,
+  onDone,
+}: {
+  title: string;
+  subtitle: string;
+  start?: string;
+  end?: string;
+  today: string | null;
+  onCancel: () => void;
+  onDone: (start?: string, end?: string) => void;
+}) {
+  const [mode, setMode] = useState<DateMode>(start && end ? "between" : start ? "from" : end ? "to" : "always");
+  const base = today ?? new Date().toISOString().slice(0, 10);
+  const [from, setFrom] = useState(start ?? base);
+  const [to, setTo] = useState(end ?? (start && start > base ? addDays(start, 6) : addDays(base, 6)));
+  const useFrom = mode === "from" || mode === "between";
+  const useTo = mode === "to" || mode === "between";
+  const backwards = mode === "between" && from > to;
+  const quick = (a: string, b: string) => {
+    setMode("between");
+    setFrom(a);
+    setTo(b);
+  };
+  const sunday = addDays(base, 7 - weekday(base));
+  const monthEnd = addDays(`${addDays(`${base.slice(0, 7)}-28`, 4).slice(0, 7)}-01`, -1);
+  return (
+    <div
+      role="dialog"
+      aria-label={title}
+      onKeyDown={(e) => e.key === "Escape" && onCancel()}
+      className="absolute right-[90px] top-[42px] z-20 flex w-[470px] max-w-[calc(100vw-48px)] flex-col gap-3 rounded-xl border border-[#c4cad2] bg-white px-[18px] py-4 shadow-[0_12px_32px_rgba(0,0,40,.18)]"
+    >
+      <div className="flex items-baseline justify-between gap-3">
+        <h5 className="min-w-0 truncate text-[14px] font-extrabold">{title}</h5>
+        <span className="shrink-0 text-[12px] text-[#5a6270]">{subtitle}</span>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {DATE_MODES.map(([m, text]) => (
+          <button key={m} type="button" aria-pressed={mode === m} onClick={() => setMode(m)} className={pill(mode === m)}>
+            {text}
+          </button>
+        ))}
+      </div>
+      {mode !== "always" && (
+        <div className="flex flex-wrap items-end gap-2 text-[13px] text-[#5a6270]">
+          {useFrom && (
+            <label className="flex flex-col gap-1">
+              Från och med
+              <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={DATE_INPUT} />
+            </label>
+          )}
+          {useTo && (
+            <label className="flex flex-col gap-1">
+              Till och med
+              <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={DATE_INPUT} />
+            </label>
+          )}
+        </div>
+      )}
+      {backwards && <p className="text-[12.5px] font-semibold text-bad-ink">Sista dagen måste vara samma dag eller efter den första.</p>}
+      <div className="flex flex-wrap gap-3 text-[12.5px]">
+        <span className="text-[#5a6270]">Snabbval:</span>
+        <button type="button" className="font-bold text-kth-blue" onClick={() => quick(base, sunday)}>Den här veckan</button>
+        <button type="button" className="font-bold text-kth-blue" onClick={() => quick(addDays(sunday, 1), addDays(sunday, 7))}>Nästa vecka</button>
+        <button type="button" className="font-bold text-kth-blue" onClick={() => quick(base, monthEnd)}>Resten av månaden</button>
+      </div>
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={onCancel} className="h-[34px] rounded-lg border border-[#c4cad2] bg-white px-3 text-[13px] font-semibold">Avbryt</button>
+        <button
+          type="button"
+          disabled={backwards || (useFrom && !from) || (useTo && !to)}
+          onClick={() => onDone(useFrom ? from : undefined, useTo ? to : undefined)}
+          className="h-[34px] rounded-lg bg-kth-blue px-3.5 text-[13px] font-bold text-white disabled:opacity-40"
+        >
+          Klar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Gäller: a whole playlist used only between two dates (SIGN_SCHEDULE.periods) */
+function ListPeriod({ period, today, onChange }: { period?: [string, string]; today: string | null; onChange: (p: [string, string] | undefined) => void }) {
+  const base = today ?? new Date().toISOString().slice(0, 10);
+  const state = period && today ? dateState(period[0], period[1], today) : null;
+  const badge =
+    state === "coming"
+      ? { text: `Börjar om ${daysBetween(today!, period![0])} ${daysBetween(today!, period![0]) === 1 ? "dag" : "dagar"}`, cls: "bg-kth-light-blue text-kth-navy" }
+      : state === "active"
+        ? { text: `Gäller nu, till ${shortDate(period![1])}`, cls: "bg-[#e8f5ee] text-[#155c39]" }
+        : state === "expired"
+          ? { text: `Slutade ${shortDate(period![1])}`, cls: "bg-[#eceef1] text-[#5a6270]" }
+          : null;
+  return (
+    <div className="flex flex-wrap items-center gap-2.5 text-[13px] text-[#5a6270]">
+      <span className="font-bold text-ink">Gäller</span>
+      <button type="button" aria-pressed={!period} onClick={() => onChange(undefined)} className={pill(!period)}>Alltid</button>
+      <button type="button" aria-pressed={!!period} onClick={() => !period && onChange([base, addDays(base, 13)])} className={pill(!!period)}>Mellan två datum</button>
+      {period && (
+        <>
+          <input type="date" aria-label="Spellistan gäller från och med" value={period[0]} onChange={(e) => e.target.value && onChange([e.target.value, period[1]])} className={DATE_INPUT} />
+          –
+          <input type="date" aria-label="Spellistan gäller till och med" value={period[1]} onChange={(e) => e.target.value && onChange([period[0], e.target.value])} className={DATE_INPUT} />
+          {badge && <span className={`inline-flex h-[26px] items-center rounded-md px-[9px] text-[12px] font-bold ${badge.cls}`}>{badge.text}</span>}
+        </>
+      )}
+    </div>
+  );
+}
+
+const MONTHS = ["Januari", "Februari", "Mars", "April", "Maj", "Juni", "Juli", "Augusti", "September", "Oktober", "November", "December"];
+
+/** Vecka | Månad: the week grid, or the month with what each day shows and a timeline of everything with dates */
+function Calendar({
+  schedule,
+  std,
+  today,
+  color,
+  nameOf,
+  onOpenList,
+}: {
+  schedule: Schedule;
+  std: SignPage[];
+  today: string;
+  color: (n: string) => { bg: string; fg: string };
+  nameOf: (p: SignPage) => string;
+  onOpenList: (name: string) => void;
+}) {
+  const [view, setView] = useState<"week" | "month">(schedule.slots.length ? "week" : "month");
+  const [offset, setOffset] = useState(0);
+  const y0 = Number(today.slice(0, 4)), m0 = Number(today.slice(5, 7)) - 1 + offset;
+  const year = y0 + Math.floor(m0 / 12), month = ((m0 % 12) + 12) % 12;
+  const first = `${year}-${String(month + 1).padStart(2, "0")}-01`;
+  const days = Number(addDays(`${addDays(first, 31).slice(0, 7)}-01`, -1).slice(8));
+  const last = `${first.slice(0, 8)}${String(days).padStart(2, "0")}`;
+  const TAB = "inline-flex h-[26px] items-center rounded-[7px] px-2.5 text-[12.5px]";
+  return (
+    <div className="mt-1.5 flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <h5 className="text-[14px] font-extrabold">Kalender</h5>
+        <span className="inline-flex gap-0.5 rounded-[9px] bg-[#eceef1] p-[3px]" role="group" aria-label="Visa">
+          {(["week", "month"] as const).map((v) => (
+            <button key={v} type="button" aria-pressed={view === v} onClick={() => setView(v)} className={`${TAB} ${view === v ? "bg-white font-bold shadow-[0_1px_2px_rgba(0,0,0,.08)]" : "font-semibold text-[#3d444d]"}`}>
+              {v === "week" ? "Vecka" : "Månad"}
+            </button>
+          ))}
+        </span>
+        <span className="flex-1" />
+        {view === "month" && (
+          <span className="flex items-center gap-2">
+            <button type="button" aria-label="Föregående månad" onClick={() => setOffset((o) => o - 1)} className="size-8 rounded-lg border border-[#c4cad2] bg-white text-[15px]">‹</button>
+            <button type="button" onClick={() => setOffset(0)} title="Den här månaden" className="min-w-[120px] text-center text-[15px] font-extrabold">{MONTHS[month]} {year}</button>
+            <button type="button" aria-label="Nästa månad" onClick={() => setOffset((o) => o + 1)} className="size-8 rounded-lg border border-[#c4cad2] bg-white text-[15px]">›</button>
+          </span>
+        )}
+      </div>
+      {view === "week" ? (
+        <WeekView schedule={schedule} color={color} heading={false} />
+      ) : (
+        <>
+          <MonthGrid schedule={schedule} std={std} first={first} days={days} today={today} color={color} nameOf={nameOf} />
+          <Timeline schedule={schedule} std={std} first={first} last={last} days={days} today={today} month={MONTHS[month].toLowerCase()} color={color} nameOf={nameOf} onOpenList={onOpenList} />
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Mon–Sun for a month: a colored bar per list the sign shows that day, and what starts or ends */
+function MonthGrid({
+  schedule,
+  std,
+  first,
+  days,
+  today,
+  color,
+  nameOf,
+}: {
+  schedule: Schedule;
+  std: SignPage[];
+  first: string;
+  days: number;
+  today: string;
+  color: (n: string) => { bg: string; fg: string };
+  nameOf: (p: SignPage) => string;
+}) {
+  const bounds = useMemo(() => dayBounds(schedule), [schedule]);
+  const lead = weekday(first) - 1;
+  const cells = Math.ceil((lead + days) / 7) * 7;
+  const all = [...std, ...Object.values(schedule.lists).flat()];
+  const used = new Set<string>();
+  const grid = Array.from({ length: cells }, (_, i) => {
+    const n = i - lead + 1;
+    if (n < 1 || n > days) return null;
+    const date = addDays(first, n - 1);
+    // Vad skylten visar under dagen: activeAt vid varje gräns (midnatt och tidernas från/till)
+    const lists = [...new Set(bounds.map((min) => activeAt(schedule, { day: weekday(date), min, date })).flatMap((a) => (a.kind === "list" ? [a.name] : [])))];
+    lists.forEach((l) => used.add(l));
+    const tags = [
+      ...Object.entries(schedule.periods).flatMap(([n, [a, b]]) => [...(a === date ? [`${n} börjar`] : []), ...(b === date ? [`${n} sista dagen`] : [])]),
+      ...all.flatMap((p) => [...(p.start === date ? [`${nameOf(p)} börjar`] : []), ...(p.end === date ? [`${nameOf(p)} sista dagen`] : [])]),
+    ];
+    return { n, date, lists, tags };
+  });
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-7 gap-1">
+        {DAY_NAMES.map((d) => <span key={d} className="pb-0.5 text-center text-[12px] font-bold text-[#3d444d]">{d}</span>)}
+        {grid.map((c, i) =>
+          c ? (
+            <div
+              key={i}
+              className={`flex min-h-[74px] min-w-0 flex-col gap-[5px] rounded-lg px-[7px] py-1.5 ${c.date === today ? "border-2 border-[#a1271d] bg-white" : "border border-[#e0e4e9] bg-white"}`}
+            >
+              <span className={`text-[12.5px] ${c.date === today ? "font-extrabold text-[#a1271d]" : "font-semibold"}`}>{c.n}</span>
+              <span className="flex flex-wrap gap-[3px]">
+                {c.lists.map((l) => <span key={l} title={l} className="h-1.5 w-[18px] rounded-[3px]" style={{ background: color(l).bg }} />)}
+              </span>
+              {c.tags.slice(0, 2).map((t) => (
+                <span key={t} title={t} className="truncate rounded px-1 py-px text-[10.5px] font-bold text-kth-navy" style={{ background: t.endsWith("börjar") ? "#def0ff" : "#e8f5ee" }}>
+                  {t}
+                </span>
+              ))}
+              {c.tags.length > 2 && <span className="text-[10.5px] font-bold text-[#5a6270]" title={c.tags.slice(2).join("\n")}>+{c.tags.length - 2}</span>}
+            </div>
+          ) : (
+            <div key={i} className="min-h-[74px] rounded-lg border border-dashed border-[#e0e4e9]" />
+          ),
+        )}
+      </div>
+      <div className="flex flex-wrap gap-4 text-[12px] text-[#5a6270]">
+        {[...used].map((l) => (
+          <span key={l} className="flex items-center gap-[5px]">
+            <span className="h-1.5 w-[18px] rounded-[3px]" style={{ background: color(l).bg }} />
+            {l}
+          </span>
+        ))}
+        <span>Utan färg: {schedule.off ? "svart skärm" : "standardlistan"}.</span>
+      </div>
+    </div>
+  );
+}
+
+/** Everything with dates that touches the month, as bars: pages, list periods and schedule times with dates */
+function Timeline({
+  schedule,
+  std,
+  first,
+  last,
+  days,
+  today,
+  month,
+  color,
+  nameOf,
+  onOpenList,
+}: {
+  schedule: Schedule;
+  std: SignPage[];
+  first: string;
+  last: string;
+  days: number;
+  today: string;
+  month: string;
+  color: (n: string) => { bg: string; fg: string };
+  nameOf: (p: SignPage) => string;
+  onOpenList: (name: string) => void;
+}) {
+  type Bar = { name: string; where: string; start?: string; end?: string; list?: string; bg: string; fg: string };
+  const page = (p: SignPage, i: number, list?: string): Bar => ({
+    name: nameOf(p),
+    where: list ? `Spellista ${list}, sida ${i + 1}` : `Standardlistan, sida ${i + 1}`,
+    start: p.start,
+    end: p.end,
+    list,
+    ...(list ? color(list) : { bg: "#5a6270", fg: "#ffffff" }),
+  });
+  const bars: Bar[] = [
+    ...Object.entries(schedule.periods).map(([n, [a, b]]) => ({ name: n, where: "Hela spellistan", start: a, end: b, list: n, ...color(n) })),
+    ...schedule.slots.flatMap((s, i) => (s.dates && !slotProblem(s, schedule.lists) ? [{ name: s.list, where: `Schemat, tid ${i + 1}`, start: s.dates[0], end: s.dates[1], list: s.list, ...color(s.list) }] : [])),
+    ...std.flatMap((p, i) => (p.start || p.end ? [page(p, i)] : [])),
+    ...Object.entries(schedule.lists).flatMap(([n, pages]) => pages.flatMap((p, i) => (p.start || p.end ? [page(p, i, n)] : []))),
+  ].filter((b) => (!b.start || b.start <= last) && (!b.end || b.end >= first));
+  const pos = (date: string) => ((Number(date.slice(8)) - 1) / days) * 100;
+  const todayIn = today >= first && today <= last;
+  return (
+    <div className="flex flex-col gap-2.5 border-t border-[#e6e9ed] pt-3">
+      <div>
+        <h5 className="text-[14px] font-extrabold">Med datum i {month}</h5>
+        <p className="mt-[3px] text-[13px] text-[#5a6270]">
+          {bars.length ? "Sidor, spellistor och tider i schemat som bara gäller vissa datum. Klicka på en stapel för att öppna spellistan." : `Inget med datum berör ${month}.`}
+        </p>
+      </div>
+      {bars.length > 0 && (
+        <div className="grid grid-cols-[minmax(0,200px)_minmax(0,1fr)] items-center gap-x-3 gap-y-1.5">
+          <span />
+          <div className="relative h-[18px] font-mono text-[10.5px] text-[#6b7380]">
+            {[1, 5, 10, 15, 20, 25, days].map((d) => (
+              <span key={d} className="absolute -translate-x-1/2" style={{ left: `${((d - 0.5) / days) * 100}%` }}>{d}</span>
+            ))}
+          </div>
+          {bars.map((b, i) => {
+            const from = b.start && b.start > first ? b.start : first;
+            const to = b.end && b.end < last ? b.end : last;
+            const left = pos(from), width = pos(to) - left + 100 / days;
+            const label = rangeText(b.start, b.end);
+            return (
+              <div key={i} className="contents">
+                <span className="min-w-0 text-[13px] leading-tight">
+                  <b className="block truncate" title={b.name}>{b.name}</b>
+                  <span className="text-[12px] text-[#5a6270]">{b.where}</span>
+                </span>
+                <div className="relative h-[30px] rounded-md bg-[#f4f5f7]" style={{ backgroundImage: `repeating-linear-gradient(90deg, transparent 0 calc(100% / ${days} - 1px), #e6e9ed calc(100% / ${days} - 1px) calc(100% / ${days}))` }}>
+                  <button
+                    type="button"
+                    disabled={!b.list}
+                    onClick={() => b.list && onOpenList(b.list)}
+                    title={`${b.name}: ${label}`}
+                    className="absolute inset-y-[3px] flex items-center overflow-hidden whitespace-nowrap rounded-[5px] px-2 text-[11.5px] font-bold disabled:cursor-default"
+                    style={{ left: `${left}%`, width: `${width}%`, background: b.bg, color: b.fg }}
+                  >
+                    {label}
+                  </button>
+                  {todayIn && <div className="pointer-events-none absolute -inset-y-1 w-0.5 bg-[#a1271d]" style={{ left: `${pos(today) + 50 / days}%` }} />}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {todayIn && bars.length > 0 && <span className="text-[12px] font-semibold text-[#a1271d]">Röd linje: i dag, {shortDate(today)}</span>}
     </div>
   );
 }
