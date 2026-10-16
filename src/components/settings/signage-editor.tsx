@@ -49,15 +49,16 @@ const ARROW = "size-[26px] shrink-0 rounded text-[15px] text-[#5a6270] hover:bg-
 const LINK = "text-[13px] font-bold text-kth-blue";
 const DAYS = ["M", "T", "O", "T", "F", "L", "S"];
 const DAY_NAMES = ["Mån", "Tis", "Ons", "Tor", "Fre", "Lör", "Sön"];
-// En färg per spellista (i ordning); text i kontrast mot färgen
+// En färg per spellista (i ordning), tydligt olika kulörer ur KTH:s palett; text i kontrast mot färgen
 const COLORS = [
-  { bg: "#004791", fg: "#ffffff" },
-  { bg: "#000061", fg: "#ffffff" },
-  { bg: "#b9d6f2", fg: "#000061" },
-  { bg: "#e0a82e", fg: "#3a2600" },
-  { bg: "#6e2b8b", fg: "#ffffff" },
-  { bg: "#1f7a4d", fg: "#ffffff" },
-  { bg: "#c4cad2", fg: "#1c1f24" },
+  { bg: "#004791", fg: "#ffffff" }, // blå
+  { bg: "#ffbe00", fg: "#3a2600" }, // gul
+  { bg: "#1f7a4d", fg: "#ffffff" }, // grön
+  { bg: "#b8336a", fg: "#ffffff" }, // rosa
+  { bg: "#1b7f86", fg: "#ffffff" }, // turkos
+  { bg: "#e86a58", fg: "#3a0d06" }, // korall
+  { bg: "#000061", fg: "#ffffff" }, // marin
+  { bg: "#c4cad2", fg: "#1c1f24" }, // grå
 ];
 const HATCH = "repeating-linear-gradient(45deg,#f4f5f7 0 6px,#eceef1 6px 12px)";
 const HOUR_PX = 21;
