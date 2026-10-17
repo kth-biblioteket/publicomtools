@@ -14,14 +14,14 @@ import { db } from "@/lib/db";
 /** The snap service on its own network (docker-compose.yml) */
 const SNAP_URL = process.env.SNAP_URL ?? "http://publicomtools-snap:3000";
 // Under mediebibliotekets mapp (MEDIA_DIR i src/lib/media.ts), så att serverns filbackup tar med bilderna
-const SNAP_DIR = join(process.env.MEDIA_DIR ?? "/data/media", "snap");
+const SNAP_DIR = join(/*turbopackIgnore: true*/ process.env.MEDIA_DIR ?? "/data/media", "snap");
 export const SNAP_REFRESH = [1, 2, 5, 10, 30, 60] as const;
 export const SNAP_SIZES = { landscape: [1920, 1080], portrait: [1080, 1920] } as const;
 /** Extra wait after the page's own requests are done, for its scripts to draw */
 const WAIT_MS = 2000;
 
 export const isSnapId = (id: string) => /^[a-z0-9]{20,32}$/.test(id);
-const snapFile = (id: string) => join(SNAP_DIR, `${id}.jpg`);
+const snapFile = (id: string) => join(/*turbopackIgnore: true*/ SNAP_DIR, `${id}.jpg`);
 
 export type SnapRow = NonNullable<Awaited<ReturnType<typeof db.snap.findUnique>>>;
 

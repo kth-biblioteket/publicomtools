@@ -23,6 +23,8 @@ import { listSnaps } from "@/lib/snap";
  */
 
 export const MEDIA_DIR = process.env.MEDIA_DIR ?? "/data/media";
+// Sökvägar under MEDIA_DIR är markerade turbopackIgnore: mappen är skyltarnas filer på servern, inte
+// en del av appen, så Next ska inte försöka spåra (och ta med) dem när appen byggs.
 export const MAX_FILE_BYTES = 30 * 1024 * 1024;
 export const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
 export const MAX_PDF_PAGES = 50;
@@ -33,7 +35,7 @@ const MAX_SIDE = 1920;
 
 const run = promisify(execFile);
 export const isMediaId = (id: string) => /^[0-9a-f]{64}$/.test(id);
-export const mediaPath = (id: string) => (isMediaId(id) ? join(MEDIA_DIR, id) : null);
+export const mediaPath = (id: string) => (isMediaId(id) ? join(/*turbopackIgnore: true*/ MEDIA_DIR, id) : null);
 
 export type MediaItem = { id: string; name: string; kind: "image" | "video"; bytes: number; width: number | null; height: number | null; durationMs: number | null };
 const toItem = (m: { id: string; name: string; kind: string; bytes: number; width: number | null; height: number | null; durationMs: number | null }): MediaItem => ({
@@ -112,7 +114,7 @@ async function saveImage(input: Buffer, format: "jpeg" | "png" | "webp", name: s
   const id = createHash("sha256").update(out.data).digest("hex");
   const existing = await db.media.findUnique({ where: { id } });
   if (existing) return toItem(existing);
-  await writeFile(join(MEDIA_DIR, id), out.data);
+  await writeFile(join(/*turbopackIgnore: true*/ MEDIA_DIR, id), out.data);
   return toItem(
     await db.media.create({
       data: { id, name, mime: format === "webp" ? "image/webp" : "image/jpeg", kind: "image", bytes: out.data.length, width: out.info.width, height: out.info.height, uploadedBy },
@@ -127,7 +129,7 @@ export type UploadResult = { ok: true; items: MediaItem[] } | { ok: false; error
  * then stored by hash (the same content twice is stored once). A pdf becomes one image per page.
  */
 export async function saveUpload(body: ReadableStream<Uint8Array>, name: string, uploadedBy: string): Promise<UploadResult> {
-  const tmpDir = join(MEDIA_DIR, "tmp");
+  const tmpDir = join(/*turbopackIgnore: true*/ MEDIA_DIR, "tmp");
   await mkdir(tmpDir, { recursive: true });
   const tmp = join(tmpDir, randomUUID());
   try {
@@ -191,7 +193,7 @@ export async function saveUpload(body: ReadableStream<Uint8Array>, name: string,
     const existing = await db.media.findUnique({ where: { id } });
     if (existing) return { ok: true, items: [toItem(existing)] };
     const durationMs = await mp4DurationMs(tmp);
-    await rename(tmp, join(MEDIA_DIR, id));
+    await rename(tmp, join(/*turbopackIgnore: true*/ MEDIA_DIR, id));
     return { ok: true, items: [toItem(await db.media.create({ data: { id, name: cleanName, mime: "video/mp4", kind: "video", bytes, durationMs, uploadedBy } }))] };
   } finally {
     await rm(tmp, { force: true });
