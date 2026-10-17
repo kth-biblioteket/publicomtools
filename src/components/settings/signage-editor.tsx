@@ -25,14 +25,31 @@ import {
   type Slot,
 } from "@/lib/signage";
 import type { EditorField } from "./apps-editor";
+import { createSnapAction, renderSnapAction } from "@/app/(admin)/media/actions";
 import { FieldControl } from "./field-control";
 import { useMinute } from "./use-minute";
 
 /** A file in the media library as the editor needs it (src/lib/media.ts MediaItem) */
 export type SignMedia = { id: string; name: string; kind: "image" | "video"; durationMs: number | null };
+/** Sida som bild as the editor needs it (src/lib/snap.ts SnapInfo) */
+export type SignSnap = {
+  id: string;
+  url: string;
+  width: number;
+  height: number;
+  refreshMin: number;
+  renderedAt: string | null;
+  error: string | null;
+  errorAt: string | null;
+};
 
 export type SignageProps = {
   media: SignMedia[];
+  snaps: SignSnap[];
+  /** Absolute address of Sida som bild: <snapBase><id>?fit=cover (what the signs load) */
+  snapBase: string;
+  /** Its images in admin: <snapImageBase><id>/image */
+  snapImageBase: string;
   /** Absolute address of the viewer pages: <viewBase><id>?fit=cover (what the kiosks load) */
   viewBase: string;
   /** The files themselves, for thumbnails in admin */
@@ -125,6 +142,8 @@ export function SignageEditor({
 }) {
   const [media, setMedia] = useState(signage.media);
   const addToLibrary = (items: SignMedia[]) => setMedia((m) => [...items.filter((x) => !m.some((y) => y.id === x.id)), ...m]);
+  const [snaps, setSnaps] = useState(signage.snaps);
+  const onSnap = (s: SignSnap) => setSnaps((all) => [s, ...all.filter((x) => x.id !== s.id)]);
   const scheduleText = schedule?.value ?? null;
   const sched = useMemo(() => parseSchedule(scheduleText), [scheduleText]);
   const std = parseSignPages(pages.value);
@@ -162,7 +181,8 @@ export function SignageEditor({
     return on === all.length ? `${pagesText(on)} i tur och ordning` : `${on} av ${pagesText(all.length)} (${all.length - on} har andra datum)`;
   };
   const byId = new Map(media.map((m) => [m.id, m]));
-  const nameOf = (p: SignPage) => pageName(p, byId);
+  const snapById = new Map(snaps.map((x) => [x.id, x]));
+  const nameOf = (p: SignPage) => pageName(p, byId, snapById);
   const dateEvent = (a: ReturnType<typeof activeList>) => {
     if (!today) return null;
     const events = shownPages(a).flatMap((p) => [
@@ -364,6 +384,8 @@ export function SignageEditor({
                 onChange={(next) => writeSchedule({ ...sched, lists: { ...sched.lists, [openList]: next } })}
                 media={media}
                 onUploaded={addToLibrary}
+                snaps={snaps}
+                onSnap={onSnap}
                 signage={signage}
                 label={openList}
                 today={today}
@@ -388,7 +410,7 @@ export function SignageEditor({
           {status && <div className="mt-2">{status([pages.meta.key])}</div>}
         </div>
         <div className={`flex min-w-0 flex-col gap-2 ${pages.inherited ? "rounded-lg border-2 border-dashed border-[#aeb6c0] bg-[#f1f3f5] p-2" : ""}`}>
-          <PageList pages={std} onChange={writeStd} media={media} onUploaded={addToLibrary} signage={signage} label="Standardlistan" today={today} purge />
+          <PageList pages={std} onChange={writeStd} media={media} onUploaded={addToLibrary} snaps={snaps} onSnap={onSnap} signage={signage} label="Standardlistan" today={today} purge />
           {pages.problem && <p className="text-[12.5px] font-semibold text-bad-ink">{pages.problem}</p>}
           {schedule && (
             <button
@@ -714,6 +736,8 @@ function PageList({
   onChange,
   media,
   onUploaded,
+  snaps,
+  onSnap,
   signage,
   label,
   today,
@@ -723,6 +747,8 @@ function PageList({
   onChange: (next: SignPage[]) => void;
   media: SignMedia[];
   onUploaded: (items: SignMedia[]) => void;
+  snaps: SignSnap[];
+  onSnap: (s: SignSnap) => void;
   signage: SignageProps;
   label: string;
   /** Stockholm date in the browser (null on the server): the rows' date colors */
@@ -738,7 +764,9 @@ function PageList({
     setRows(pages);
   }
   const [picking, setPicking] = useState(false);
+  const [snapping, setSnapping] = useState(false);
   const [dating, setDating] = useState<number | null>(null);
+  const snapById = new Map(snaps.map((x) => [x.id, x]));
   const expired = today ? rows.filter((p) => dateState(p.start, p.end, today) === "expired").length : 0;
   const commit = (next: SignPage[]) => {
     setRows(next);
@@ -766,23 +794,29 @@ function PageList({
       )}
       {rows.map((p, i) => {
         const m = p.media ? byId.get(p.media) : undefined;
+        const sid = snapIdOf(p.url);
         const state = today ? dateState(p.start, p.end, today) : null;
+        const fitSelect = (
+          <select
+            aria-label={`${label}, sida ${i + 1}, storlek`}
+            value={p.url.includes("fit=contain") ? "contain" : "cover"}
+            onChange={(e) => commit(rows.map((x, j) => (j === i ? { ...x, url: x.url.replace(/fit=(cover|contain)/, `fit=${e.target.value}`) } : x)))}
+            className="h-7 rounded-md bg-transparent px-1 text-[12.5px] text-[#5a6270]"
+          >
+            <option value="cover">Fyll skärmen</option>
+            <option value="contain">Hela bilden</option>
+          </select>
+        );
         return (
           <div key={i} className={`relative flex w-full min-w-0 flex-wrap items-center gap-1.5 ${state === "expired" ? "opacity-55" : ""}`}>
             <span className="w-4 shrink-0 text-center text-[12px] font-bold text-[#5a6270]">{i + 1}</span>
-            {p.media ? (
+            {sid ? (
+              <SnapRowBox id={sid} snap={snapById.get(sid)} signage={signage} onSnap={onSnap} fitSelect={fitSelect} />
+            ) : p.media ? (
               <span className={`${BOX} flex min-w-[120px] flex-1 items-center gap-2 py-0.5 pl-0.5 pr-1.5`}>
                 <MediaThumb item={m} id={p.media} fileBase={signage.fileBase} />
                 <span className="min-w-0 flex-1 truncate">{m ? m.name : "Filen finns inte längre"}</span>
-                <select
-                  aria-label={`${label}, sida ${i + 1}, storlek`}
-                  value={p.url.includes("fit=contain") ? "contain" : "cover"}
-                  onChange={(e) => commit(rows.map((x, j) => (j === i ? { ...x, url: x.url.replace(/fit=(cover|contain)/, `fit=${e.target.value}`) } : x)))}
-                  className="h-7 rounded-md bg-transparent px-1 text-[12.5px] text-[#5a6270]"
-                >
-                  <option value="cover">Fyll skärmen</option>
-                  <option value="contain">Hela bilden</option>
-                </select>
+                {fitSelect}
               </span>
             ) : (
               <input
@@ -824,7 +858,7 @@ function PageList({
             </span>
             {dating === i && (
               <DatesPopover
-                title={`När visas ${p.media ? (m?.name ?? "filen") : pageName(p, byId)}?`}
+                title={`När visas ${pageName(p, byId, snapById)}?`}
                 subtitle={`Sida ${i + 1} i ${label}`}
                 start={p.start}
                 end={p.end}
@@ -842,12 +876,23 @@ function PageList({
       <div className="flex flex-wrap gap-4 py-0.5">
         <button type="button" onClick={() => setRows((r) => [...r, { url: "", s: null }])} className={LINK}>+ Lägg till sida</button>
         <button type="button" onClick={() => setPicking((p) => !p)} aria-expanded={picking} className={LINK}>+ Bild, film eller pdf</button>
+        <button type="button" onClick={() => setSnapping((p) => !p)} aria-expanded={snapping} className={LINK}>+ Sida som bild</button>
         {purge && expired > 0 && (
           <button type="button" onClick={() => commit(rows.filter((p) => dateState(p.start, p.end, today!) !== "expired"))} className={LINK}>
             Ta bort utgångna ({expired})
           </button>
         )}
       </div>
+      {snapping && (
+        <SnapForm
+          onCancel={() => setSnapping(false)}
+          onAdded={(snap) => {
+            onSnap(snap);
+            commit([...rows, { url: `${signage.snapBase}${snap.id}?fit=cover`, s: null }]);
+            setSnapping(false);
+          }}
+        />
+      )}
       {picking && (
         <MediaPicker
           media={media}
@@ -944,10 +989,135 @@ function withDates(p: SignPage, start?: string, end?: string): SignPage {
   return next;
 }
 
-/** What a row is called in texts: the file's name, or the address without https:// */
-function pageName(p: SignPage, byId: Map<string, SignMedia>): string {
+const bareUrl = (url: string) => url.replace(/^https?:\/\//, "").replace(/\/$/, "");
+
+/** What a row is called in texts: the file's name, the page behind a Sida som bild, or the address */
+function pageName(p: SignPage, byId: Map<string, SignMedia>, snapById: Map<string, SignSnap>): string {
   if (p.media) return byId.get(p.media)?.name ?? "filen";
-  return p.url.replace(/^https?:\/\//, "").replace(/\/$/, "") || "sidan";
+  const sid = snapIdOf(p.url);
+  if (sid) return snapById.get(sid) ? bareUrl(snapById.get(sid)!.url) : "sidan som bild";
+  return bareUrl(p.url) || "sidan";
+}
+
+/** The id of a Sida som bild row (/api/sign/s/<id>), or null */
+function snapIdOf(url: string): string | null {
+  return /\/api\/sign\/s\/([a-z0-9]{20,32})(?:[?#]|$)/.exec(url)?.[1] ?? null;
+}
+
+const clock = (iso: string) => new Date(iso).toLocaleString("sv-SE", { timeZone: "Europe/Stockholm", hour: "2-digit", minute: "2-digit" });
+const dayClock = (iso: string) =>
+  new Date(iso).toLocaleString("sv-SE", { timeZone: "Europe/Stockholm", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).replace(".", "");
+
+/** A Sida som bild row: the latest image, the page behind it, and how the latest render went */
+function SnapRowBox({ id, snap, signage, onSnap, fitSelect }: { id: string; snap?: SignSnap; signage: SignageProps; onSnap: (s: SignSnap) => void; fitSelect: React.ReactNode }) {
+  const [busy, setBusy] = useState(false);
+  const now = useMinute();
+  const old = snap?.renderedAt && now ? now.getTime() - Date.parse(snap.renderedAt) > 3 * snap.refreshMin * 60_000 : false;
+  const failed = !!snap?.error && (!snap.renderedAt || (snap.errorAt ?? "") > snap.renderedAt);
+  const status = !snap
+    ? "Finns inte längre"
+    : !snap.renderedAt
+      ? failed
+        ? `Ingen bild: ${snap.error}`
+        : "Ingen bild än"
+      : `${now && Date.parse(snap.renderedAt) > now.getTime() - 20 * 3600_000 ? `Bild kl ${clock(snap.renderedAt)}` : `Bild ${dayClock(snap.renderedAt)}`} · var ${snap.refreshMin} min${failed ? ` · senaste försöket misslyckades: ${snap.error}` : ""}`;
+  const refresh = async () => {
+    setBusy(true);
+    try {
+      const res = await renderSnapAction(id);
+      if (res.ok) onSnap(res.snap);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const portrait = snap ? snap.height > snap.width : false;
+  const bad = failed || old || !snap;
+  return (
+    <>
+      <span className={`${BOX} flex min-w-[160px] flex-1 items-center gap-2 py-0.5 pl-0.5 pr-1.5`}>
+        {snap?.renderedAt ? (
+          // eslint-disable-next-line @next/next/no-img-element -- renderad av publicomtools själv
+          <img src={`${signage.snapImageBase}${id}/image?v=${Date.parse(snap.renderedAt)}`} alt="" loading="lazy" className={`shrink-0 rounded bg-kth-navy object-cover ${portrait ? "h-8 w-[18px]" : "h-8 w-12"}`} />
+        ) : (
+          <span className="flex h-8 w-12 shrink-0 items-center justify-center rounded-md bg-[#eceef1] text-[10px] font-semibold text-[#5a6270]">Bild</span>
+        )}
+        <span className="min-w-0 flex-1 truncate" title={snap?.url}>{snap ? bareUrl(snap.url) : "Sida som bild"}</span>
+        {fitSelect}
+      </span>
+      {/* Hur senaste bilden gick, på en egen rad under raden */}
+      <span className={`order-last flex basis-full items-center gap-2 pl-[22px] text-[12px] ${bad ? "font-semibold text-bad-ink" : "text-[#5a6270]"}`}>
+        <span className="min-w-0 truncate" title={status}>
+          {snap && `Sida som bild, ${portrait ? "stående" : "liggande"} · `}
+          {old && !failed ? `Gammal bild: ${status}` : status}
+        </span>
+        {snap && (
+          <button type="button" onClick={refresh} disabled={busy} title="Ta en ny bild nu" className="shrink-0 font-bold text-kth-blue disabled:opacity-50">
+            {busy ? "Tar bild…" : "Uppdatera nu"}
+          </button>
+        )}
+      </span>
+    </>
+  );
+}
+
+/** + Sida som bild: the address, orientation and how often; the first image is taken at once */
+function SnapForm({ onCancel, onAdded }: { onCancel: () => void; onAdded: (s: SignSnap) => void }) {
+  const [url, setUrl] = useState("");
+  const [orientation, setOrientation] = useState<"landscape" | "portrait">("landscape");
+  const [refreshMin, setRefreshMin] = useState(5);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const add = async () => {
+    setError(null);
+    setBusy(true);
+    try {
+      const res = await createSnapAction({ url, orientation, refreshMin });
+      if (!res.ok) setError(res.error);
+      else onAdded(res.snap);
+    } catch {
+      setError("Det gick inte att nå servern. Försök igen.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="flex flex-col gap-2.5 rounded-lg border border-[#d9dde2] bg-white p-3">
+      <p className="text-[12.5px] text-[#5a6270]">
+        Publicomtools öppnar sidan och tar en bild av den, som skylten visar i stället för sidan. För skärmar vars webbläsare inte klarar sidan (Samsung Tizen 4.0). Bilden står still mellan uppdateringarna.
+      </p>
+      <input
+        type="url"
+        value={url}
+        placeholder="https://apps.lib.kth.se/smartsigntools/…"
+        aria-label="Sidans adress"
+        onChange={(e) => setUrl(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && url.trim() && !busy && add()}
+        className={`${BOX} px-3`}
+      />
+      <div className="flex flex-wrap items-center gap-2 text-[13px]">
+        {(["landscape", "portrait"] as const).map((o) => (
+          <button key={o} type="button" aria-pressed={orientation === o} onClick={() => setOrientation(o)} className={pill(orientation === o)}>
+            {o === "landscape" ? "Liggande 1920×1080" : "Stående 1080×1920"}
+          </button>
+        ))}
+        <label className="ml-1 flex items-center gap-1.5 text-[#5a6270]">
+          Ny bild var
+          <select value={refreshMin} onChange={(e) => setRefreshMin(Number(e.target.value))} className="h-[30px] rounded-md border border-[#c4cad2] bg-white px-1.5 text-ink">
+            {[1, 2, 5, 10, 30, 60].map((m) => (
+              <option key={m} value={m}>{m} min</option>
+            ))}
+          </select>
+        </label>
+      </div>
+      {error && <p role="alert" className="text-[12.5px] font-semibold text-bad-ink">{error}</p>}
+      <div className="flex gap-2">
+        <button type="button" disabled={busy || !url.trim()} onClick={add} className="h-[34px] rounded-lg bg-kth-blue px-3.5 text-[13px] font-bold text-white disabled:opacity-40">
+          {busy ? "Tar första bilden…" : "Lägg till"}
+        </button>
+        <button type="button" onClick={onCancel} className="h-[34px] rounded-lg border border-[#c4cad2] bg-white px-3 text-[13px] font-semibold">Avbryt</button>
+      </div>
+    </div>
+  );
 }
 
 type DateMode = "always" | "from" | "to" | "between";

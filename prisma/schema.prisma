@@ -269,3 +269,26 @@ model Media {
   uploadedBy String
   createdAt  DateTime @default(now())
 }
+
+/// Sida som bild: a web page the snap service (snap/, headless Chromium) renders to a JPEG for
+/// signs that can't draw it themselves (Samsung Tizen 4.0). A playlist row is the address
+/// /api/sign/s/<id>; the image is rendered when a sign asks and it's older than refreshMin.
+model Snap {
+  id          String    @id @default(cuid())
+  url         String
+  width       Int
+  height      Int
+  refreshMin  Int
+  /// The latest good image: MEDIA_DIR/snap/<id>.jpg
+  renderedAt  DateTime?
+  renderMs    Int?
+  bytes       Int?
+  /// The latest failure (the previous image is kept and shown meanwhile)
+  error       String?
+  errorAt     DateTime?
+  requestedAt DateTime?
+  createdBy   String
+  createdAt   DateTime  @default(now())
+
+  @@unique([url, width, height])
+}

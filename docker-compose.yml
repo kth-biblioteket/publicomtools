@@ -17,8 +17,6 @@ services:
   publicomtools:
     container_name: publicomtools
     image: ghcr.io/kth-biblioteket/publicomtools:${REPO_TYPE}
-    depends_on:
-      - publicomtools-db
     restart: always
     environment:
       TZ: ${TZ}
@@ -33,6 +31,9 @@ services:
     #   mkdir -p /local/docker/publicomtools/media && chown 1001:1001 /local/docker/publicomtools/media
     volumes:
       - "/local/docker/publicomtools/media:/data/media"
+    depends_on:
+      - publicomtools-db
+      - publicomtools-snap
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.publicomtools.rule=Host(`${DOMAIN_NAME}`) && PathPrefix(`${PATHPREFIX}`)"
@@ -41,6 +42,20 @@ services:
       - "traefik.http.routers.publicomtools.tls.certresolver=myresolver"
     networks:
       - "apps-net"
+      - "snap-net"
+
+  # Sida som bild: headless Chromium som renderar skyltsidor till bilder åt publicomtools (snap/).
+  # Bara på det egna nätet snap-net: publicomtools når den på http://publicomtools-snap:3000,
+  # men den når inte databasen eller andra tjänster på apps-net. Ingen volym och ingen port utåt.
+  publicomtools-snap:
+    container_name: publicomtools-snap
+    image: ghcr.io/kth-biblioteket/publicomtools-snap:${REPO_TYPE}
+    restart: always
+    mem_limit: 768m
+    environment:
+      TZ: ${TZ}
+    networks:
+      - "snap-net"
 
   publicomtools-db:
     container_name: publicomtools-db
@@ -64,3 +79,5 @@ volumes:
 networks:
   apps-net:
     external: true
+  snap-net:
+    name: publicomtools-snap-net

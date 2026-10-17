@@ -11,6 +11,7 @@ import { headers } from "next/headers";
 import sharp from "sharp";
 import { withBasePath } from "@/lib/base-path";
 import { db } from "@/lib/db";
+import { listSnaps } from "@/lib/snap";
 
 /**
  * The signs' media library. Files live in MEDIA_DIR (a bind mount on the server,
@@ -252,9 +253,12 @@ export async function signageProps(catalog: { key: string }[]) {
   const h = await headers();
   const origin = `${h.get("x-forwarded-proto") ?? "http"}://${h.get("x-forwarded-host") ?? h.get("host")}`;
   const base = withBasePath("/api/sign");
-  const rows = await db.media.findMany({ orderBy: { createdAt: "desc" } });
+  const [rows, snaps] = await Promise.all([db.media.findMany({ orderBy: { createdAt: "desc" } }), listSnaps()]);
   return {
     media: rows.map((m) => ({ id: m.id, name: m.name, kind: m.kind === "video" ? ("video" as const) : ("image" as const), durationMs: m.durationMs })),
+    snaps,
+    snapBase: `${origin}${base}/s/`,
+    snapImageBase: `${base}/s/`,
     viewBase: `${origin}${base}/m/`,
     fileBase: `${base}/f/`,
     uploadUrl: withBasePath("/media/upload"),

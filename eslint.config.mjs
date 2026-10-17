@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Renderingstjänsten är en egen liten Node-tjänst (CommonJS), inte en del av Next-appen
+    "snap/**",
   ]),
 ]);
 

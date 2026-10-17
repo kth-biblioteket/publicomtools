@@ -4,3 +4,5 @@ node_modules
 publicomtools.env
 .git
 src/generated
+# Renderingstjänsten byggs som en egen avbild (snap/Dockerfile)
+snap

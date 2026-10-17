@@ -45,6 +45,21 @@ jobs:
           build-args: |
             BASE_PATH=/publicomtools
 
+      # Renderingstjänsten för Sida som bild (snap/), en egen avbild med samma taggar
+      - name: Extract metadata for the snap image
+        id: meta-snap
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-snap
+
+      - name: Build and push snap image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./snap
+          push: true
+          tags: ${{ steps.meta-snap.outputs.tags }}
+          labels: ${{ steps.meta-snap.outputs.labels }}
+
   deploy:
     needs: build-and-push-image
     runs-on: ubuntu-latest
