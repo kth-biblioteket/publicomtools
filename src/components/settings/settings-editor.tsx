@@ -185,7 +185,8 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
       (k) => SIGN_KEYS.includes(k.key),
     );
   // Typkorten och (för en skylt) skyltblocket står överst, som i designen; de tas ur grupperna
-  const signageTop = !!signage && computerType === "signage";
+  // Tizen-skärmar är bara skyltar: ingen typ att välja, skyltblocket är hela sidan
+  const signageTop = !!signage && (computerType === "signage" || data.platform === "tizen");
   const onTop = (k: CatalogEntry) =>
     k.key === typeMeta?.key ||
     (signageTop && (SIGN_KEYS.includes(k.key) || k.key === appsKey?.key || (data.platform === "android" && HOME_KEYS.includes(k.key))));

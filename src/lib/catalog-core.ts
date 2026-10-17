@@ -208,6 +208,7 @@ export type CatalogSource = { text: string; source: string; version: string };
 export const CATALOG_SOURCES: Record<Platform, { env: string; repo: string; ref: string }> = {
   linux: { env: "PUBLICOM_CATALOG", repo: "kth-biblioteket/publicom", ref: "stable" },
   android: { env: "ANDROID_CATALOG", repo: "kth-biblioteket/publikiosk", ref: "main" },
+  tizen: { env: "TIZEN_CATALOG", repo: "kth-biblioteket/publiplayer", ref: "main" },
 };
 
 /** The branch a platform's catalog is read from ("stable", "main"), or "lokal fil". */

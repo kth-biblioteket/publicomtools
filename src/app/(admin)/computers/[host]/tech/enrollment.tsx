@@ -14,8 +14,11 @@ export function Enrollment({
   codeExpiresAt,
   recoveryCode,
   unlockRequestedAt,
+  tizen = false,
 }: {
   host: string;
+  /** A Tizen screen (PubLiPlayer): the code is entered on the screen's own enrollment view; no PIN menu */
+  tizen?: boolean;
   enrolledAt: string | null;
   codeExpiresAt: string | null;
   /** Unlocks the settings menu on the device without network (forgotten PIN) */
@@ -55,7 +58,11 @@ export function Enrollment({
 
       {code ? (
         <div className="mt-3 flex flex-col gap-2 rounded-[10px] bg-[#eef6ff] px-4 py-3.5">
-          <span className="text-sm">Ange koden i appen på enheten: menyn (5 tryck nere till höger) → Anslut till publicomtools.</span>
+          <span className="text-sm">
+            {tizen
+              ? "Ange koden i PubLiPlayer på skärmen (inskrivningen visas när spelaren saknar nyckel)."
+              : "Ange koden i appen på enheten: menyn (5 tryck nere till höger) → Anslut till publicomtools."}
+          </span>
           <span className="font-mono text-[28px] font-extrabold tracking-[0.15em]">{code.code}</span>
           <span className="text-[13px] text-muted">
             Gäller en gång, till {time(code.expiresAt)}. Koden visas bara nu.
@@ -91,7 +98,7 @@ export function Enrollment({
           )}
         </div>
       )}
-      {enrolledAt && (
+      {enrolledAt && !tizen && (
         <div className="mt-5 border-t border-line-soft pt-4">
           <h3 className="text-[15px] font-extrabold">Menyn på enheten</h3>
           <p className="mt-1 text-sm text-muted">

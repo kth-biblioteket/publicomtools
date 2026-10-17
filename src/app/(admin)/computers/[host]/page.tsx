@@ -86,7 +86,12 @@ export default async function ComputerOverviewPage({ params }: PageProps<"/compu
             <dd>{s ? `${formatAgo(c.lastSeenAt, now)} (${formatWhen(c.lastSeenAt, now)})` : "aldrig"}</dd>
             <dt className="text-muted">Igång sedan</dt>
             <dd>{s ? formatDuration(s.uptimeSeconds) : "–"}</dd>
-            {c.platform === "android" ? (
+            {c.platform === "tizen" ? (
+              <>
+                <dt className="text-muted">Sidan</dt>
+                <dd>{s?.pageLoaded === undefined ? "–" : s.pageLoaded ? "Laddad" : "Inte laddad"}</dd>
+              </>
+            ) : c.platform === "android" ? (
               <>
                 <dt className="text-muted">Startsidan</dt>
                 <dd>{s?.pageLoaded === undefined ? "–" : s.pageLoaded ? "Laddad" : "Inte laddad"}</dd>
@@ -115,7 +120,7 @@ export default async function ComputerOverviewPage({ params }: PageProps<"/compu
             <dt className="text-muted">Inställningar</dt>
             <dd>
               {c.configState === "new"
-                ? c.platform === "android"
+                ? c.platform !== "linux"
                   ? "Inte hämtade än (enheten är inte inskriven)"
                   : "Inte hämtade än (datorn är inte installerad)"
                 : c.configState === "legacy"

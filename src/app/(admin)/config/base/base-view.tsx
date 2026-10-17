@@ -1,20 +1,20 @@
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
-import { baseTarget, PLATFORMS, PLATFORM_LABEL, type Platform } from "@/lib/platforms";
+import { baseTarget, deviceNoun, PLATFORMS, PLATFORM_LABEL, type Platform } from "@/lib/platforms";
 import { signageProps } from "@/lib/media";
 import { getSettingsData } from "@/lib/settings";
 import { SettingsEditor } from "@/components/settings/settings-editor";
 import { Tabs } from "@/components/ui/tabs";
 
-/** Grundinställningar för en plattform (/config/base = Linux, /config/base/android). */
+/** Grundinställningar för en plattform (/config/base = Linux, /config/base/android, /config/base/tizen). */
 export async function BaseView({ platform }: { platform: Platform }) {
   await requireAdmin();
   const target = baseTarget(platform);
   const data = await getSettingsData(target);
   if (!data) notFound();
   const n = data.computers.length;
-  const devices = platform === "android" ? (n === 1 ? "Android-enhet" : "Android-enheter") : n === 1 ? "dator" : "datorer";
-  const all = platform === "android" ? "alla Android-enheter" : "alla datorer";
+  const devices = deviceNoun(platform, n);
+  const all = `alla ${deviceNoun(platform, 2)}`;
   const href = platform === "linux" ? "/config/base" : `/config/base/${platform}`;
 
   return (
@@ -22,7 +22,7 @@ export async function BaseView({ platform }: { platform: Platform }) {
       <div>
         <h1 className="text-[26px] font-extrabold tracking-tight">Grundinställningar</h1>
         <p className="mt-1 max-w-[640px] text-sm text-muted">
-          Gäller {n === 1 ? "den enda" : `alla ${n}`} {devices}. Profiler och enskilda {platform === "android" ? "enheter" : "datorer"} kan ändra dem.
+          Gäller {n === 1 ? "den enda" : `alla ${n}`} {devices}. Profiler och enskilda {platform === "linux" ? "datorer" : "enheter"} kan ändra dem.
         </p>
       </div>
       <Tabs

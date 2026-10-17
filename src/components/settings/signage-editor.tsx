@@ -163,7 +163,7 @@ export function SignageEditor({
   const color = (name: string) => COLORS[Math.max(0, names.indexOf(name)) % COLORS.length];
   const [open, setOpen] = useState<string | null>(names[0] ?? null);
   const openList = open && open in sched.lists ? open : (names[0] ?? null);
-  const fallback = platform === "android" ? "startsidan" : "första Startsidan";
+  const fallback = platform === "android" ? "startsidan" : platform === "tizen" ? "en svart skärm" : "första Startsidan";
 
   // Visas nu och nästa byte, med samma regler som kioskerna; bara i webbläsaren (useMinute)
   const now = useMinute();

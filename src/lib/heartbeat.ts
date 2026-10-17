@@ -44,8 +44,8 @@ export const heartbeatSchema = z.object({
     })
     .optional(),
 
-  // Android (PubLiKiosk)
-  platform: z.enum(["linux", "android"]).optional(),
+  // Android (PubLiKiosk) and Tizen (PubLiPlayer, the same fields except battery, kiosk lock and visits)
+  platform: z.enum(["linux", "android", "tizen"]).optional(),
   appVersion: z.string().max(40).optional(),
   model: z.string().max(100).optional(),
   webViewVersion: z.string().max(40).optional(),

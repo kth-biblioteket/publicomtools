@@ -11,6 +11,7 @@ import { headers } from "next/headers";
 import sharp from "sharp";
 import { withBasePath } from "@/lib/base-path";
 import { db } from "@/lib/db";
+import { asPlatform, PLATFORM_SHORT } from "@/lib/platforms";
 import { listSnaps } from "@/lib/snap";
 
 /**
@@ -208,7 +209,7 @@ export async function mediaUsage(): Promise<Map<string, string[]>> {
   ]);
   const texts = [
     ...layers.map((l) => ({
-      label: l.kind === "base" ? `Grundinställningar ${l.platform === "android" ? "Android" : "Linux"}` : `Profil ${l.label || l.name}`,
+      label: l.kind === "base" ? `Grundinställningar ${PLATFORM_SHORT[asPlatform(l.platform)]}` : `Profil ${l.label || l.name}`,
       text: JSON.stringify(l.values),
     })),
     ...computers.map((c) => ({ label: c.label || c.computerName || c.host, text: JSON.stringify(c.overrides) })),

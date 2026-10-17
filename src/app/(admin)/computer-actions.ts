@@ -6,7 +6,7 @@ import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Prisma } from "@/generated/prisma/client";
 import { PROFILE_KEY } from "@/lib/settings-shared";
-import { asPlatform } from "@/lib/platforms";
+import { asPlatform, deviceNoun, enrolls } from "@/lib/platforms";
 
 export type AddComputerState = { error?: string } | undefined;
 
@@ -53,7 +53,7 @@ export async function addComputerAction(_prev: AddComputerState, form: FormData)
           target: `host:${host}`,
           snapshot: { profile, overrides: {} },
           changedBy: user.email,
-          note: platform === "android" ? "Ny Android-enhet" : "Ny dator",
+          note: platform === "linux" ? "Ny dator" : `Ny ${deviceNoun(platform, 1)}`,
           changes: [{ key: PROFILE_KEY, before: null, after: profile }],
         },
       }),
@@ -65,6 +65,6 @@ export async function addComputerAction(_prev: AddComputerState, form: FormData)
     throw e;
   }
   revalidatePath("/", "layout");
-  // Android: next step is the enrollment code (Teknik)
-  redirect(platform === "android" ? `/computers/${host}/tech` : `/computers/${host}/settings`);
+  // Android, Tizen: next step is the enrollment code (Teknik)
+  redirect(enrolls(platform) ? `/computers/${host}/tech` : `/computers/${host}/settings`);
 }

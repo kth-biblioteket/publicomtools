@@ -46,7 +46,12 @@ export default async function ComputerTechPage({ params }: PageProps<"/computers
     ["IP-adress", c.lastIp ?? "–"],
     ["System", s ? `${s.os ?? "–"}${s.kernel ? ` (${s.kernel})` : ""}` : "–"],
     ["Kod", s ? `${s.branch ?? "–"}, ${formatTime(s.deployedAt)}${s.deployFilesChanged !== undefined ? ` (${s.deployFilesChanged} filer)` : ""}` : "–"],
-    ...(c.platform === "android"
+    ...(c.platform === "tizen"
+      ? ([
+          ["Spelare", s?.appVersion ?? "–"],
+          ["Modell", s?.model ?? "–"],
+        ] as [string, React.ReactNode][])
+      : c.platform === "android"
       ? ([
           ["App", s?.appVersion ?? "–"],
           ["Modell", s?.model ?? "–"],
@@ -73,13 +78,14 @@ export default async function ComputerTechPage({ params }: PageProps<"/computers
 
   return (
     <div className="flex flex-col gap-5">
-      {c.platform === "android" && (
+      {c.platform !== "linux" && (
         <Enrollment
           host={c.host}
           enrolledAt={c.enrolledAt?.toISOString() ?? null}
           codeExpiresAt={c.enrollCodeExpiresAt?.toISOString() ?? null}
           recoveryCode={row.recoveryCode}
           unlockRequestedAt={row.pinUnlockRequestedAt?.toISOString() ?? null}
+          tizen={c.platform === "tizen"}
         />
       )}
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">

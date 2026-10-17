@@ -145,10 +145,16 @@ export function toView(computer: ComputerRow, times?: LayerTimes, now = new Date
     : {
         health: "warning",
         problems: [
-          platform === "android"
+          platform !== "linux"
             ? computer.enrolledAt
-              ? { text: "Enheten har inte rapporterat någon status än", hint: "Den visas när appen skickat sin första statusrapport." }
-              : { text: "Väntar på inskrivning", hint: "Öppna appens meny på enheten, välj Anslut till publicomtools och ange koden. En ny kod får du under Teknik." }
+              ? { text: "Enheten har inte rapporterat någon status än", hint: `Den visas när ${platform === "tizen" ? "spelaren" : "appen"} skickat sin första statusrapport.` }
+              : {
+                  text: "Väntar på inskrivning",
+                  hint:
+                    platform === "tizen"
+                      ? "Starta PubLiPlayer på skärmen och ange koden. En ny kod får du under Teknik."
+                      : "Öppna appens meny på enheten, välj Anslut till publicomtools och ange koden. En ny kod får du under Teknik.",
+                }
             : computer.addedBy
               ? { text: "Väntar på installation", hint: "Installera datorn enligt docs/installera.md i publicom. Den hämtar sina inställningar härifrån och syns som OK efter första statusrapporten." }
               : { text: "Datorn har inte rapporterat någon status än", hint: "Den visas när den skickat sin första statusrapport." },

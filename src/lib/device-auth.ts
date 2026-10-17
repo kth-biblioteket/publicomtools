@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { db } from "@/lib/db";
+import { asPlatform, enrolls } from "@/lib/platforms";
 
 /**
  * Devices authenticate with "Authorization: Bearer <token>":
@@ -60,10 +61,10 @@ export async function authenticateDevice(request: Request): Promise<{ identity: 
 
 /**
  * Whether the caller may read or report for this host: a device token only for its own device,
- * the shared token only for computers that are not Android (those have their own tokens).
+ * the shared token only for Linux computers (Android and Tizen devices have their own tokens).
  */
 export async function mayActFor(identity: DeviceIdentity, host: string): Promise<boolean> {
   if (identity.kind === "device") return identity.host === host;
   const c = await db.computer.findUnique({ where: { host }, select: { platform: true } });
-  return !c || c.platform !== "android";
+  return !c || !enrolls(asPlatform(c.platform));
 }

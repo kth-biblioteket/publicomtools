@@ -8,7 +8,7 @@ import type { ConfigState } from "@/lib/computers";
 import { HealthBadge } from "@/components/health-badge";
 import { Chip } from "@/components/ui/chip";
 import { PauseIcon, PlayIcon, SearchIcon } from "@/components/ui/icons";
-import { PLATFORMS, PLATFORM_LABEL, PLATFORM_SHORT, type Platform } from "@/lib/platforms";
+import { enrolls, PLATFORMS, PLATFORM_LABEL, PLATFORM_SHORT, type Platform } from "@/lib/platforms";
 
 export type ComputerRow = {
   host: string;
@@ -29,7 +29,7 @@ const REFRESH_MS = 30_000;
 
 function ConfigChip({ state, platform }: { state: ConfigState; platform: Platform }) {
   if (state === "pending") return <Chip tone="draft" title="Inställningar har ändrats efter att datorn senast startade">Väntar på omstart</Chip>;
-  if (state === "new" && platform === "android")
+  if (state === "new" && enrolls(platform))
     return <Chip tone="draft" title="Tillagd i admin, men enheten är inte inskriven och har inte hämtat sina inställningar än">Väntar på inskrivning</Chip>;
   if (state === "new") return <Chip tone="draft" title="Tillagd i admin, men datorn har inte installerats och hämtat sina inställningar än">Väntar på installation</Chip>;
   if (state === "legacy") return <Chip title="Datorn hämtar fortfarande sina inställningar från de gamla configfilerna på GitHub">Gamla configfiler</Chip>;

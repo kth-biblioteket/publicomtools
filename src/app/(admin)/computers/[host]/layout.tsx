@@ -54,8 +54,9 @@ export default async function ComputerLayout({ params, children }: LayoutProps<"
               />
             </>
           )}
-          {/* Datorer med gamla configfiler, eller som inte är installerade, kör inte koden som kan starta om */}
-          {(c.configState === "current" || c.configState === "pending") && !c.reloadRequestedAt && (
+          {/* Datorer med gamla configfiler, eller som inte är installerade, kör inte koden som kan starta om.
+              En Tizen-skärm kan inte startas om utifrån (det kräver Samsungs partnercertifikat). */}
+          {(c.configState === "current" || c.configState === "pending") && !c.reloadRequestedAt && c.platform !== "tizen" && (
             <RebootButton
               host={c.host}
               name={c.name}
@@ -65,7 +66,7 @@ export default async function ComputerLayout({ params, children }: LayoutProps<"
             />
           )}
           {c.configState === "legacy" && <Chip>Gamla configfiler</Chip>}
-          {c.configState === "new" && <Chip tone="draft">{c.platform === "android" ? "Väntar på inskrivning" : "Väntar på installation"}</Chip>}
+          {c.configState === "new" && <Chip tone="draft">{c.platform !== "linux" ? "Väntar på inskrivning" : "Väntar på installation"}</Chip>}
         </div>
       </div>
       <Tabs

@@ -337,7 +337,7 @@ function DeviceTable({
               <tr key={d.host} className="border-b border-line-soft last:border-0">
                 <td className="py-2.5 pr-3">
                   <Link href={href(d.host)} className="font-semibold text-kth-blue">{d.name}</Link>
-                  {d.platform === "android" && <span className="ml-1.5 text-[12px] text-muted">Android</span>}
+                  {d.platform !== "linux" && <span className="ml-1.5 text-[12px] text-muted">{d.platform === "tizen" ? "Tizen" : "Android"}</span>}
                 </td>
                 <td className="py-2.5 pr-3 text-muted">{profile(d.profile)}</td>
                 <td className="py-2.5 pr-3 text-right tabular-nums">{num(d.visits)}</td>

@@ -40,7 +40,9 @@ export function evaluate(lastSeenAt: Date, status: HeartbeatStatus, now = new Da
         {
           text: `Ingen kontakt sedan ${formatWhen(lastSeenAt, now)}`,
           hint:
-            status.platform === "android"
+            status.platform === "tizen"
+              ? "Kontrollera att skärmen är påslagen, ansluten till nätet och att PubLiPlayer är igång."
+              : status.platform === "android"
               ? "Kontrollera att enheten är påslagen, har ström och är ansluten till Wi-Fi."
               : "Kontrollera att datorn är påslagen och att nätverkskabeln sitter i.",
           detail: `senaste heartbeat ${formatTime(lastSeenAt)}`,
@@ -50,6 +52,12 @@ export function evaluate(lastSeenAt: Date, status: HeartbeatStatus, now = new Da
   }
 
   const problems: Problem[] = [];
+  if (status.platform === "tizen" && status.pageLoaded === false)
+    problems.push({
+      text: "Sidan har inte laddats",
+      hint: "Kontrollera nätet och skyltens sidor. Stäng av och slå på skärmen om det inte löser sig.",
+      detail: "pageLoaded: false",
+    });
   if (status.platform === "android") {
     if (status.kioskLocked === false)
       problems.push({

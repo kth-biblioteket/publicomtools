@@ -5,7 +5,7 @@ import { UsageView, visitLimit } from "@/components/stats/usage-view";
 
 export const dynamic = "force-dynamic";
 
-const PLATFORM_LABELS: Record<string, string> = { linux: "Datorer (Linux)", android: "Kiosker (Android)" };
+const PLATFORM_LABELS: Record<string, string> = { linux: "Datorer (Linux)", android: "Kiosker (Android)", tizen: "Skyltar (Tizen)" };
 
 export default async function StatsPage({ searchParams }: PageProps<"/stats">) {
   await requireAdmin();

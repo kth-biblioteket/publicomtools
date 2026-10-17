@@ -23,7 +23,7 @@ export default async function ProfilesPage() {
       </div>
       {PLATFORMS.map((platform) => {
         const list = profiles.filter((p) => p.platform === platform);
-        // Android shows up once it has a profile
+        // Android och Tizen syns när de har en profil
         if (!list.length && platform !== "linux") return null;
         return (
           <section key={platform} className="flex flex-col gap-3">
@@ -38,7 +38,7 @@ export default async function ProfilesPage() {
                   {p.description && <span className="text-sm text-muted">{p.description}</span>}
                   <span className="text-[13px] text-muted">
                     {p.keyCount} egna inställningar · {p.computers.length}{" "}
-                    {platform === "android" ? (p.computers.length === 1 ? "enhet" : "enheter") : p.computers.length === 1 ? "dator" : "datorer"}
+                    {platform === "linux" ? (p.computers.length === 1 ? "dator" : "datorer") : p.computers.length === 1 ? "enhet" : "enheter"}
                   </span>
                   {p.computers.length > 0 && (
                     <span className="flex flex-wrap gap-1.5">

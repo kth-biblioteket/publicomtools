@@ -13,7 +13,7 @@ model Computer {
   /// The publicom config name (config/hosts/<host>.env), e.g. "gc1".
   host         String      @id
   hostname     String
-  /// "linux" (publicom) or "android" (PubLiKiosk): which catalog, base layer and profiles apply
+  /// "linux" (publicom), "android" (PubLiKiosk) or "tizen" (PubLiPlayer): which catalog, base layer and profiles apply
   platform     String      @default("linux")
   profile      String?
   computerType String?

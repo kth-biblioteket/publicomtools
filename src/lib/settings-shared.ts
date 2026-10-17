@@ -45,12 +45,12 @@ export const PROFILE_KEY = "__profile";
 /**
  * Why a value can't be saved, or null. Every character is allowed. platform: the Linux computers get
  * their settings as one KEY="value" line each (read verbatim by load_config, see publicom
- * config_lib.sh), so a line break can't be part of a value there; the Android tablets get JSON.
+ * config_lib.sh), so a line break can't be part of a value there; Android and Tizen get JSON.
  * (Requires publicom's init.sh with the format check instead of bash -n, which rejected the whole
  * file for a value with an odd number of ".)
  */
 export function validateValue(meta: Pick<CatalogEntry, "type" | "options"> & { key?: string }, value: string, platform?: string): string | null {
-  if (platform !== "android" && /[\r\n]/.test(value)) return "Får inte innehålla radbrytningar.";
+  if ((platform ?? "linux") === "linux" && /[\r\n]/.test(value)) return "Får inte innehålla radbrytningar.";
   if (meta.key === SIGN_PAGES_KEY) return signPagesProblem(value, platform);
   if (meta.key === SIGN_SCHEDULE_KEY) return scheduleProblem(value, platform);
   switch (meta.type) {
@@ -382,7 +382,7 @@ export function settingWarnings(
     if (!parseSignPages(value(SIGN_PAGES_KEY)).length && !lists.some((l) => l.length))
       warnings.push({
         key: SIGN_PAGES_KEY,
-        message: `Lägg till sidorna skylten ska visa. Utan sidor visar den ${platform === "android" ? "startsidan" : "första Startsidan"}.`,
+        message: `Lägg till sidorna skylten ska visa. Utan sidor visar den ${platform === "android" ? "startsidan" : platform === "tizen" ? "en svart skärm" : "första Startsidan"}.`,
       });
   }
   // A csv list with options (the screensaver images) is picked from the options; an older value

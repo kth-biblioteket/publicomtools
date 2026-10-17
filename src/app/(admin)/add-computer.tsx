@@ -2,14 +2,16 @@
 
 import { useActionState, useState } from "react";
 import { addComputerAction } from "./computer-actions";
-import { PLATFORMS, PLATFORM_LABEL, type Platform } from "@/lib/platforms";
+import { enrolls, PLATFORMS, PLATFORM_LABEL, type Platform } from "@/lib/platforms";
 
-/** "Lägg till dator": prepare a computer or Android tablet in the admin before installing it. */
+/** "Lägg till dator": prepare a computer, Android tablet or Tizen screen in the admin before installing it. */
 export function AddComputer({ profiles }: { profiles: { name: string; label: string; platform: Platform }[] }) {
   const [open, setOpen] = useState(false);
   const [platform, setPlatform] = useState<Platform>("linux");
   const own = profiles.filter((p) => p.platform === platform);
-  const android = platform === "android";
+  const android = enrolls(platform);
+  // Var inskrivningskoden anges
+  const where = platform === "tizen" ? "PubLiPlayer på skärmen" : "appen på enheten";
   const [state, action, pending] = useActionState(addComputerAction, undefined);
 
   return (
@@ -24,7 +26,7 @@ export function AddComputer({ profiles }: { profiles: { name: string; label: str
               <h2 id="add-h" className="text-xl font-extrabold">Lägg till dator</h2>
               <p className="mt-1 text-sm text-muted">
                 {android
-                  ? "Förbered enheten här. Sedan skapar du en inskrivningskod, som du anger i appen på enheten."
+                  ? `Förbered enheten här. Sedan skapar du en inskrivningskod, som du anger i ${where}.`
                   : "Förbered datorn här innan den installeras. Den hämtar sina inställningar härifrån vid första starten."}
               </p>
             </div>
@@ -47,7 +49,7 @@ export function AddComputer({ profiles }: { profiles: { name: string; label: str
                   required
                   autoFocus
                   pattern="[a-z0-9][a-z0-9-]{0,62}"
-                  placeholder={android ? "t.ex. kiosk1" : "t.ex. gc4"}
+                  placeholder={platform === "tizen" ? "t.ex. skylt1" : android ? "t.ex. kiosk1" : "t.ex. gc4"}
                   autoComplete="off"
                   className="h-[38px] rounded-lg border border-field px-3 font-mono text-sm font-normal"
                 />
