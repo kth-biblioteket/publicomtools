@@ -52,8 +52,10 @@ services:
     mem_limit: 768m
     environment:
       TZ: ${TZ}
-      # Sidor på serverns eget namn hämtas direkt från Traefik-containern: inifrån en container
-      # svarar serverns publika adress inte (brandväggen), men Traefik nås på apps-net
+      # Sidor och anrop till namn som pekar på den här servern hämtas direkt från Traefik-containern:
+      # inifrån en container svarar serverns publika adress inte (brandväggen), men Traefik nås på
+      # apps-net. Kommaseparerat; prod: "apps.lib.kth.se,api.lib.kth.se" (öppettiderna i
+      # librarytoday hämtas från api.lib.kth.se, som ligger på samma server)
       SNAP_LOCAL_HOSTS: ${DOMAIN_NAME}
       SNAP_LOCAL_TARGET: traefik
     networks:
