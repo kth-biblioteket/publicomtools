@@ -34,12 +34,14 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: |
           echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "Ogiltig version: $VERSION"; exit 1; }
-          # Ett nytt försök om AWS spegel svarar 429
+          # AWS spegel först, Docker Hub som reserv (samma officiella avbild); några försök var, eftersom
+          # båda kan svara 429 för GitHubs delade byggmaskiner. En lyckad kopiering räcker.
           for i in 1 2 3; do
-            docker buildx imagetools create \
-              -t "ghcr.io/kth-biblioteket/node:${VERSION}-alpine" \
-              "public.ecr.aws/docker/library/node:${VERSION}-alpine" && break
-            [ "$i" = 3 ] && exit 1
+            for src in "public.ecr.aws/docker/library/node:${VERSION}-alpine" "docker.io/library/node:${VERSION}-alpine"; do
+              echo "Kopierar från $src"
+              docker buildx imagetools create -t "ghcr.io/kth-biblioteket/node:${VERSION}-alpine" "$src" && ok=1 && break 2
+            done
             sleep 60
           done
+          [ "$ok" = 1 ] || exit 1
           docker buildx imagetools inspect "ghcr.io/kth-biblioteket/node:${VERSION}-alpine"
