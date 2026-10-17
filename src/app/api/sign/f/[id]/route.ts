@@ -20,9 +20,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     if (!path || !row) throw new Error("unknown");
     size = (await stat(path)).size;
   } catch {
-    return new Response("Hittar inte filen.", { status: 404 });
+    return new Response("Hittar inte filen.", { status: 404, headers: { "Access-Control-Allow-Origin": "*" } });
   }
   const headers: Record<string, string> = {
+    // Spelare på annan origin (Tizen) kontrollerar filen med fetch före visning
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Expose-Headers": "Content-Length, Content-Range, Accept-Ranges",
     "Content-Type": row.mime,
     "Cache-Control": "public, max-age=31536000, immutable",
     "X-Content-Type-Options": "nosniff",
@@ -43,3 +46,5 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const stream = Readable.toWeb(createReadStream(path)) as ReadableStream;
   return new Response(stream, { headers: { ...headers, "Content-Length": String(size) } });
 }
+
+export const HEAD = GET;

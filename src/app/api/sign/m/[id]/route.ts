@@ -34,6 +34,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   return new Response(html, {
     status: row ? 200 : 404,
     headers: {
+      // Spelare på annan origin (Tizen) kontrollerar sidan med fetch före visning
+      "Access-Control-Allow-Origin": "*",
       "Content-Type": "text/html; charset=utf-8",
       "Content-Security-Policy": "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'",
       "X-Content-Type-Options": "nosniff",
@@ -42,3 +44,5 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     },
   });
 }
+
+export const HEAD = GET;
