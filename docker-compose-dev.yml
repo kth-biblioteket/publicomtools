@@ -58,10 +58,9 @@ services:
         condition: service_healthy
     networks:
       - "apps-net"
-      - "snap-net"
 
-  # Sida som bild: headless Chromium som renderar skyltsidor till bilder (snap/). Bara på det
-  # egna nätet snap-net, som i produktion; publicomtools når den på http://publicomtools-snap:3000.
+  # Sida som bild: headless Chromium som renderar skyltsidor till bilder (snap/), på apps-net som
+  # i produktion; publicomtools når den på http://publicomtools-snap:3000.
   publicomtools-snap:
     container_name: publicomtools-snap
     build:
@@ -71,7 +70,7 @@ services:
     environment:
       TZ: ${TZ}
     networks:
-      - "snap-net"
+      - "apps-net"
 
 volumes:
   persistent-publicomtools-db:
@@ -80,4 +79,3 @@ volumes:
 networks:
   apps-net:
     external: true
-  snap-net:

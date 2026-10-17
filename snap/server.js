@@ -9,7 +9,12 @@
  *
  * Chromium hålls igång; varje rendering får ett eget tomt webbläsarkontext (inga kakor eller cache
  * mellan sidor) som stängs efteråt. Högst MAX_PARALLEL renderingar åt gången, resten köar.
- * Tjänsten har ingen databas och ingen volym och nås bara från publicomtools (eget nät).
+ * Tjänsten har ingen databas och ingen volym.
+ *
+ * SNAP_LOCAL_HOSTS (kommaseparerat, t.ex. apps.lib.kth.se) och SNAP_LOCAL_TARGET (t.ex. traefik):
+ * sidor på serverns eget namn hämtas från Traefik-containern direkt. Inifrån en container pekar
+ * serverns namn annars på dess publika adress, som inte svarar dit. Adressen i webbläsaren och
+ * certifikatet är desamma; bara vart anslutningen går ändras.
  */
 const http = require('node:http');
 const puppeteer = require('puppeteer-core');
@@ -21,6 +26,9 @@ const TIMEOUT_MS = 30_000;
 /** Längsta väntan på att sidans anrop blir klara efter att den laddats */
 const IDLE_MS = 12_000;
 const MAX_QUEUE = 20;
+const LOCAL_HOSTS = (process.env.SNAP_LOCAL_HOSTS || '').split(',').map((h) => h.trim()).filter((h) => /^[a-z0-9.-]+$/i.test(h));
+const LOCAL_TARGET = /^[a-z0-9.-]+$/i.test(process.env.SNAP_LOCAL_TARGET || '') ? process.env.SNAP_LOCAL_TARGET : '';
+const RESOLVER_RULES = LOCAL_TARGET && LOCAL_HOSTS.length ? [`--host-resolver-rules=${LOCAL_HOSTS.map((h) => `MAP ${h} ${LOCAL_TARGET}`).join(', ')}`] : [];
 
 let browser = null;
 let launching = null;
@@ -34,7 +42,7 @@ async function getBrowser() {
       headless: true,
       // --no-sandbox: Chromiums egen sandlåda kräver rättigheter som containern inte har; containern
       // kör i stället som vanlig användare utan databas, volym eller åtkomst till andra tjänster.
-      args: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--hide-scrollbars', '--force-color-profile=srgb', '--lang=sv-SE'],
+      args: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--hide-scrollbars', '--force-color-profile=srgb', '--lang=sv-SE', ...RESOLVER_RULES],
     })
     .then((b) => {
       browser = b;
@@ -150,7 +158,7 @@ http
       fail(res, (e && e.status) || 502, msg.replace(/^net::ERR_/, 'nätverksfel: ').slice(0, 300));
     }
   })
-  .listen(PORT, () => console.log(`publicomtools-snap lyssnar på ${PORT}`));
+  .listen(PORT, () => console.log(`publicomtools-snap lyssnar på ${PORT}${RESOLVER_RULES.length ? `, ${LOCAL_HOSTS.join(', ')} via ${LOCAL_TARGET}` : ''}`));
 
 for (const sig of ['SIGTERM', 'SIGINT'])
   process.on(sig, async () => {

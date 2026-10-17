@@ -42,11 +42,9 @@ services:
       - "traefik.http.routers.publicomtools.tls.certresolver=myresolver"
     networks:
       - "apps-net"
-      - "snap-net"
 
   # Sida som bild: headless Chromium som renderar skyltsidor till bilder åt publicomtools (snap/).
-  # Bara på det egna nätet snap-net: publicomtools når den på http://publicomtools-snap:3000,
-  # men den når inte databasen eller andra tjänster på apps-net. Ingen volym och ingen port utåt.
+  # publicomtools når den på http://publicomtools-snap:3000. Ingen volym och ingen port utåt.
   publicomtools-snap:
     container_name: publicomtools-snap
     image: ghcr.io/kth-biblioteket/publicomtools-snap:${REPO_TYPE}
@@ -54,14 +52,12 @@ services:
     mem_limit: 768m
     environment:
       TZ: ${TZ}
-    # Serverns eget namn (apps.lib.kth.se på prod) pekar inifrån en container på serverns publika
-    # adress, som inte svarar dit. host-gateway = servern själv, där Traefik tar emot på 443. Kräver
-    # att ufw släpper in snap-nätet (gränssnittet br-ptsnap nedan) på port 443:
-    #   sudo ufw allow in on br-ptsnap to any port 443 proto tcp comment 'publicomtools-snap till Traefik'
-    extra_hosts:
-      - "${DOMAIN_NAME}:host-gateway"
+      # Sidor på serverns eget namn hämtas direkt från Traefik-containern: inifrån en container
+      # svarar serverns publika adress inte (brandväggen), men Traefik nås på apps-net
+      SNAP_LOCAL_HOSTS: ${DOMAIN_NAME}
+      SNAP_LOCAL_TARGET: traefik
     networks:
-      - "snap-net"
+      - "apps-net"
 
   publicomtools-db:
     container_name: publicomtools-db
@@ -85,8 +81,3 @@ volumes:
 networks:
   apps-net:
     external: true
-  snap-net:
-    name: publicomtools-snap-net
-    driver_opts:
-      # Fast namn på nätets gränssnitt, så att ufw-regeln gäller även när nätet skapas om
-      com.docker.network.bridge.name: br-ptsnap
