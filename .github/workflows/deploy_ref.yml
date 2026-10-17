@@ -26,6 +26,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.DEPLOY_TOKEN }}
 
+      # Buildx med containerdrivrutin, så att lagren kan sparas i GitHubs byggcache (type=gha):
+      # oförändrade lager (npm ci, Chromium i snap) byggs då inte om vid nästa körning
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v5
@@ -39,6 +44,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=publicomtools
+          cache-to: type=gha,mode=max,scope=publicomtools
           # Baked into the Next.js build at compile time (see Dockerfile and
           # next.config.ts) — must match the Traefik PathPrefix this image
           # is deployed behind on apps-ref.lib.kth.se.
@@ -59,6 +66,8 @@ jobs:
           push: true
           tags: ${{ steps.meta-snap.outputs.tags }}
           labels: ${{ steps.meta-snap.outputs.labels }}
+          cache-from: type=gha,scope=publicomtools-snap
+          cache-to: type=gha,mode=max,scope=publicomtools-snap
 
   deploy:
     needs: build-and-push-image
