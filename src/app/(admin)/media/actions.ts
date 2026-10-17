@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentUser, isAdmin } from "@/lib/auth";
 import { deleteMedia } from "@/lib/media";
-import { ensureSnap, isSnapId, renderSnap, SNAP_REFRESH, SNAP_SIZES, toSnapInfo, type SnapInfo } from "@/lib/snap";
+import { ensureSnap, isSnapId, renderSnap, setSnapRefresh, SNAP_REFRESH, SNAP_SIZES, toSnapInfo, type SnapInfo } from "@/lib/snap";
 
 export async function deleteMediaAction(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const user = await getCurrentUser();
@@ -39,5 +39,18 @@ export async function renderSnapAction(id: string): Promise<{ ok: true; snap: Sn
   if (!user || !isAdmin(user)) return { ok: false, error: "Logga in som administratör." };
   if (!isSnapId(id)) return { ok: false, error: "Okänd bild." };
   const snap = await renderSnap(id);
+  return snap ? { ok: true, snap: toSnapInfo(snap) } : { ok: false, error: "Bilden finns inte längre." };
+}
+
+/**
+ * How often a Sida som bild gets a new image. Saved at once (it belongs to the image, not to a
+ * playlist row, so every list that shows the same address and orientation follows it).
+ */
+export async function setSnapRefreshAction(id: string, refreshMin: number): Promise<{ ok: true; snap: SnapInfo } | { ok: false; error: string }> {
+  const user = await getCurrentUser();
+  if (!user || !isAdmin(user)) return { ok: false, error: "Logga in som administratör." };
+  if (!isSnapId(id)) return { ok: false, error: "Okänd bild." };
+  if (!(SNAP_REFRESH as readonly number[]).includes(refreshMin)) return { ok: false, error: "Ogiltigt uppdateringsintervall." };
+  const snap = await setSnapRefresh(id, refreshMin);
   return snap ? { ok: true, snap: toSnapInfo(snap) } : { ok: false, error: "Bilden finns inte längre." };
 }

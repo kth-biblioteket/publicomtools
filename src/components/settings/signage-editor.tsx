@@ -25,7 +25,7 @@ import {
   type Slot,
 } from "@/lib/signage";
 import type { EditorField } from "./apps-editor";
-import { createSnapAction, renderSnapAction } from "@/app/(admin)/media/actions";
+import { createSnapAction, renderSnapAction, setSnapRefreshAction } from "@/app/(admin)/media/actions";
 import { FieldControl } from "./field-control";
 import { useMinute } from "./use-minute";
 
@@ -1060,6 +1060,7 @@ const dayClock = (iso: string) =>
 /** A Sida som bild row: the latest image, the page behind it, and how the latest render went */
 function SnapRowBox({ id, snap, signage, onSnap, fitSelect }: { id: string; snap?: SignSnap; signage: SignageProps; onSnap: (s: SignSnap) => void; fitSelect: React.ReactNode }) {
   const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
   const now = useMinute();
   const old = snap?.renderedAt && now ? now.getTime() - Date.parse(snap.renderedAt) > 3 * snap.refreshMin * 60_000 : false;
   const failed = !!snap?.error && (!snap.renderedAt || (snap.errorAt ?? "") > snap.renderedAt);
@@ -1069,7 +1070,16 @@ function SnapRowBox({ id, snap, signage, onSnap, fitSelect }: { id: string; snap
       ? failed
         ? `Ingen bild: ${snap.error}`
         : "Ingen bild än"
-      : `${now && Date.parse(snap.renderedAt) > now.getTime() - 20 * 3600_000 ? `Bild kl ${clock(snap.renderedAt)}` : `Bild ${dayClock(snap.renderedAt)}`} · var ${snap.refreshMin} min${failed ? ` · senaste försöket misslyckades: ${snap.error}` : ""}`;
+      : `${now && Date.parse(snap.renderedAt) > now.getTime() - 20 * 3600_000 ? `Bild kl ${clock(snap.renderedAt)}` : `Bild ${dayClock(snap.renderedAt)}`}${failed ? ` · senaste försöket misslyckades: ${snap.error}` : ""}`;
+  const setRefresh = async (refreshMin: number) => {
+    setSaving(true);
+    try {
+      const res = await setSnapRefreshAction(id, refreshMin);
+      if (res.ok) onSnap(res.snap);
+    } finally {
+      setSaving(false);
+    }
+  };
   const refresh = async () => {
     setBusy(true);
     try {
@@ -1105,6 +1115,23 @@ function SnapRowBox({ id, snap, signage, onSnap, fitSelect }: { id: string; snap
           {snap && `Sida som bild, ${portrait ? "stående" : "liggande"} · `}
           {old && !failed ? `Gammal bild: ${status}` : status}
         </span>
+        {snap && (
+          // Intervallet hör till bilden (adress och orientering), inte till raden: sparas direkt
+          <label className="flex shrink-0 items-center gap-1 font-normal text-[#5a6270]" title="Gäller bilden i alla spellistor som visar samma adress och orientering. Sparas direkt.">
+            ny bild var
+            <select
+              aria-label="Ny bild var"
+              value={snap.refreshMin}
+              disabled={saving}
+              onChange={(e) => setRefresh(Number(e.target.value))}
+              className="h-6 rounded border border-[#c4cad2] bg-white px-1 text-[12px] text-ink disabled:opacity-50"
+            >
+              {[1, 2, 5, 10, 30, 60].map((m) => (
+                <option key={m} value={m}>{m} min</option>
+              ))}
+            </select>
+          </label>
+        )}
         {snap && (
           <button type="button" onClick={refresh} disabled={busy} title="Ta en ny bild nu" className="shrink-0 font-bold text-kth-blue disabled:opacity-50">
             {busy ? "Tar bild…" : "Uppdatera nu"}

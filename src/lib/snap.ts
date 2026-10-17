@@ -105,6 +105,12 @@ export async function ensureSnap(input: { url: string; width: number; height: nu
   });
 }
 
+/** A new refresh interval for the image (null if it's gone) */
+export async function setSnapRefresh(id: string, refreshMin: number): Promise<SnapRow | null> {
+  const updated = await db.snap.updateMany({ where: { id }, data: { refreshMin } });
+  return updated.count ? db.snap.findUnique({ where: { id } }) : null;
+}
+
 export async function deleteSnapFile(id: string) {
   if (isSnapId(id)) await rm(snapFile(id), { force: true });
 }
