@@ -814,7 +814,7 @@ function PageList({
               <SnapRowBox id={sid} snap={snapById.get(sid)} signage={signage} onSnap={onSnap} fitSelect={fitSelect} />
             ) : p.media ? (
               <span className={`${BOX} flex min-w-[120px] flex-1 items-center gap-2 py-0.5 pl-0.5 pr-1.5`}>
-                <MediaThumb item={m} id={p.media} fileBase={signage.fileBase} />
+                <MediaThumb item={m} id={p.media} fileBase={signage.fileBase} enlarge />
                 <span className="min-w-0 flex-1 truncate">{m ? m.name : "Filen finns inte längre"}</span>
                 {fitSelect}
               </span>
@@ -908,14 +908,63 @@ function PageList({
   );
 }
 
-function MediaThumb({ item, id, fileBase }: { item?: SignMedia; id: string; fileBase: string }) {
+/** enlarge: a click shows the file large (in a list row; not in the picker, where a click picks it) */
+function MediaThumb({ item, id, fileBase, enlarge = false }: { item?: SignMedia; id: string; fileBase: string; enlarge?: boolean }) {
   const cls = "h-8 w-12 shrink-0 rounded-md bg-kth-navy object-cover";
   if (!item) return <span className={`${cls} flex items-center justify-center bg-bad-bg text-[10px] font-semibold text-bad-ink`}>Saknas</span>;
-  return item.kind === "video" ? (
-    <video src={`${fileBase}${id}#t=0.5`} muted preload="metadata" className={cls} />
+  const thumb =
+    item.kind === "video" ? (
+      <video src={`${fileBase}${id}#t=0.5`} muted preload="metadata" className={cls} />
+    ) : (
+      // eslint-disable-next-line @next/next/no-img-element -- ur mediebiblioteket, redan nedskalad
+      <img src={`${fileBase}${id}`} alt="" loading="lazy" className={cls} />
+    );
+  return enlarge ? (
+    <Enlarge src={`${fileBase}${id}`} kind={item.kind} title={item.name}>
+      {thumb}
+    </Enlarge>
   ) : (
-    // eslint-disable-next-line @next/next/no-img-element -- ur mediebiblioteket, redan nedskalad
-    <img src={`${fileBase}${id}`} alt="" loading="lazy" className={cls} />
+    thumb
+  );
+}
+
+/**
+ * A thumbnail that shows the picture (or film) large when clicked, in a modal box over the page;
+ * Esc, Stäng or a click beside it closes it.
+ */
+function Enlarge({ src, kind, title, children }: { src: string; kind: "image" | "video"; title: string; children: React.ReactNode }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const [open, setOpen] = useState(false);
+  const show = () => {
+    setOpen(true);
+    ref.current?.showModal();
+  };
+  return (
+    <>
+      <button type="button" onClick={show} title="Visa större" aria-label={`Visa ${title} större`} className="shrink-0 cursor-zoom-in rounded-md focus-visible:outline-2 focus-visible:outline-kth-blue">
+        {children}
+      </button>
+      <dialog
+        ref={ref}
+        onClose={() => setOpen(false)}
+        onClick={(e) => e.target === e.currentTarget && ref.current?.close()}
+        aria-label={title}
+        className="m-auto max-h-[92vh] max-w-[92vw] rounded-xl bg-white p-0 shadow-2xl backdrop:bg-[rgba(20,24,32,.6)]"
+      >
+        {/* w-0 min-w-full: rubriken följer bildens bredd i stället för att göra rutan bredare */}
+        <div className="flex w-0 min-w-full items-center justify-between gap-4 px-4 py-2.5">
+          <span className="min-w-0 truncate text-[14px] font-bold" title={title}>{title}</span>
+          <button type="button" onClick={() => ref.current?.close()} className="shrink-0 text-[13px] font-bold text-kth-blue">Stäng</button>
+        </div>
+        {open &&
+          (kind === "video" ? (
+            <video src={src} controls autoPlay muted loop playsInline className="block max-h-[calc(92vh_-_48px)] max-w-[92vw] bg-black" />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element -- ur mediebiblioteket eller renderad av publicomtools
+            <img src={src} alt="" className="block max-h-[calc(92vh_-_48px)] max-w-[92vw] bg-kth-navy object-contain" />
+          ))}
+      </dialog>
+    </>
   );
 }
 
@@ -1036,8 +1085,14 @@ function SnapRowBox({ id, snap, signage, onSnap, fitSelect }: { id: string; snap
     <>
       <span className={`${BOX} flex min-w-[160px] flex-1 items-center gap-2 py-0.5 pl-0.5 pr-1.5`}>
         {snap?.renderedAt ? (
-          // eslint-disable-next-line @next/next/no-img-element -- renderad av publicomtools själv
-          <img src={`${signage.snapImageBase}${id}/image?v=${Date.parse(snap.renderedAt)}`} alt="" loading="lazy" className={`shrink-0 rounded bg-kth-navy object-cover ${portrait ? "h-8 w-[18px]" : "h-8 w-12"}`} />
+          <Enlarge
+            src={`${signage.snapImageBase}${id}/image?v=${Date.parse(snap.renderedAt)}`}
+            kind="image"
+            title={`${bareUrl(snap.url)}, bild kl ${clock(snap.renderedAt)}`}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element -- renderad av publicomtools själv */}
+            <img src={`${signage.snapImageBase}${id}/image?v=${Date.parse(snap.renderedAt)}`} alt="" loading="lazy" className={`block shrink-0 rounded bg-kth-navy object-cover ${portrait ? "h-8 w-[18px]" : "h-8 w-12"}`} />
+          </Enlarge>
         ) : (
           <span className="flex h-8 w-12 shrink-0 items-center justify-center rounded-md bg-[#eceef1] text-[10px] font-semibold text-[#5a6270]">Bild</span>
         )}
