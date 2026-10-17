@@ -4,13 +4,15 @@
 # The Node version is pinned to an exact patch and matches .nvmrc,
 # package.json's "engines" and Dockerfile-dev. Bump all of them together.
 #
-# The official Node image is pulled from AWS's mirror of Docker Hub's library
-# (public.ecr.aws/docker/library), not docker.io: GitHub's runners hit Docker
-# Hub's anonymous pull limit (429) and its outages. Same image, same tag.
+# The official Node image is pulled from our own copy on ghcr.io
+# (ghcr.io/kth-biblioteket/node), made by .github/workflows/mirror_node.yml: both
+# Docker Hub and AWS's mirror of it (public.ecr.aws) answer 429 to GitHub's shared
+# runners, while the build is already logged in to ghcr.io. Same image, same tag.
+# A new Node version: run "Spegla node-avbilden till ghcr.io" first.
 # Same layout as bookingtools.
 
 # ---- deps: install once, reused by the builder stage ----
-FROM public.ecr.aws/docker/library/node:22.23.2-alpine AS deps
+FROM ghcr.io/kth-biblioteket/node:22.23.2-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -18,7 +20,7 @@ RUN npm ci
 # ---- prod-deps: runtime dependencies only (no typescript/eslint/tailwind) for
 # the runner stage. `prisma` and `dotenv` are regular dependencies, since
 # `prisma migrate deploy` (which loads prisma.config.ts) runs at container start.
-FROM public.ecr.aws/docker/library/node:22.23.2-alpine AS prod-deps
+FROM ghcr.io/kth-biblioteket/node:22.23.2-alpine AS prod-deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 # Nexts kompilator (SWC) installeras i två varianter; på Alpine används bara musl, så gnu (~85 MB)
@@ -26,7 +28,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && rm -rf node_modules/@next/swc-*-gnu
 
 # ---- builder: generate the Prisma client and build the Next.js app ----
-FROM public.ecr.aws/docker/library/node:22.23.2-alpine AS builder
+FROM ghcr.io/kth-biblioteket/node:22.23.2-alpine AS builder
 WORKDIR /app
 # Baked into the build (see next.config.ts). Must match the Traefik PathPrefix
 # this image is deployed behind (PATHPREFIX in docker-compose.yml).
@@ -43,7 +45,7 @@ RUN npx prisma generate
 RUN npm run build && rm -rf .next/cache
 
 # ---- runner: the smallest image that can actually run the app ----
-FROM public.ecr.aws/docker/library/node:22.23.2-alpine AS runner
+FROM ghcr.io/kth-biblioteket/node:22.23.2-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001

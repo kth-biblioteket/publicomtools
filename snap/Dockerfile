@@ -1,7 +1,7 @@
 # publicomtools-snap: headless Chromium som renderar skyltsidor till bilder åt publicomtools
 # ("Sida som bild"). En egen avbild så att publicomtools förblir liten och webbläsaren isolerad.
-# Node-versionen som i ../Dockerfile, hämtad från AWS spegel av Docker Hub (se ../Dockerfile).
-FROM public.ecr.aws/docker/library/node:22.23.2-alpine
+# Node-versionen som i ../Dockerfile, från vår kopia på ghcr.io (se ../Dockerfile).
+FROM ghcr.io/kth-biblioteket/node:22.23.2-alpine
 # Chromium och typsnitt (Noto täcker svenska tecken och emoji på sidorna)
 RUN apk add --no-cache chromium font-noto font-noto-emoji ttf-freefont \
     && addgroup -S snap && adduser -S -G snap snap
