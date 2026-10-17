@@ -54,6 +54,12 @@ services:
     mem_limit: 768m
     environment:
       TZ: ${TZ}
+    # Serverns eget namn (apps.lib.kth.se på prod) pekar inifrån en container på serverns publika
+    # adress, som inte svarar dit. host-gateway = servern själv, där Traefik tar emot på 443. Kräver
+    # att ufw släpper in snap-nätet (gränssnittet br-ptsnap nedan) på port 443:
+    #   sudo ufw allow in on br-ptsnap to any port 443 proto tcp comment 'publicomtools-snap till Traefik'
+    extra_hosts:
+      - "${DOMAIN_NAME}:host-gateway"
     networks:
       - "snap-net"
 
@@ -81,3 +87,6 @@ networks:
     external: true
   snap-net:
     name: publicomtools-snap-net
+    driver_opts:
+      # Fast namn på nätets gränssnitt, så att ufw-regeln gäller även när nätet skapas om
+      com.docker.network.bridge.name: br-ptsnap
