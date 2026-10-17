@@ -21,7 +21,9 @@ RUN npm ci
 FROM public.ecr.aws/docker/library/node:22.23.2-alpine AS prod-deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+# Nexts kompilator (SWC) installeras i två varianter; på Alpine används bara musl, så gnu (~85 MB)
+# tas bort. musl behövs även av next start (laddas annars ner från nätet vid start).
+RUN npm ci --omit=dev && rm -rf node_modules/@next/swc-*-gnu
 
 # ---- builder: generate the Prisma client and build the Next.js app ----
 FROM public.ecr.aws/docker/library/node:22.23.2-alpine AS builder
@@ -37,7 +39,8 @@ ENV DATABASE_URL="postgresql://build:build@localhost:5432/build"
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npx prisma generate
-RUN npm run build
+# .next/cache är byggets egen cache (~460 MB) och behövs inte när appen körs
+RUN npm run build && rm -rf .next/cache
 
 # ---- runner: the smallest image that can actually run the app ----
 FROM public.ecr.aws/docker/library/node:22.23.2-alpine AS runner
