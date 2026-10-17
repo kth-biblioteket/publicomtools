@@ -1,4 +1,5 @@
 import { authenticateDevice, mayActFor } from "@/lib/device-auth";
+import { corsPreflight, withCors } from "@/lib/cors";
 import { db } from "@/lib/db";
 import { getEffectiveConfig, serializeEnv } from "@/lib/config";
 
@@ -13,7 +14,7 @@ export const dynamic = "force-dynamic";
  * Android tablets ask for JSON (Accept: application/json or ?format=json):
  * { values: {KEY: "value"}, version: PUBLICOM_CONFIG_VERSION }.
  */
-export async function GET(request: Request) {
+export const GET = withCors(async function get(request: Request) {
   const auth = await authenticateDevice(request);
   if ("denied" in auth) return auth.denied;
 
@@ -41,4 +42,6 @@ export async function GET(request: Request) {
   return new Response(serializeEnv(values), {
     headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
   });
-}
+});
+
+export const OPTIONS = corsPreflight;

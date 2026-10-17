@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { corsPreflight, withCors } from "@/lib/cors";
 import { authenticateDevice, mayActFor } from "@/lib/device-auth";
 import { heartbeatSchema, HEARTBEAT_RETENTION_DAYS, plausibleVisits, USAGE_RETENTION_DAYS } from "@/lib/heartbeat";
 import { heartbeatInterval } from "@/lib/status";
@@ -16,7 +17,7 @@ function clientIp(request: Request) {
   return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
 }
 
-export async function POST(request: Request) {
+export const POST = withCors(async function post(request: Request) {
   const auth = await authenticateDevice(request);
   if ("denied" in auth) return auth.denied;
 
@@ -158,4 +159,6 @@ export async function POST(request: Request) {
 
   // visitsAck: the visits are stored (or were duplicates), the device may forget them
   return Response.json({ ok: true, reload, reboot, screenshot, pinUnlock, visitsAck: reportedVisits !== undefined });
-}
+});
+
+export const OPTIONS = corsPreflight;

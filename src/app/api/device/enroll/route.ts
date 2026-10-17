@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { corsPreflight, withCors } from "@/lib/cors";
 import { enrollDevice } from "@/lib/enroll";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ function clientIp(request: Request) {
   return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
 }
 
-export async function POST(request: Request) {
+export const POST = withCors(async function post(request: Request) {
   const ip = clientIp(request);
   const now = Date.now();
   const f = failures.get(ip);
@@ -42,4 +43,6 @@ export async function POST(request: Request) {
   }
   failures.delete(ip);
   return Response.json(result, { headers: { "Cache-Control": "no-store" } });
-}
+});
+
+export const OPTIONS = corsPreflight;
