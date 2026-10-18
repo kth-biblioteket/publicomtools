@@ -6,6 +6,12 @@
   var DEFAULT_URL = 'https://apps.lib.kth.se/publicomtools';
   var TIMEOUT_MS = 20000;
 
+  /** Serveras spelaren från publicomtools (https://värd/publicomtools/player/…) föreslås samma värd, annars standardadressen */
+  function defaultUrl() {
+    var m = /^(https:\/\/[^\/]+\/publicomtools)\//.exec(window.location.href);
+    return m ? m[1] : DEFAULT_URL;
+  }
+
   function fail(message, status) {
     var e = new Error(message);
     e.status = status || 0;
@@ -17,7 +23,7 @@
   }
 
   function baseUrl() {
-    return store.get('url') || DEFAULT_URL;
+    return store.get('url') || defaultUrl();
   }
 
   /** Glöm anslutningen (t ex när token inte längre godtas) */
@@ -28,7 +34,7 @@
 
   /** "apps.lib.kth.se/publicomtools/" → "https://apps.lib.kth.se/publicomtools". Bara https (http enbart mot localhost för utveckling). */
   function normalizeBaseUrl(url) {
-    var u = (url || '').trim() || DEFAULT_URL;
+    var u = (url || '').trim() || defaultUrl();
     if (u.indexOf('://') < 0) u = 'https://' + u;
     u = u.replace(/\/+$/, '');
     if (!/^https:\/\/[^\/]+/.test(u) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(u)) {
