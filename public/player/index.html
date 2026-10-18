@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PubLiPlayer</title>
+  <link rel="stylesheet" href="css/player.css">
+</head>
+<body>
+  <div id="stage">
+    <div id="frames" class="hidden">
+      <iframe id="frame-a" src="about:blank" scrolling="no" tabindex="-1"></iframe>
+      <iframe id="frame-b" src="about:blank" scrolling="no" tabindex="-1"></iframe>
+    </div>
+
+    <div id="error" class="overlay hidden">
+      <p id="error-sv"></p>
+      <p id="error-en" class="en"></p>
+    </div>
+
+    <div id="enroll" class="overlay hidden">
+      <form id="enroll-form" autocomplete="off">
+        <h1>PubLiPlayer</h1>
+        <label for="enroll-url">Adress till publicomtools</label>
+        <input id="enroll-url" type="url" spellcheck="false">
+        <label for="enroll-code">Inskrivningskod från admin</label>
+        <input id="enroll-code" type="text" spellcheck="false" autocapitalize="off">
+        <button type="submit">Skriv in</button>
+        <p id="enroll-msg" role="status"></p>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/schedule.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/client.js"></script>
+  <script src="js/rotator.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

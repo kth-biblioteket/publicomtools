@@ -11,6 +11,16 @@ const nextConfig: NextConfig = {
   // BASE_PATH build arg in Dockerfile) and at container runtime (`next
   // start` re-reads this config) — see BASE_PATH in docker-compose.yml.
   ...(process.env.BASE_PATH ? { basePath: process.env.BASE_PATH } : {}),
+  // PubLiPlayer (Tizen-skärmarnas spelare) i public/player, en tillfällig kopia av publiplayer
+  // (commit 3995860) tills repot kth-biblioteket/publiplayer finns; ändra den inte här, kopiera på
+  // nytt. Skärmens URL Launcher: <värd>/publicomtools/player/index.html. /player leder dit, så att
+  // sidans relativa länkar (css/…, js/…) fungerar, och nya versioner når skärmen utan cache
+  async redirects() {
+    return [{ source: "/player", destination: "/player/index.html", permanent: false }];
+  },
+  async headers() {
+    return [{ source: "/player/:path*", headers: [{ key: "Cache-Control", value: "no-cache" }] }];
+  },
 };
 
 export default nextConfig;
