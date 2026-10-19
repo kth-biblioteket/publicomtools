@@ -45,7 +45,10 @@ export default async function ComputerTechPage({ params }: PageProps<"/computers
     ["Värdnamn", c.hostname],
     ["IP-adress", c.lastIp ?? "–"],
     ["System", s ? `${s.os ?? "–"}${s.kernel ? ` (${s.kernel})` : ""}` : "–"],
-    ["Kod", s ? `${s.branch ?? "–"}, ${formatTime(s.deployedAt)}${s.deployFilesChanged !== undefined ? ` (${s.deployFilesChanged} filer)` : ""}` : "–"],
+    // Kod, kraschade tjänster och disk rapporteras bara av Linux-datorerna (publicom)
+    ...(c.platform === "linux"
+      ? ([["Kod", s ? `${s.branch ?? "–"}, ${formatTime(s.deployedAt)}${s.deployFilesChanged !== undefined ? ` (${s.deployFilesChanged} filer)` : ""}` : "–"]] as [string, React.ReactNode][])
+      : []),
     ...(c.platform === "tizen"
       ? ([
           ["Spelare", s?.appVersion ?? "–"],
@@ -62,8 +65,10 @@ export default async function ComputerTechPage({ params }: PageProps<"/computers
       : ([
           ["guest.service", s ? `${s.guestService ?? "–"}${s.guestRestarts !== undefined ? `, ${s.guestRestarts} sessioner sedan start` : ""}` : "–"],
         ] as [string, React.ReactNode][])),
-    ["Kraschade tjänster", s && s.failedUnits.length ? s.failedUnits.join(", ") : "–"],
-    ["Ledig disk", s?.diskFreePercent !== undefined ? `${s.diskFreePercent} %` : "–"],
+    ...(c.platform === "linux" ? ([["Kraschade tjänster", s && s.failedUnits.length ? s.failedUnits.join(", ") : "–"]] as [string, React.ReactNode][]) : []),
+    ...(c.platform === "linux" || s?.diskFreePercent !== undefined
+      ? ([["Ledig disk", s?.diskFreePercent !== undefined ? `${s.diskFreePercent} %` : "–"]] as [string, React.ReactNode][])
+      : []),
     ["Config hämtad", c.configFetchedAt ? formatTime(c.configFetchedAt) : c.configState === "new" ? "aldrig (inte installerad)" : "aldrig (gamla configfiler)"],
     ["Config ändrad", formatTime(row.configUpdatedAt ?? undefined)],
     [
@@ -110,12 +115,12 @@ export default async function ComputerTechPage({ params }: PageProps<"/computers
                   <th className="border-b border-line px-3 py-2">Tid</th>
                   <th className="border-b border-line px-3 py-2">Igång</th>
                   <th className="border-b border-line px-3 py-2">{c.platform === "tizen" ? "Sidan" : c.platform === "android" ? "Startsidan" : "Gästprogram"}</th>
-                  <th className="border-b border-line px-3 py-2">Fel</th>
+                  {c.platform === "linux" && <th className="border-b border-line px-3 py-2">Fel</th>}
                 </tr>
               </thead>
               <tbody>
                 {history.length === 0 && (
-                  <tr><td colSpan={4} className="px-3 py-3 text-muted">Inga rapporter än.</td></tr>
+                  <tr><td colSpan={c.platform === "linux" ? 4 : 3} className="px-3 py-3 text-muted">Inga rapporter än.</td></tr>
                 )}
                 {history.map((h) => {
                   const hs = heartbeatSchema.safeParse(h.status);
@@ -131,7 +136,9 @@ export default async function ComputerTechPage({ params }: PageProps<"/computers
                       <td className="border-b border-line-soft px-3 py-2">
                         {!hs.success ? "–" : hs.data.guestService ?? (hs.data.pageLoaded === undefined ? "–" : hs.data.pageLoaded ? "laddad" : "inte laddad")}
                       </td>
-                      <td className="border-b border-line-soft px-3 py-2">{hs.success && hs.data.failedUnits.length ? hs.data.failedUnits.join(", ") : "–"}</td>
+                      {c.platform === "linux" && (
+                        <td className="border-b border-line-soft px-3 py-2">{hs.success && hs.data.failedUnits.length ? hs.data.failedUnits.join(", ") : "–"}</td>
+                      )}
                     </tr>
                   );
                 })}
