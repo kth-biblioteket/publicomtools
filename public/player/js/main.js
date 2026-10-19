@@ -6,6 +6,7 @@
   var CONFIG_POLL_MS = PP.configPollMs || 60000; // ändrad spellista slår igenom inom så här lång tid (PP.configPollMs bara för tests/poll.html)
   var CONFIG_RETRY_MS = 30000;
   var MIN_HEARTBEAT_GAP_MS = 10000;
+  var LOAD_REPORT_GAP_MS = 30000;
 
   var client = PP.client, store = PP.store, schedule = PP.schedule;
   var rotator = null;
@@ -17,6 +18,8 @@
   var configTimer = null;
   var firstFetch = true;
   var lastHeartbeat = 0;
+  var reportedLoaded;           // pageLoaded i senaste statusrapporten (undefined: ingen rapport än)
+  var lastLoadReport = 0;
   var startedAt = Date.now();
 
   function intValue(values, key, def, min, max) {
@@ -56,7 +59,7 @@
       defaultList: schedule.parsePages(pagesRaw, seconds, null),
       schedule: schedule.parseSchedule(scheduleRaw, seconds),
       scripts: scripts,
-      onLoaded: function () {},
+      onLoaded: pageStateChanged,
     });
     rotator.start();
   }
@@ -82,7 +85,20 @@
     if (configVersion) s.configVersion = configVersion;
     var loaded = rotator.pageLoaded();
     if (loaded !== null) s.pageLoaded = loaded;
+    reportedLoaded = loaded;
     return s;
+  }
+
+  /**
+   * Sidan som visas har blivit laddad eller inte (ok; null = svart skärm). Den första rapporten går innan sidan hunnit
+   * laddas, så en ändring mot vad som senast rapporterats skickas direkt, men en sida som växlar mellan laddad och
+   * inte ger högst en rapport var 30:e sekund.
+   */
+  function pageStateChanged(ok) {
+    if (ok === null || ok === reportedLoaded) return;
+    if (reportedLoaded !== undefined && Date.now() - lastLoadReport < LOAD_REPORT_GAP_MS) return;
+    lastLoadReport = Date.now();
+    sendHeartbeat(true);
   }
 
   /** Token som inte godtas längre: tillbaka till inskrivning */
@@ -129,7 +145,10 @@
       if (changed || firstFetch) store.setConfig(config);
       apply(config);
       // Admin ska se den nya versionen direkt (och första rapporten kommer när inställningarna hämtats)
-      if (changed || firstFetch) sendHeartbeat(true);
+      if (changed || firstFetch) {
+        lastLoadReport = 0; // sidan hinner inte laddas före rapporten; när den blivit laddad ska det rapporteras direkt
+        sendHeartbeat(true);
+      }
       firstFetch = false;
       scheduleHeartbeat();
     }, function (err) {
