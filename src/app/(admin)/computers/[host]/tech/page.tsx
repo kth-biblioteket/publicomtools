@@ -109,7 +109,7 @@ export default async function ComputerTechPage({ params }: PageProps<"/computers
                 <tr className="text-left text-[11.5px] font-bold uppercase tracking-wide text-muted">
                   <th className="border-b border-line px-3 py-2">Tid</th>
                   <th className="border-b border-line px-3 py-2">Igång</th>
-                  <th className="border-b border-line px-3 py-2">Gästprogram</th>
+                  <th className="border-b border-line px-3 py-2">{c.platform === "tizen" ? "Sidan" : c.platform === "android" ? "Startsidan" : "Gästprogram"}</th>
                   <th className="border-b border-line px-3 py-2">Fel</th>
                 </tr>
               </thead>
@@ -129,7 +129,7 @@ export default async function ComputerTechPage({ params }: PageProps<"/computers
                       <td className="whitespace-nowrap border-b border-line-soft px-3 py-2">{formatTime(h.receivedAt)}</td>
                       <td className="whitespace-nowrap border-b border-line-soft px-3 py-2">{hs.success ? formatDuration(hs.data.uptimeSeconds) : "–"}</td>
                       <td className="border-b border-line-soft px-3 py-2">
-                        {!hs.success ? "–" : hs.data.guestService ?? (hs.data.pageLoaded === undefined ? "–" : hs.data.pageLoaded ? "startsida laddad" : "startsida ej laddad")}
+                        {!hs.success ? "–" : hs.data.guestService ?? (hs.data.pageLoaded === undefined ? "–" : hs.data.pageLoaded ? "laddad" : "inte laddad")}
                       </td>
                       <td className="border-b border-line-soft px-3 py-2">{hs.success && hs.data.failedUnits.length ? hs.data.failedUnits.join(", ") : "–"}</td>
                     </tr>
