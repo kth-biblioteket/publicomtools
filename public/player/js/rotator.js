@@ -90,7 +90,7 @@
       dbg('kontroll ' + result + ' ' + tail(url));
       if (result === 'http' || result === 'net') return self.fail(result === 'net');
       // ?nosandbox (felsökning): ingen sandbox alls, för att se om den hindrar videon
-      if (window.PP_debug && /[?&]nosandbox/.test(window.location.search)) self.el.removeAttribute('sandbox');
+      if (window.PP_debug && /[?&]nosandbox|debugns/.test(window.location.search)) self.el.removeAttribute('sandbox');
       else self.el.setAttribute('sandbox', scripts ? 'allow-scripts allow-same-origin' : 'allow-same-origin');
       self.el.src = url;
       self.timer = setTimeout(function () {

@@ -12,7 +12,7 @@ const nextConfig: NextConfig = {
   // start` re-reads this config) — see BASE_PATH in docker-compose.yml.
   ...(process.env.BASE_PATH ? { basePath: process.env.BASE_PATH } : {}),
   // PubLiPlayer (Tizen-skärmarnas spelare) i public/player, en tillfällig kopia av publiplayer
-  // (commit dae9651) tills repot kth-biblioteket/publiplayer finns; ändra den inte här, kopiera på
+  // (commit 6ae2ac3) tills repot kth-biblioteket/publiplayer finns; ändra den inte här, kopiera på
   // nytt. Skärmens URL Launcher: <värd>/publicomtools/player/index.html. /player leder dit, så att
   // sidans relativa länkar (css/…, js/…) fungerar, och nya versioner når skärmen utan cache
   async redirects() {

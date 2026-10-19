@@ -1,7 +1,7 @@
 'use strict';
 // Start och styrning: inskrivning, inställningar, rotation och statusrapporter mot publicomtools.
 (function (PP) {
-  var VERSION = '0.1.9'; // höjs vid varje ändring av spelaren (syns som Spelare i admin); config.xml har samma
+  var VERSION = '0.1.10'; // höjs vid varje ändring av spelaren (syns som Spelare i admin); config.xml har samma
   var CLIENT_VERSION = 1;
   var CONFIG_POLL_MS = PP.configPollMs || 60000; // ändrad spellista slår igenom inom så här lång tid (PP.configPollMs bara för tests/poll.html)
   var CONFIG_RETRY_MS = 30000;
@@ -57,7 +57,7 @@
         + ', nycklar: ' + Object.keys(values).join(','));
     }
 
-    if (window.PP_debug && /[?&]testvideo/.test(window.location.search) && !window.PP_testVideoStarted) {
+    if (window.PP_debug && /[?&]testvideo|debugtv/.test(window.location.search) && !window.PP_testVideoStarted) {
       window.PP_testVideoStarted = true;
       startTestVideo(config);
     }
