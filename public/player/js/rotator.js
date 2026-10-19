@@ -84,6 +84,7 @@
     this.reset();
     this.url = url;
     this.loading = true;
+    this.playTried = false;
     probe(url).then(function (result) {
       if (token !== self.token) return;
       dbg('kontroll ' + result + ' ' + tail(url));
@@ -96,10 +97,39 @@
     });
   };
 
+  /** Felsökning: logga tillståndet för en <video> i ramen (går bara när ramens sida har samma origin som spelaren) */
+  Frame.prototype.watchVideo = function () {
+    if (!window.PP_debug) return;
+    var self = this, token = this.token, tries = 0, last = '';
+    var iv = setInterval(function () {
+      tries++;
+      if (token !== self.token || tries > 8) return clearInterval(iv);
+      try {
+        var v = self.el.contentDocument && self.el.contentDocument.querySelector('video');
+        if (!v) { if (tries === 1) dbg('video: ingen <video> i sidan (eller annan origin)'); return; }
+        if (!self.playTried) {
+          // Eget play() bara i felsökningsläget: NotAllowedError = autoplay-policy, NotSupportedError = format
+          self.playTried = true;
+          var p = v.play();
+          if (p && p.then) p.then(function () { dbg('play(): ok'); }, function (e) { dbg('play(): ' + e.name + ' ' + e.message); });
+          else dbg('play(): anropat (inget löfte)');
+        }
+        var state = 'video: ' + (v.paused ? 'pausad' : 'spelar') + ' ready=' + v.readyState + ' network=' + v.networkState
+          + ' ' + v.videoWidth + 'x' + v.videoHeight + ' t=' + Math.round(v.currentTime * 10) / 10 + (v.muted ? ' muted' : '')
+          + (v.error ? ' FEL=' + v.error.code : '') + (v.src ? ' src=' + tail(v.currentSrc || v.src) : '');
+        if (state !== last) dbg(state);
+        last = state;
+      } catch (e) {
+        if (tries === 1) dbg('video: kan inte läsas (' + e.message + ')');
+      }
+    }, 2000);
+  };
+
   Frame.prototype.loaded = function () {
     if (!this.loading || this.el.getAttribute('src') === BLANK) return;
     clearTimeout(this.timer);
     dbg('laddad ' + tail(this.url));
+    this.watchVideo();
     this.loading = false;
     this.ok = true;
     this.okAt = Date.now();
