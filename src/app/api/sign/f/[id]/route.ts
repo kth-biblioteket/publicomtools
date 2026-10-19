@@ -27,12 +27,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     size = st.size;
     modified = st.mtime;
   } catch {
-    return new Response("Hittar inte filen.", { status: 404, headers: { "Access-Control-Allow-Origin": "*" } });
+    return new Response("Hittar inte filen.", { status: 404 });
   }
   const headers: Record<string, string> = {
-    // Spelare på annan origin (Tizen) kontrollerar filen med fetch före visning
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Expose-Headers": "Content-Length, Content-Range, Accept-Ranges",
+    // Ingen CORS här: spelarna kontrollerar filmsidan (/api/sign/m/), inte filen, och Tizens videospelare
+    // hämtade ingenting när filen hade Access-Control-Allow-Origin (prov 19 okt)
     "Content-Type": row.mime,
     "Cache-Control": "public, max-age=31536000",
     ETag: `"${id}"`,
