@@ -377,7 +377,9 @@ export function settingWarnings(
   // En skylt utan sidor: varken standardlista eller någon spellista med sidor
   const typeKey = catalog.has("COMPUTER_TYPE") ? "COMPUTER_TYPE" : "HOME_MODE";
   const typeMeta = catalog.get(typeKey);
-  if (catalog.has(SIGN_PAGES_KEY) && typeMeta && (value(typeKey) ?? typeMeta.defaultValue) === "signage") {
+  // Tizen-skärmar är alltid skyltar (ingen typ att välja)
+  const isSign = platform === "tizen" || (!!typeMeta && (value(typeKey) ?? typeMeta.defaultValue) === "signage");
+  if (catalog.has(SIGN_PAGES_KEY) && isSign) {
     const lists = Object.values(parseSchedule(value(SIGN_SCHEDULE_KEY)).lists);
     if (!parseSignPages(value(SIGN_PAGES_KEY)).length && !lists.some((l) => l.length))
       warnings.push({
