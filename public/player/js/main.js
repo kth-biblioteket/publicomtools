@@ -3,6 +3,7 @@
 (function (PP) {
   var VERSION = '0.1.0';
   var CLIENT_VERSION = 1;
+  var CONFIG_POLL_MS = PP.configPollMs || 60000; // ändrad spellista slår igenom inom så här lång tid (PP.configPollMs bara för tests/poll.html)
   var CONFIG_RETRY_MS = 30000;
   var MIN_HEARTBEAT_GAP_MS = 10000;
 
@@ -14,6 +15,7 @@
   var heartbeatMinutes = 5;
   var heartbeatTimer = null;
   var configTimer = null;
+  var firstFetch = true;
   var lastHeartbeat = 0;
   var startedAt = Date.now();
 
@@ -88,12 +90,15 @@
     rotator.stop();
     appliedSignature = null;
     clearTimeout(heartbeatTimer);
+    heartbeatTimer = null;
     clearTimeout(configTimer);
+    firstFetch = true;
     PP.ui.showEnroll(enroll, message);
   }
 
-  function sendHeartbeat() {
-    if (!client.isEnrolled() || Date.now() - lastHeartbeat < MIN_HEARTBEAT_GAP_MS) return;
+  /** force: en ny version ska rapporteras direkt; annars hindrar MIN_HEARTBEAT_GAP_MS att reload-svar ger en snabb slinga */
+  function sendHeartbeat(force) {
+    if (!client.isEnrolled() || (!force && Date.now() - lastHeartbeat < MIN_HEARTBEAT_GAP_MS)) return;
     lastHeartbeat = Date.now();
     client.heartbeat(status()).then(function (res) {
       if (res && res.reload) loadConfig();
@@ -102,20 +107,30 @@
     });
   }
 
+  /** Statusrapport var HEARTBEAT_INTERVAL minut; startas en gång (inställningshämtningen får inte nollställa den) */
   function scheduleHeartbeat() {
-    clearTimeout(heartbeatTimer);
+    if (heartbeatTimer) return;
     heartbeatTimer = setTimeout(function () {
+      heartbeatTimer = null;
       sendHeartbeat();
       scheduleHeartbeat();
     }, heartbeatMinutes * 60000);
   }
 
+  /**
+   * Hämtar inställningarna och gör det igen var CONFIG_POLL_MS. En skylt har ingen användare, så en ändrad spellista
+   * ska slå igenom av sig själv i stället för att vänta på en reload eller omstart. En oförändrad version gör ingenting.
+   */
   function loadConfig() {
     clearTimeout(configTimer);
     client.fetchConfig().then(function (config) {
-      store.setConfig(config);
+      configTimer = setTimeout(loadConfig, CONFIG_POLL_MS); // först, så att ett fel längre ner inte stoppar hämtningen
+      var changed = String(config.version || '') !== configVersion;
+      if (changed || firstFetch) store.setConfig(config);
       apply(config);
-      sendHeartbeat();
+      // Admin ska se den nya versionen direkt (och första rapporten kommer när inställningarna hämtats)
+      if (changed || firstFetch) sendHeartbeat(true);
+      firstFetch = false;
       scheduleHeartbeat();
     }, function (err) {
       if (err.status === 401) return reenroll(err.message);
