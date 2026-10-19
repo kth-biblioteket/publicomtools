@@ -14,7 +14,22 @@ export const dynamic = "force-dynamic";
  * nothing when the answer had a Content-Security-Policy, no ETag/Last-Modified and "immutable" (19 okt). Only
  * JPEG, PNG, WebP and MP4 are stored (src/lib/media.ts), so a CSP isn't needed on the file itself.
  */
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+/** TILLFÄLLIGT (felsökning av film på Tizen, 19 okt): en rad per anrop i containerns logg; tas bort sedan */
+function logRequest(request: Request, name: string, status: number) {
+  const h = request.headers;
+  console.log(
+    `sign-f ${request.method} ${name.slice(0, 12)}… range=${h.get("range") ?? "-"} status=${status} ` +
+      `ua=${(h.get("user-agent") ?? "-").slice(0, 160)} ip=${h.get("x-forwarded-for") ?? h.get("x-real-ip") ?? "-"}`,
+  );
+}
+
+export async function GET(request: Request, ctx: { params: Promise<{ id: string }> }) {
+  const res = await serve(request, ctx);
+  logRequest(request, (await ctx.params).id, res.status);
+  return res;
+}
+
+async function serve(request: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
   // <id>.mp4, .jpg, .png, .webp är samma fil: Tizens videospelare verkar välja format efter adressens ändelse
   const id = (await params).id.replace(/\.(mp4|jpe?g|png|webp)$/i, "");
   const path = mediaPath(id);
