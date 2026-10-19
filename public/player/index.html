@@ -11,9 +11,16 @@
       if (location.search.indexOf('debug') < 0) return;
       var box = document.createElement('pre');
       box.id = 'debug';
-      box.style.cssText = 'position:fixed;left:0;top:0;right:0;z-index:999;margin:0;padding:8px;background:#fff;color:#000;font:18px monospace;white-space:pre-wrap;max-height:100%;overflow:hidden';
+      // Vänstra delen av skärmen (testvideon ligger till höger). De 5 första raderna ligger kvar, sedan de senaste raderna.
+      box.style.cssText = 'position:fixed;left:0;top:0;width:58%;z-index:999;margin:0;padding:8px;background:#fff;color:#000;font:16px monospace;white-space:pre-wrap;word-break:break-all;max-height:100%;overflow:hidden';
       document.documentElement.appendChild(box);
-      function log(t) { box.appendChild(document.createTextNode(t + '\n')); }
+      var head = [], tail = [], KEEP = 5, MAX_TAIL = 22;
+      function log(t) {
+        t = String(t);
+        if (head.length < KEEP) head.push(t);
+        else { tail.push(t); if (tail.length > MAX_TAIL) tail.shift(); }
+        box.textContent = head.join('\n') + (tail.length ? '\n' + tail.join('\n') : '') + '\n';
+      }
       window.PP_debug = log;
       log('UA: ' + navigator.userAgent);
       log('storlek: ' + window.innerWidth + 'x' + window.innerHeight);
