@@ -1,7 +1,7 @@
 'use strict';
 // Start och styrning: inskrivning, inställningar, rotation och statusrapporter mot publicomtools.
 (function (PP) {
-  var VERSION = '0.1.6'; // höjs vid varje ändring av spelaren (syns som Spelare i admin); config.xml har samma
+  var VERSION = '0.1.8'; // höjs vid varje ändring av spelaren (syns som Spelare i admin); config.xml har samma
   var CLIENT_VERSION = 1;
   var CONFIG_POLL_MS = PP.configPollMs || 60000; // ändrad spellista slår igenom inom så här lång tid (PP.configPollMs bara för tests/poll.html)
   var CONFIG_RETRY_MS = 30000;
@@ -57,6 +57,11 @@
         + ', nycklar: ' + Object.keys(values).join(','));
     }
 
+    if (window.PP_debug && /[?&]testvideo/.test(window.location.search) && !window.PP_testVideoStarted) {
+      window.PP_testVideoStarted = true;
+      startTestVideo(config);
+    }
+
     var sig = JSON.stringify([pagesRaw, scheduleRaw, seconds, scripts]);
     if (sig === appliedSignature) return;
     appliedSignature = sig;
@@ -67,6 +72,40 @@
       onLoaded: pageStateChanged,
     });
     rotator.start();
+  }
+
+  /**
+   * Felsökning (?debug&testvideo): en <video muted autoplay> direkt i toppsidan med den första uppladdade filmen i configen
+   * (/api/sign/m/<id> -> /api/sign/f/<id>). Visar om skärmens webbläsare startar video utanför en ram, och om ett tryck på
+   * en knapp på fjärrkontrollen behövs.
+   */
+  function startTestVideo(config) {
+    var dbg = window.PP_debug;
+    var text = JSON.stringify(config.values || {});
+    var m = /\/api\/sign\/m\/([0-9a-f]+)/.exec(text.replace(/\\\//g, '/'));
+    if (!m) return dbg('testvideo: ingen /api/sign/m/ i configen');
+    var src = client.baseUrl() + '/api/sign/f/' + m[1];
+    var v = document.createElement('video');
+    v.muted = true; v.loop = true; v.autoplay = true;
+    v.setAttribute('muted', ''); v.setAttribute('autoplay', ''); v.setAttribute('loop', ''); v.setAttribute('playsinline', '');
+    v.style.cssText = 'position:fixed;right:0;top:0;width:40%;height:100%;z-index:500;background:#222;object-fit:cover';
+    ['loadstart', 'loadedmetadata', 'loadeddata', 'canplay', 'playing', 'waiting', 'stalled', 'error', 'abort', 'emptied'].forEach(function (ev) {
+      v.addEventListener(ev, function () { dbg('testvideo ' + ev + (v.error ? ' FEL=' + v.error.code : '') + ' ready=' + v.readyState + ' ' + v.videoWidth + 'x' + v.videoHeight); });
+    });
+    document.documentElement.appendChild(v);
+    v.src = src;
+    dbg('testvideo: ' + src.replace(/^https?:\/\/[^\/]+/, '').slice(0, 60));
+    var n = 0, iv = setInterval(function () {
+      dbg('testvideo: ' + (v.paused ? 'pausad' : 'spelar') + ' ready=' + v.readyState + ' network=' + v.networkState + ' t=' + Math.round(v.currentTime * 10) / 10);
+      if (++n >= 5) clearInterval(iv);
+    }, 2000);
+    var p = v.play();
+    if (p && p.then) p.then(function () { dbg('testvideo play(): ok'); }, function (e) { dbg('testvideo play(): ' + e.name + ' ' + e.message); });
+    // Ett tryck på valfri knapp ska starta den om autoplay blockeras
+    document.addEventListener('keydown', function () {
+      var q = v.play();
+      if (q && q.then) q.then(function () { dbg('testvideo play() efter knapptryck: ok'); }, function (e) { dbg('testvideo play() efter knapptryck: ' + e.name); });
+    });
   }
 
   function osName() {

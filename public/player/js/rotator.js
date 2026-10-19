@@ -89,7 +89,9 @@
       if (token !== self.token) return;
       dbg('kontroll ' + result + ' ' + tail(url));
       if (result === 'http' || result === 'net') return self.fail(result === 'net');
-      self.el.setAttribute('sandbox', scripts ? 'allow-scripts allow-same-origin' : 'allow-same-origin');
+      // ?nosandbox (felsökning): ingen sandbox alls, för att se om den hindrar videon
+      if (window.PP_debug && /[?&]nosandbox/.test(window.location.search)) self.el.removeAttribute('sandbox');
+      else self.el.setAttribute('sandbox', scripts ? 'allow-scripts allow-same-origin' : 'allow-same-origin');
       self.el.src = url;
       self.timer = setTimeout(function () {
         if (token === self.token) self.fail(false);
@@ -101,12 +103,20 @@
   Frame.prototype.watchVideo = function () {
     if (!window.PP_debug) return;
     var self = this, token = this.token, tries = 0, last = '';
+    var name = this.el.id === 'frame-a' ? 'A' : 'B';
     var iv = setInterval(function () {
       tries++;
       if (token !== self.token || tries > 8) return clearInterval(iv);
       try {
-        var v = self.el.contentDocument && self.el.contentDocument.querySelector('video');
-        if (!v) { if (tries === 1) dbg('video: ingen <video> i sidan (eller annan origin)'); return; }
+        var doc = self.el.contentDocument;
+        if (!doc) { if (tries === 1) dbg('ram ' + name + ': contentDocument är null (annan origin eller inte klar)'); return; }
+        var v = doc.querySelector('video');
+        if (!v) {
+          if (tries === 1 || tries === 4) {
+            dbg('ram ' + name + ': ingen <video>; url=' + tail(doc.URL) + ' ready=' + doc.readyState + ' body=' + String(doc.body ? doc.body.innerHTML : '(ingen body)').slice(0, 100).replace(/\s+/g, ' '));
+          }
+          return;
+        }
         if (!self.playTried) {
           // Eget play() bara i felsökningsläget: NotAllowedError = autoplay-policy, NotSupportedError = format
           self.playTried = true;
@@ -114,13 +124,13 @@
           if (p && p.then) p.then(function () { dbg('play(): ok'); }, function (e) { dbg('play(): ' + e.name + ' ' + e.message); });
           else dbg('play(): anropat (inget löfte)');
         }
-        var state = 'video: ' + (v.paused ? 'pausad' : 'spelar') + ' ready=' + v.readyState + ' network=' + v.networkState
+        var state = 'ram ' + name + ' video: ' + (v.paused ? 'pausad' : 'spelar') + ' ready=' + v.readyState + ' network=' + v.networkState
           + ' ' + v.videoWidth + 'x' + v.videoHeight + ' t=' + Math.round(v.currentTime * 10) / 10 + (v.muted ? ' muted' : '')
           + (v.error ? ' FEL=' + v.error.code : '') + (v.src ? ' src=' + tail(v.currentSrc || v.src) : '');
         if (state !== last) dbg(state);
         last = state;
       } catch (e) {
-        if (tries === 1) dbg('video: kan inte läsas (' + e.message + ')');
+        if (tries === 1) dbg('ram ' + name + ': kan inte läsas (' + e.message + ')');
       }
     }, 2000);
   };
