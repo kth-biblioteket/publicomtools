@@ -15,7 +15,8 @@ export const dynamic = "force-dynamic";
  * JPEG, PNG, WebP and MP4 are stored (src/lib/media.ts), so a CSP isn't needed on the file itself.
  */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+  // <id>.mp4, .jpg, .png, .webp är samma fil: Tizens videospelare verkar välja format efter adressens ändelse
+  const id = (await params).id.replace(/\.(mp4|jpe?g|png|webp)$/i, "");
   const path = mediaPath(id);
   const row = path ? await db.media.findUnique({ where: { id }, select: { mime: true } }) : null;
   let size = 0;

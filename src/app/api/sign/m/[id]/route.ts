@@ -27,7 +27,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const row = isMediaId(id) ? await db.media.findUnique({ where: { id }, select: { kind: true, name: true } }) : null;
   const fit = new URL(request.url).searchParams.get("fit") === "contain" ? "contain" : "cover";
-  const src = `../f/${id}`;
+  // Filmer med .mp4 i adressen (samma fil): Tizens videospelare hämtade ingenting utan ändelse
+  const src = row?.kind === "video" ? `../f/${id}.mp4` : `../f/${id}`;
   const body = !row
     ? ""
     : row.kind === "video"
