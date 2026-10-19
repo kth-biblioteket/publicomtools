@@ -8,17 +8,23 @@ export const dynamic = "force-dynamic";
 
 /**
  * A file in the signs' media library, public like the pages the signs show. The name is the hash of the content, so
- * it never changes: cached for a year. Range requests (206) so a film can start before it's all
- * loaded. A file missing on disk (a restored database without the file) is 404; the sign shows a black page.
+ * it never changes: cached for a year, with the hash as ETag. Range requests (206) so a film can start before it's
+ * all loaded. A file missing on disk (a restored database without the file) is 404; the sign shows a black page.
+ * The headers are kept to what ordinary file servers send: Samsung Tizen's video player (Tizen 4.0) loaded
+ * nothing when the answer had a Content-Security-Policy, no ETag/Last-Modified and "immutable" (19 okt). Only
+ * JPEG, PNG, WebP and MP4 are stored (src/lib/media.ts), so a CSP isn't needed on the file itself.
  */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const path = mediaPath(id);
   const row = path ? await db.media.findUnique({ where: { id }, select: { mime: true } }) : null;
   let size = 0;
+  let modified = new Date(0);
   try {
     if (!path || !row) throw new Error("unknown");
-    size = (await stat(path)).size;
+    const st = await stat(path);
+    size = st.size;
+    modified = st.mtime;
   } catch {
     return new Response("Hittar inte filen.", { status: 404, headers: { "Access-Control-Allow-Origin": "*" } });
   }
@@ -27,11 +33,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Expose-Headers": "Content-Length, Content-Range, Accept-Ranges",
     "Content-Type": row.mime,
-    "Cache-Control": "public, max-age=31536000, immutable",
+    "Cache-Control": "public, max-age=31536000",
+    ETag: `"${id}"`,
+    "Last-Modified": modified.toUTCString(),
     "X-Content-Type-Options": "nosniff",
-    "Content-Security-Policy": "default-src 'none'",
     "Accept-Ranges": "bytes",
   };
+  if (request.headers.get("if-none-match") === `"${id}"`) return new Response(null, { status: 304, headers });
 
   const range = /^bytes=(\d*)-(\d*)$/.exec(request.headers.get("range") ?? "");
   if (range && (range[1] || range[2])) {
