@@ -1,7 +1,7 @@
 'use strict';
 // Start och styrning: inskrivning, inställningar, rotation och statusrapporter mot publicomtools.
 (function (PP) {
-  var VERSION = '0.1.1'; // höjs vid varje ändring av spelaren (syns som Spelare i admin); config.xml har samma
+  var VERSION = '0.1.5'; // höjs vid varje ändring av spelaren (syns som Spelare i admin); config.xml har samma
   var CLIENT_VERSION = 1;
   var CONFIG_POLL_MS = PP.configPollMs || 60000; // ändrad spellista slår igenom inom så här lång tid (PP.configPollMs bara för tests/poll.html)
   var CONFIG_RETRY_MS = 30000;
@@ -49,6 +49,13 @@
     configVersion = config.version ? String(config.version) : '';
     computerName = String(values.COMPUTER_NAME || '');
     heartbeatMinutes = intValue(values, 'HEARTBEAT_INTERVAL', 5, 1, 60);
+
+    if (window.PP_debug) {
+      var parsedSchedule = schedule.parseSchedule(scheduleRaw, seconds);
+      window.PP_debug('config ' + (config.version || '?') + ': SIGN_PAGES ' + pagesRaw.length + ' tecken, SIGN_SCHEDULE ' + scheduleRaw.length + ' tecken'
+        + (scheduleRaw ? (parsedSchedule ? ' (tolkat: ' + Object.keys(parsedSchedule.lists).length + ' listor, ' + parsedSchedule.slots.length + ' rader' + (parsedSchedule.off ? ', off' : '') + ')' : ' (KUNDE INTE TOLKAS)') : '')
+        + ', nycklar: ' + Object.keys(values).join(','));
+    }
 
     var sig = JSON.stringify([pagesRaw, scheduleRaw, seconds, scripts]);
     if (sig === appliedSignature) return;
@@ -165,6 +172,7 @@
   }
 
   function boot() {
+    if (window.PP_debug) window.PP_debug('start: version ' + VERSION + ', inskriven=' + client.isEnrolled());
     PP.ui.init();
     rotator = new PP.Rotator(document.getElementById('frame-a'), document.getElementById('frame-b'), PP.ui);
     if (!client.isEnrolled()) {

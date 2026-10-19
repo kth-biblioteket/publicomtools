@@ -21,6 +21,15 @@
   var LOAD_TIMEOUT_MS = 30000;   // en sida som inte laddats klart efter så här länge räknas som misslyckad
   var BLANK = 'about:blank';
 
+  /** Skriver till felsökningsrutan (index.html?debug=1), annars ingenting */
+  function dbg(text) {
+    if (window.PP_debug) window.PP_debug(text);
+  }
+
+  function tail(url) {
+    return String(url || '').replace(/^https?:\/\/[^\/]+/, '').slice(0, 60);
+  }
+
   function withTimeout(promise, ms, onTimeout) {
     var timer;
     var timeout = new Promise(function (resolve) {
@@ -77,6 +86,7 @@
     this.loading = true;
     probe(url).then(function (result) {
       if (token !== self.token) return;
+      dbg('kontroll ' + result + ' ' + tail(url));
       if (result === 'http' || result === 'net') return self.fail(result === 'net');
       self.el.setAttribute('sandbox', scripts ? 'allow-scripts allow-same-origin' : 'allow-same-origin');
       self.el.src = url;
@@ -89,6 +99,7 @@
   Frame.prototype.loaded = function () {
     if (!this.loading || this.el.getAttribute('src') === BLANK) return;
     clearTimeout(this.timer);
+    dbg('laddad ' + tail(this.url));
     this.loading = false;
     this.ok = true;
     this.okAt = Date.now();
@@ -97,6 +108,7 @@
 
   Frame.prototype.fail = function (net) {
     clearTimeout(this.timer);
+    dbg('MISSLYCKADES' + (net ? ' (nät)' : '') + ' ' + tail(this.url));
     this.loading = false;
     this.ok = false;
     this.failed = true;
@@ -201,6 +213,7 @@
       key = 'default#' + schedule.signature(shown);
     }
     if (!first && key === this.currentKey) return;
+    dbg('lista: ' + key.slice(0, 60) + ' | sidor: ' + (shown ? shown.length : 0) + (c.black ? ' | svart (off)' : '') + ' | tid ' + now.toTimeString().slice(0, 8));
     // Från svart skärm eller en sida som inte gick att ladda: den nya listan börjar direkt (inget att visa bakom)
     var direct = first || this.black || this.frames[this.active].hasFailed();
     this.currentKey = key;

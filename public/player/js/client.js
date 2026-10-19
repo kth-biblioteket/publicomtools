@@ -6,8 +6,9 @@
   var DEFAULT_URL = 'https://apps.lib.kth.se/publicomtools';
   var TIMEOUT_MS = 20000;
 
-  /** Serveras spelaren från publicomtools (https://värd/publicomtools/player/…) föreslås samma värd, annars standardadressen */
+  /** PP_DEFAULT_URL (js/env.js, satt av bygget) gäller först; serveras spelaren från publicomtools (https://värd/publicomtools/player/…) föreslås samma värd, annars standardadressen */
   function defaultUrl() {
+    if (window.PP_DEFAULT_URL) return window.PP_DEFAULT_URL;
     var m = /^(https:\/\/[^\/]+\/publicomtools)\//.exec(window.location.href);
     return m ? m[1] : DEFAULT_URL;
   }
