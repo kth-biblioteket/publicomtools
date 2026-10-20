@@ -7,13 +7,16 @@ export const dynamic = "force-dynamic";
 /**
  * Starts the film for browsers that don't autoplay from the attributes alone (older Chromium on
  * Samsung Tizen, some desktop browsers): mutes it in script and calls play(), again when it can
- * play and every other second while paused, at most five times (a TV shows its sound icon on each try). ES5, since Tizen 4.0 runs Chromium 56. Allowed by its
+ * play and every other second while paused, at most five times (a TV shows its sound icon on each try).
+ * A player that preloads the page in a hidden frame (PubLiPlayer) posts 'pp-activate' when it shows it:
+ * the film then starts over, instead of being some seconds in. ES5, since Tizen 4.0 runs Chromium 56. Allowed by its
  * hash in the CSP, so no other script can run on the page.
  */
 const PLAY_SCRIPT =
   "(function(){var v=document.querySelector('video');if(!v)return;v.muted=true;" +
   "function p(){var r=v.play();if(r&&r.catch)r.catch(function(){});}" +
-  "p();v.addEventListener('canplay',p);var n=0,t=setInterval(function(){if(++n>5)return clearInterval(t);if(v.paused)p();},2000);})();";
+  "p();v.addEventListener('canplay',p);var n=0,t=setInterval(function(){if(++n>5)return clearInterval(t);if(v.paused)p();},2000);" +
+  "window.addEventListener('message',function(e){if(e.data==='pp-activate'){try{v.currentTime=0;}catch(x){}p();}});})();";
 const PLAY_SCRIPT_HASH = `'sha256-${createHash("sha256").update(PLAY_SCRIPT).digest("base64")}'`;
 
 const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
