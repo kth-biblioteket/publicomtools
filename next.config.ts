@@ -22,7 +22,7 @@ const nextConfig: NextConfig = {
     return [
       { source: "/player/:path*", headers: [{ key: "Cache-Control", value: "no-cache" }] },
       // Installationsmappen för Samsungs URL Launcher (SSSP): skärmen hämtar sssp_config.xml och
-      // PubLiPlayer.wgt från mappen. Tillfälligt prov med ett osignerat paket (publiplayer 0.1.4).
+      // PubLiPlayer.wgt från mappen. Signerat med Samsungs certifikat för skärmen (publiplayer 0.1.12).
       {
         source: "/player-install/sssp_config.xml",
         headers: [
