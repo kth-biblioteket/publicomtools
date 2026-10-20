@@ -30,8 +30,8 @@ export const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
 export const MAX_PDF_PAGES = 50;
 /** The whole library; MEDIA_QUOTA_GB on the server (/local has 25 GB free of 30, shared) */
 export const QUOTA_BYTES = Number(process.env.MEDIA_QUOTA_GB || 8) * 1024 ** 3;
-/** Images and pdf pages are scaled down to fit this box (the screens are at most 1920×1080) */
-const MAX_SIDE = 1920;
+/** Images and pdf pages are scaled down to fit this box: 4K, so text stays sharp on large 4K screens */
+const MAX_SIDE = 3840;
 
 const run = promisify(execFile);
 export const isMediaId = (id: string) => /^[0-9a-f]{64}$/.test(id);
@@ -107,17 +107,28 @@ export async function usedBytes(): Promise<number> {
   return r._sum.bytes ?? 0;
 }
 
-/** An image (or pdf page) re-encoded: upright, at most 1920 px, no metadata (GPS …), stored by hash */
+/**
+ * An image (or pdf page) re-encoded: upright, at most MAX_SIDE px, no metadata (GPS …), stored by
+ * hash. PNG and pdf pages (text, graphics) become lossless WebP, so text stays exactly as drawn;
+ * JPEG photos JPEG at quality 92 with full colour resolution (4:4:4), WebP WebP at 92. Lower JPEG
+ * quality gave blotchy blocks around text and purple tints in dark areas on Samsung Tizen (20 okt).
+ */
 async function saveImage(input: Buffer, format: "jpeg" | "png" | "webp", name: string, uploadedBy: string): Promise<MediaItem> {
   const img = sharp(input, { failOn: "error" }).rotate().resize({ width: MAX_SIDE, height: MAX_SIDE, fit: "inside", withoutEnlargement: true });
-  const out = await (format === "webp" ? img.webp({ quality: 85 }) : img.jpeg({ quality: 85, mozjpeg: true })).toBuffer({ resolveWithObject: true });
+  const encoded =
+    format === "png"
+      ? img.webp({ lossless: true, effort: 3 })
+      : format === "webp"
+        ? img.webp({ quality: 92 })
+        : img.jpeg({ quality: 92, chromaSubsampling: "4:4:4", mozjpeg: true });
+  const out = await encoded.toBuffer({ resolveWithObject: true });
   const id = createHash("sha256").update(out.data).digest("hex");
   const existing = await db.media.findUnique({ where: { id } });
   if (existing) return toItem(existing);
   await writeFile(join(/*turbopackIgnore: true*/ MEDIA_DIR, id), out.data);
   return toItem(
     await db.media.create({
-      data: { id, name, mime: format === "webp" ? "image/webp" : "image/jpeg", kind: "image", bytes: out.data.length, width: out.info.width, height: out.info.height, uploadedBy },
+      data: { id, name, mime: format === "jpeg" ? "image/jpeg" : "image/webp", kind: "image", bytes: out.data.length, width: out.info.width, height: out.info.height, uploadedBy },
     }),
   );
 }
@@ -171,15 +182,16 @@ export async function saveUpload(body: ReadableStream<Uint8Array>, name: string,
       const dir = await mkdtemp(join(tmpDir, "pdf-"));
       try {
         try {
-          await run("pdftoppm", ["-jpeg", "-scale-to", String(MAX_SIDE), "-l", String(MAX_PDF_PAGES), tmp, join(dir, "p")], { timeout: 120_000 });
+          // PNG (utan förlust): sidorna sparas som WebP utan förlust, så texten blir som i pdf:en
+          await run("pdftoppm", ["-png", "-scale-to", String(MAX_SIDE), "-l", String(MAX_PDF_PAGES), tmp, join(dir, "p")], { timeout: 300_000 });
         } catch {
           return { ok: false, error: "Pdf:en går inte att läsa. Spara den på nytt (t.ex. Skriv ut › Spara som PDF) och försök igen." };
         }
-        const pages = (await readdir(dir)).filter((f) => f.endsWith(".jpg")).sort((a, b) => Number(a.match(/(\d+)\.jpg$/)?.[1]) - Number(b.match(/(\d+)\.jpg$/)?.[1]));
+        const pages = (await readdir(dir)).filter((f) => f.endsWith(".png")).sort((a, b) => Number(a.match(/(\d+)\.png$/)?.[1]) - Number(b.match(/(\d+)\.png$/)?.[1]));
         if (!pages.length) return { ok: false, error: "Pdf:en har inga sidor." };
         const items: MediaItem[] = [];
         for (const [i, f] of pages.entries())
-          items.push(await saveImage(await readFile(join(dir, f)), "jpeg", pages.length > 1 ? `${cleanName} – sida ${i + 1}` : cleanName, uploadedBy));
+          items.push(await saveImage(await readFile(join(dir, f)), "png", pages.length > 1 ? `${cleanName} – sida ${i + 1}` : cleanName, uploadedBy));
         return { ok: true, items };
       } finally {
         await rm(dir, { recursive: true, force: true });

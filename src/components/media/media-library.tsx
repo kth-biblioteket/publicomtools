@@ -79,7 +79,7 @@ export function MediaLibrary({ media, quota, fileBase, uploadUrl }: { media: Ite
             e.target.value = "";
           }}
         />
-        <span className="text-[13px] text-muted">Bild (JPEG, PNG, WebP) och pdf högst 30 MB, film (MP4) högst 200 MB. Bilder skalas om till 1920 punkter.</span>
+        <span className="text-[13px] text-muted">Bild (JPEG, PNG, WebP) och pdf högst 30 MB, film (MP4) högst 200 MB. Bilder skalas om till högst 3840 punkter; PNG och pdf sparas utan förlust.</span>
         <span className="flex-1" />
         <span className="flex min-w-[220px] flex-col gap-1 text-[12.5px] text-muted">
           <span>
