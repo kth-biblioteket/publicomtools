@@ -1,6 +1,7 @@
 import "server-only";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import sharp from "sharp";
 import { db } from "@/lib/db";
 
 /**
@@ -56,7 +57,9 @@ export function renderSnap(id: string): Promise<SnapRow | null> {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(body.error ?? `renderingstjänsten svarade ${res.status}`);
       }
-      const jpeg = Buffer.from(await res.arrayBuffer());
+      // Samma kodning som uppladdade bilder (src/lib/media.ts): Chromiums JPEG (baseline, med inbäddad
+      // färgprofil) blev fläckig och lila i mörka partier på Samsung Tizen, uppladdade bilder gör det inte
+      const jpeg = await sharp(Buffer.from(await res.arrayBuffer())).jpeg({ quality: 85, mozjpeg: true }).toBuffer();
       await mkdir(SNAP_DIR, { recursive: true });
       const tmp = `${snapFile(id)}.${process.pid}.tmp`;
       await writeFile(tmp, jpeg);
