@@ -1,7 +1,7 @@
 'use strict';
 // Start och styrning: inskrivning, inställningar, rotation och statusrapporter mot publicomtools.
 (function (PP) {
-  var VERSION = '0.1.14'; // höjs vid varje ändring av spelaren (syns som Spelare i admin); config.xml har samma
+  var VERSION = '0.1.15'; // höjs vid varje ändring av spelaren (syns som Spelare i admin); config.xml har samma
   var CLIENT_VERSION = 1;
   var CONFIG_POLL_MS = PP.configPollMs || 60000; // ändrad spellista slår igenom inom så här lång tid (PP.configPollMs bara för tests/poll.html)
   var CONFIG_RETRY_MS = 30000;
@@ -71,7 +71,9 @@
       scripts: scripts,
       onLoaded: pageStateChanged,
     });
-    rotator.start();
+    // En ändrad spellista byts in mjukt (den gamla sidan visas tills den nya är laddad); start() tömmer ramarna och visar svart
+    if (rotator.running) rotator.applySchedule(false);
+    else rotator.start();
   }
 
   /**

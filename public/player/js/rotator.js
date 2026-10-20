@@ -252,7 +252,14 @@
       shown = schedule.on(this.cfg.defaultList, schedule.today(now));
       key = 'default#' + schedule.signature(shown);
     }
-    if (!first && key === this.currentKey) return;
+    if (!first && key === this.currentKey) {
+      // Samma sidor: inget byte, men nya visningstider och inställningar gäller (de nya sidobjekten tar över listan)
+      if (shown && shown.length && this.running && !this.black) {
+        this.list = shown;
+        this.scheduleNext();
+      }
+      return;
+    }
     dbg('lista: ' + key.slice(0, 60) + ' | sidor: ' + (shown ? shown.length : 0) + (c.black ? ' | svart (off)' : '') + ' | tid ' + now.toTimeString().slice(0, 8));
     // Från svart skärm eller en sida som inte gick att ladda: den nya listan börjar direkt (inget att visa bakom)
     var direct = first || this.black || this.frames[this.active].hasFailed();
