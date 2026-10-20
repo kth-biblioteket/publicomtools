@@ -10,27 +10,12 @@ export const dynamic = "force-dynamic";
  * A file in the signs' media library, public like the pages the signs show. The name is the hash of the content, so
  * it never changes: cached for a year, with the hash as ETag. Range requests (206) so a film can start before it's
  * all loaded. A file missing on disk (a restored database without the file) is 404; the sign shows a black page.
- * The headers are kept to what ordinary file servers send: Samsung Tizen's video player (Tizen 4.0) loaded
- * nothing when the answer had a Content-Security-Policy, no ETag/Last-Modified and "immutable" (19 okt). Only
- * JPEG, PNG, WebP and MP4 are stored (src/lib/media.ts), so a CSP isn't needed on the file itself.
+ * The headers are what ordinary file servers send (ETag, Last-Modified, no CSP: only JPEG, PNG, WebP and MP4
+ * are stored, src/lib/media.ts). Samsung Tizen's video player played nothing from here until the server
+ * answered on IPv6 too (ufw, 20 okt); the header changes made on the way are harmless and kept.
  */
-/** TILLFÄLLIGT (felsökning av film på Tizen, 19 okt): en rad per anrop i containerns logg; tas bort sedan */
-function logRequest(request: Request, name: string, status: number) {
-  const h = request.headers;
-  console.log(
-    `sign-f ${request.method} ${name.slice(0, 12)}… range=${h.get("range") ?? "-"} status=${status} ` +
-      `ua=${(h.get("user-agent") ?? "-").slice(0, 160)} ip=${h.get("x-forwarded-for") ?? h.get("x-real-ip") ?? "-"}`,
-  );
-}
-
-export async function GET(request: Request, ctx: { params: Promise<{ id: string }> }) {
-  const res = await serve(request, ctx);
-  logRequest(request, (await ctx.params).id, res.status);
-  return res;
-}
-
-async function serve(request: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
-  // <id>.mp4, .jpg, .png, .webp är samma fil: Tizens videospelare verkar välja format efter adressens ändelse
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  // <id>.mp4, .jpg, .png, .webp är samma fil (filmsidan använder .mp4)
   const id = (await params).id.replace(/\.(mp4|jpe?g|png|webp)$/i, "");
   const path = mediaPath(id);
   const row = path ? await db.media.findUnique({ where: { id }, select: { mime: true } }) : null;
