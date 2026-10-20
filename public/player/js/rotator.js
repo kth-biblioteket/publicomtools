@@ -315,6 +315,19 @@
     this.frames.forEach(function (f, n) { f.el.style.zIndex = n === active ? 2 : 1; });
   };
 
+  /**
+   * Ramen har just blivit synlig. Den har förladdats (och en film i den har redan spelat i ca 10 s bakom den förra ramen), så
+   * sidan får ett meddelande och kan börja om från början. Sidor som inte lyssnar påverkas inte.
+   */
+  Rotator.prototype.activate = function (frame) {
+    try {
+      if (frame.el.contentWindow) frame.el.contentWindow.postMessage('pp-activate', '*');
+      dbg('aktiverar ' + tail(frame.url));
+    } catch (e) {
+      // ramen kan sakna fönster just då
+    }
+  };
+
   /** Visar felsidan så länge den aktuella sidan inte har kunnat laddas, och försöker igen */
   Rotator.prototype.settle = function () {
     var self = this;
@@ -374,6 +387,7 @@
     this.index = next;
     this.raise();
     this.settle();
+    this.activate(this.frames[this.active]);
     // Den gamla ramen släpps (stoppar skript och film) så att den är tom när den blir nästa förladdningsram
     this.later('drop', function () {
       if (self.active !== old) self.frames[old].clear();
