@@ -21,6 +21,8 @@ export async function createSnapAction(input: {
   url: string;
   orientation: "landscape" | "portrait";
   refreshMin: number;
+  /** 2: twice the pixels, for 4K screens */
+  scale?: 1 | 2;
 }): Promise<{ ok: true; snap: SnapInfo } | { ok: false; error: string }> {
   const user = await getCurrentUser();
   if (!user || !isAdmin(user)) return { ok: false, error: "Logga in som administratör." };
@@ -29,7 +31,8 @@ export async function createSnapAction(input: {
   if (!(SNAP_REFRESH as readonly number[]).includes(input.refreshMin)) return { ok: false, error: "Ogiltigt uppdateringsintervall." };
   const size = SNAP_SIZES[input.orientation];
   if (!size) return { ok: false, error: "Välj liggande eller stående." };
-  const snap = await ensureSnap({ url, width: size[0], height: size[1], refreshMin: input.refreshMin, user: user.email });
+  const scale = input.scale === 2 ? 2 : 1;
+  const snap = await ensureSnap({ url, width: size[0], height: size[1], scale, refreshMin: input.refreshMin, user: user.email });
   return { ok: true, snap: toSnapInfo((await renderSnap(snap.id)) ?? snap) };
 }
 

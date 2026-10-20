@@ -278,6 +278,8 @@ model Snap {
   url         String
   width       Int
   height      Int
+  /// 1, or 2 for twice the pixels (same layout) for 4K screens
+  scale       Int       @default(1)
   refreshMin  Int
   /// The latest good image: MEDIA_DIR/snap/<id>.jpg
   renderedAt  DateTime?
@@ -290,5 +292,5 @@ model Snap {
   createdBy   String
   createdAt   DateTime  @default(now())
 
-  @@unique([url, width, height])
+  @@unique([url, width, height, scale])
 }

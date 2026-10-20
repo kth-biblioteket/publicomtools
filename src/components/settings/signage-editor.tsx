@@ -37,6 +37,8 @@ export type SignSnap = {
   url: string;
   width: number;
   height: number;
+  /** 2: twice the pixels, for 4K screens */
+  scale: number;
   refreshMin: number;
   renderedAt: string | null;
   error: string | null;
@@ -1112,7 +1114,7 @@ function SnapRowBox({ id, snap, signage, onSnap, fitSelect }: { id: string; snap
       {/* Hur senaste bilden gick, på en egen rad under raden */}
       <span className={`order-last flex basis-full items-center gap-2 pl-[22px] text-[12px] ${bad ? "font-semibold text-bad-ink" : "text-[#5a6270]"}`}>
         <span className="min-w-0 truncate" title={status}>
-          {snap && `Sida som bild, ${portrait ? "stående" : "liggande"} · `}
+          {snap && `Sida som bild, ${portrait ? "stående" : "liggande"}${snap.scale === 2 ? ", 4K" : ""} · `}
           {old && !failed ? `Gammal bild: ${status}` : status}
         </span>
         {snap && (
@@ -1147,13 +1149,14 @@ function SnapForm({ onCancel, onAdded }: { onCancel: () => void; onAdded: (s: Si
   const [url, setUrl] = useState("");
   const [orientation, setOrientation] = useState<"landscape" | "portrait">("landscape");
   const [refreshMin, setRefreshMin] = useState(5);
+  const [scale, setScale] = useState<1 | 2>(1);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const add = async () => {
     setError(null);
     setBusy(true);
     try {
-      const res = await createSnapAction({ url, orientation, refreshMin });
+      const res = await createSnapAction({ url, orientation, refreshMin, scale });
       if (!res.ok) setError(res.error);
       else onAdded(res.snap);
     } catch {
@@ -1182,6 +1185,15 @@ function SnapForm({ onCancel, onAdded }: { onCancel: () => void; onAdded: (s: Si
             {o === "landscape" ? "Liggande 1920×1080" : "Stående 1080×1920"}
           </button>
         ))}
+        <button
+          type="button"
+          aria-pressed={scale === 2}
+          onClick={() => setScale((x) => (x === 2 ? 1 : 2))}
+          title="Samma sida med dubbelt så många pixlar: skarp text på 4K-skärmar (t.ex. 55 tum). Större fil, tar lite längre tid."
+          className={pill(scale === 2)}
+        >
+          Dubbel upplösning (4K-skärmar)
+        </button>
         <label className="ml-1 flex items-center gap-1.5 text-[#5a6270]">
           Ny bild var
           <select value={refreshMin} onChange={(e) => setRefreshMin(Number(e.target.value))} className="h-[30px] rounded-md border border-[#c4cad2] bg-white px-1.5 text-ink">

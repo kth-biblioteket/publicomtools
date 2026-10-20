@@ -55,7 +55,7 @@ export function renderSnap(id: string): Promise<SnapRow | null> {
       const res = await fetch(`${SNAP_URL}/render`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: snap.url, width: snap.width, height: snap.height, waitMs: WAIT_MS }),
+        body: JSON.stringify({ url: snap.url, width: snap.width, height: snap.height, scale: snap.scale, waitMs: WAIT_MS }),
         signal: AbortSignal.timeout(90_000),
       });
       if (!res.ok) {
@@ -106,10 +106,10 @@ export async function snapForSign(id: string): Promise<SnapRow | null> {
 }
 
 /** The row for an address and size, created if new (the refresh interval is the latest chosen) */
-export async function ensureSnap(input: { url: string; width: number; height: number; refreshMin: number; user: string }): Promise<SnapRow> {
+export async function ensureSnap(input: { url: string; width: number; height: number; scale: 1 | 2; refreshMin: number; user: string }): Promise<SnapRow> {
   return db.snap.upsert({
-    where: { url_width_height: { url: input.url, width: input.width, height: input.height } },
-    create: { url: input.url, width: input.width, height: input.height, refreshMin: input.refreshMin, createdBy: input.user },
+    where: { url_width_height_scale: { url: input.url, width: input.width, height: input.height, scale: input.scale } },
+    create: { url: input.url, width: input.width, height: input.height, scale: input.scale, refreshMin: input.refreshMin, createdBy: input.user },
     update: { refreshMin: input.refreshMin },
   });
 }
@@ -130,6 +130,7 @@ export type SnapInfo = {
   url: string;
   width: number;
   height: number;
+  scale: number;
   refreshMin: number;
   renderedAt: string | null;
   error: string | null;
@@ -140,6 +141,7 @@ export const toSnapInfo = (s: SnapRow): SnapInfo => ({
   url: s.url,
   width: s.width,
   height: s.height,
+  scale: s.scale,
   refreshMin: s.refreshMin,
   renderedAt: s.renderedAt?.toISOString() ?? null,
   error: s.error,

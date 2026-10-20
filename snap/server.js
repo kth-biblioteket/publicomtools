@@ -3,7 +3,7 @@
  * publicomtools-snap: renderar en webbsida till en JPEG, åt publicomtools "Sida som bild" (skyltar
  * vars webbläsare inte klarar KTH:s levande sidor, t.ex. Samsung Tizen 4.0).
  *
- *   POST /render  {"url":"https://…","width":1920,"height":1080,"waitMs":2000}
+ *   POST /render  {"url":"https://…","width":1920,"height":1080,"waitMs":2000,"scale":1}  (scale 2: dubbla pixlar)
  *                 → 200 image/jpeg, eller 4xx/5xx {"error":"…"}
  *   GET  /health  → 200 "ok"
  *
@@ -73,14 +73,15 @@ function release() {
   else running--;
 }
 
-async function render({ url, width, height, waitMs }) {
+async function render({ url, width, height, waitMs, scale }) {
   await slot();
   const t0 = Date.now();
   let context = null;
   try {
     context = await (await getBrowser()).createBrowserContext();
     const page = await context.newPage();
-    await page.setViewport({ width, height, deviceScaleFactor: 1 });
+    // scale 2: samma layout med dubbelt så många pixlar (skarp text på 4K-skärmar)
+    await page.setViewport({ width, height, deviceScaleFactor: scale });
     // Bara webbsidor: inga file:-, data:- eller andra adresser som huvudsida
     page.on('request', (r) => {
       if (r.isNavigationRequest() && r.frame() === page.mainFrame() && !/^https:\/\//.test(r.url())) r.abort('blockedbyclient');
@@ -144,12 +145,14 @@ http
     try {
       const b = await readJson(req);
       const width = Number(b.width), height = Number(b.height), waitMs = b.waitMs === undefined ? 2000 : Number(b.waitMs);
+      const scale = b.scale === undefined ? 1 : Number(b.scale);
+      if (scale !== 1 && scale !== 2) return fail(res, 400, 'ogiltig skala');
       if (typeof b.url !== 'string' || !/^https:\/\/[^\s/]+/.test(b.url)) return fail(res, 400, 'adressen måste börja med https://');
       if (![width, height].every((n) => Number.isInteger(n) && n >= 200 && n <= 3840)) return fail(res, 400, 'ogiltig storlek');
       if (!Number.isInteger(waitMs) || waitMs < 0 || waitMs > 10_000) return fail(res, 400, 'ogiltig väntetid');
-      job = { url: b.url, width, height, waitMs };
+      job = { url: b.url, width, height, waitMs, scale };
       const { jpeg, ms, slow } = await render(job);
-      console.log(`klar ${job.url} ${width}×${height} ${jpeg.length} byte ${ms} ms${slow ? ' (anrop som inte blev klara)' : ''}`);
+      console.log(`klar ${job.url} ${width}×${height}${scale === 2 ? ' ×2' : ''} ${jpeg.length} byte ${ms} ms${slow ? ' (anrop som inte blev klara)' : ''}`);
       res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Content-Length': jpeg.length, 'X-Render-Ms': String(ms), 'X-Render-Slow': slow ? '1' : '0' });
       res.end(jpeg);
     } catch (e) {
