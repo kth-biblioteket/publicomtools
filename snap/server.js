@@ -4,7 +4,7 @@
  * vars webbläsare inte klarar KTH:s levande sidor, t.ex. Samsung Tizen 4.0).
  *
  *   POST /render  {"url":"https://…","width":1920,"height":1080,"waitMs":2000,"scale":1}  (scale 2: dubbla pixlar)
- *                 → 200 image/jpeg, eller 4xx/5xx {"error":"…"}
+ *                 → 200 image/png (utan förlust; publicomtools kodar om), eller 4xx/5xx {"error":"…"}
  *   GET  /health  → 200 "ok"
  *
  * Chromium hålls igång; varje rendering får ett eget tomt webbläsarkontext (inga kakor eller cache
@@ -99,8 +99,9 @@ async function render({ url, width, height, waitMs, scale }) {
     });
     // Sidans skript ska hinna rita klart (mätare, listor som hämtas efter laddningen)
     await new Promise((r) => setTimeout(r, waitMs));
-    const jpeg = await page.screenshot({ type: 'jpeg', quality: 85 });
-    return { jpeg: Buffer.from(jpeg), ms: Date.now() - t0, slow };
+    // PNG, utan förlust: publicomtools kodar om bilden (WebP utan förlust), så JPEG-fel här skulle följa med
+    const png = await page.screenshot({ type: 'png' });
+    return { image: Buffer.from(png), ms: Date.now() - t0, slow };
   } catch (e) {
     if (e && e.name === 'TimeoutError') throw Object.assign(new Error(`sidan blev inte klar på ${TIMEOUT_MS / 1000} s`), { status: 504 });
     throw e;
@@ -151,10 +152,10 @@ http
       if (![width, height].every((n) => Number.isInteger(n) && n >= 200 && n <= 3840)) return fail(res, 400, 'ogiltig storlek');
       if (!Number.isInteger(waitMs) || waitMs < 0 || waitMs > 10_000) return fail(res, 400, 'ogiltig väntetid');
       job = { url: b.url, width, height, waitMs, scale };
-      const { jpeg, ms, slow } = await render(job);
-      console.log(`klar ${job.url} ${width}×${height}${scale === 2 ? ' ×2' : ''} ${jpeg.length} byte ${ms} ms${slow ? ' (anrop som inte blev klara)' : ''}`);
-      res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Content-Length': jpeg.length, 'X-Render-Ms': String(ms), 'X-Render-Slow': slow ? '1' : '0' });
-      res.end(jpeg);
+      const { image, ms, slow } = await render(job);
+      console.log(`klar ${job.url} ${width}×${height}${scale === 2 ? ' ×2' : ''} ${image.length} byte ${ms} ms${slow ? ' (anrop som inte blev klara)' : ''}`);
+      res.writeHead(200, { 'Content-Type': 'image/png', 'Content-Length': image.length, 'X-Render-Ms': String(ms), 'X-Render-Slow': slow ? '1' : '0' });
+      res.end(image);
     } catch (e) {
       const msg = (e && e.message) || String(e);
       console.error(`misslyckades ${job ? job.url : ''}: ${msg}`);
