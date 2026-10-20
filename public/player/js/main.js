@@ -1,7 +1,7 @@
 'use strict';
 // Start och styrning: inskrivning, inställningar, rotation och statusrapporter mot publicomtools.
 (function (PP) {
-  var VERSION = '0.1.11'; // höjs vid varje ändring av spelaren (syns som Spelare i admin); config.xml har samma
+  var VERSION = '0.1.13'; // höjs vid varje ändring av spelaren (syns som Spelare i admin); config.xml har samma
   var CLIENT_VERSION = 1;
   var CONFIG_POLL_MS = PP.configPollMs || 60000; // ändrad spellista slår igenom inom så här lång tid (PP.configPollMs bara för tests/poll.html)
   var CONFIG_RETRY_MS = 30000;
@@ -75,8 +75,8 @@
   }
 
   /**
-   * Felsökning (?debugtv): tre <video muted autoplay> direkt i toppsidan, ovanför varandra till höger: A vår egen film (den första
-   * uppladdade i configen, /api/sign/m/<id> -> /api/sign/f/<id>), B en film från w3schools och C en från Mozilla. Visar om skärmens
+   * Felsökning (?debugtv): <video muted autoplay> direkt i toppsidan, ovanför varandra till höger: A1/A2 vår egen film (den första
+   * uppladdade i configen, /api/sign/m/<id> -> /api/sign/f/<id>.mp4 respektive utan ändelse), B en film från w3schools och C en från Mozilla. Visar om skärmens
    * webbläsare startar video utanför en ram och om det är just vår server eller fil som den inte får data från. Ett tryck på
    * en knapp på fjärrkontrollen anropar play() på alla.
    */
@@ -85,8 +85,10 @@
     var text = JSON.stringify(config.values || {});
     var m = /\/api\/sign\/m\/([0-9a-f]+)/.exec(text);
     var sources = [];
-    if (m) sources.push(['A vår', client.baseUrl() + '/api/sign/f/' + m[1]]);
-    else dbg('testvideo: ingen /api/sign/m/ i configen (A utelämnas)');
+    if (m) {
+      sources.push(['A1 vår .mp4', client.baseUrl() + '/api/sign/f/' + m[1] + '.mp4']); // som filmsidan
+      sources.push(['A2 vår utan', client.baseUrl() + '/api/sign/f/' + m[1]]);
+    } else dbg('testvideo: ingen /api/sign/m/ i configen (A utelämnas)');
     sources.push(['B w3schools', 'https://www.w3schools.com/html/mov_bbb.mp4']);
     sources.push(['C mozilla', 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4']);
     var videos = [];
@@ -95,7 +97,8 @@
       var v = document.createElement('video');
       v.muted = true; v.loop = true; v.autoplay = true;
       v.setAttribute('muted', ''); v.setAttribute('autoplay', ''); v.setAttribute('loop', ''); v.setAttribute('playsinline', '');
-      v.style.cssText = 'position:fixed;right:0;top:' + (i * 33) + '%;width:40%;height:33%;z-index:500;background:#' + ['222', '255', '522'][i] + ';object-fit:contain';
+      var h = Math.floor(100 / sources.length);
+      v.style.cssText = 'position:fixed;right:0;top:' + (i * h) + '%;width:40%;height:' + h + '%;z-index:500;background:#' + ['222', '225', '252', '522'][i % 4] + ';object-fit:contain';
       ['loadstart', 'loadedmetadata', 'canplay', 'playing', 'waiting', 'stalled', 'error', 'abort'].forEach(function (ev) {
         v.addEventListener(ev, function () { dbg('tv ' + label + ' ' + ev + (v.error ? ' FEL=' + v.error.code : '') + ' ready=' + v.readyState + ' ' + v.videoWidth + 'x' + v.videoHeight); });
       });
