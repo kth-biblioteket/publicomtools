@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 /**
  * Sida som bild: web pages the snap service (snap/server.js, headless Chromium in its own
  * container) renders to JPEGs, for signs whose browser can't draw KTH's live pages (Samsung Tizen
- * 4.0). A playlist row is the address /api/sign/s/<id>, shown like an uploaded image. An image is
+ * 4.0). A playlist row is the address /api/sign/s/<id>, shown like an uploaded image (lossless WebP). An image is
  * rendered when a sign asks and it's older than the row's refreshMin, so only pages some sign shows
  * are rendered; the sign gets the previous image that time. A failure keeps the previous image.
  */
@@ -22,17 +22,22 @@ export const SNAP_SIZES = { landscape: [1920, 1080], portrait: [1080, 1920] } as
 const WAIT_MS = 2000;
 
 export const isSnapId = (id: string) => /^[a-z0-9]{20,32}$/.test(id);
-const snapFile = (id: string) => join(/*turbopackIgnore: true*/ SNAP_DIR, `${id}.jpg`);
+const snapFile = (id: string, ext: "webp" | "jpg" = "webp") => join(/*turbopackIgnore: true*/ SNAP_DIR, `${id}.${ext}`);
 
 export type SnapRow = NonNullable<Awaited<ReturnType<typeof db.snap.findUnique>>>;
 
 /** The image file, or null if none has been rendered (or it's gone from disk) */
-export async function snapImage(id: string): Promise<Buffer | null> {
+export async function snapImage(id: string): Promise<{ data: Buffer; type: string } | null> {
   if (!isSnapId(id)) return null;
   try {
-    return await readFile(snapFile(id));
+    return { data: await readFile(snapFile(id)), type: "image/webp" };
   } catch {
-    return null;
+    // Bilder tagna före WebP (20 okt) ligger kvar som JPEG tills de förnyas
+    try {
+      return { data: await readFile(snapFile(id, "jpg")), type: "image/jpeg" };
+    } catch {
+      return null;
+    }
   }
 }
 
@@ -57,16 +62,17 @@ export function renderSnap(id: string): Promise<SnapRow | null> {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(body.error ?? `renderingstjänsten svarade ${res.status}`);
       }
-      // Samma kodning som uppladdade bilder (src/lib/media.ts): Chromiums JPEG (baseline, med inbäddad
-      // färgprofil) blev fläckig och lila i mörka partier på Samsung Tizen, uppladdade bilder gör det inte
-      const jpeg = await sharp(Buffer.from(await res.arrayBuffer())).jpeg({ quality: 85, mozjpeg: true }).toBuffer();
+      // WebP utan förlust: Chromiums JPEG blev fläckig och lila i mörka partier på Samsung Tizen (hårdvaruavkodad
+      // JPEG med halverad färgupplösning); WebP avkodas av webbläsaren själv och utan förlust blir inget förstört
+      const image = await sharp(Buffer.from(await res.arrayBuffer())).webp({ lossless: true }).toBuffer();
       await mkdir(SNAP_DIR, { recursive: true });
       const tmp = `${snapFile(id)}.${process.pid}.tmp`;
-      await writeFile(tmp, jpeg);
+      await writeFile(tmp, image);
       await rename(tmp, snapFile(id));
+      await rm(snapFile(id, "jpg"), { force: true });
       return await db.snap.update({
         where: { id },
-        data: { renderedAt: new Date(), renderMs: Number(res.headers.get("x-render-ms")) || null, bytes: jpeg.length, error: null, errorAt: null },
+        data: { renderedAt: new Date(), renderMs: Number(res.headers.get("x-render-ms")) || null, bytes: image.length, error: null, errorAt: null },
       });
     } catch (e) {
       const msg = e instanceof Error ? (e.name === "TimeoutError" ? "renderingstjänsten svarade inte i tid" : e.message) : String(e);
@@ -115,7 +121,7 @@ export async function setSnapRefresh(id: string, refreshMin: number): Promise<Sn
 }
 
 export async function deleteSnapFile(id: string) {
-  if (isSnapId(id)) await rm(snapFile(id), { force: true });
+  if (isSnapId(id)) await Promise.all([rm(snapFile(id), { force: true }), rm(snapFile(id, "jpg"), { force: true })]);
 }
 
 /** What the sign editor shows per row: address, size, interval and how the latest image went */
