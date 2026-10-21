@@ -20,7 +20,9 @@
   var PROBE_TIMEOUT_MS = 20000;  // sidovagnens första bild kan ta ~15 s
   var LOAD_TIMEOUT_MS = 30000;   // en sida som inte laddats klart efter så här länge räknas som misslyckad
   var FADE_SETTLE_MS = 150;      // tid i svart efter att den nya filmen gått, innan bilden tonas in
-  var FILM_LEAD_MS = 1500;       // en film som ska följa på en vanlig sida startas så här lång tid före bytet, under den sidan
+  var FILM_LEAD_MS = 4000;       // en film som ska följa på en vanlig sida startas så här lång tid före bytet (högst sidans tid), under den sidan
+  var FILM_WAIT_MS = 1500;       // går filmen inte vid bytet väntas så här länge på den innan en tonad start väljs
+  var XFADE_MS = 300;            // övertoning när en sida byts mot en annan (bild till bild, film till bild, bild till film)
   var FADE_MS = 400;             // film till film: tona ut och in så här länge (samma tid som i css/player.css)
   var BLANK = 'about:blank';
 
@@ -351,14 +353,34 @@
   /**
    * Den aktiva ramen överst. Den andra (förladdningen) ritas inte alls: Tizen spelar film på ett eget videoplan bakom webblagret och
    * gör ett hål i det där filmen ligger, så en synlig ram under skulle lysa igenom hålet (nästa sida syntes de sista 10 s av filmen).
-   * visibility:hidden laddar sidan som vanligt men ritar ingenting.
+   * visibility:hidden laddar sidan som vanligt men ritar ingenting. cross: den nya sidan tonas in över den gamla (XFADE_MS) och
+   * den gamla döljs först när övertoningen är klar.
    */
-  Rotator.prototype.raise = function () {
+  Rotator.prototype.raise = function (cross) {
+    var self = this;
     var active = this.active;
+    this.cancel('xhide');
     this.frames.forEach(function (f, n) {
-      f.el.style.zIndex = n === active ? 2 : 1;
-      f.el.style.visibility = n === active ? 'visible' : 'hidden';
+      var st = f.el.style;
+      st.zIndex = n === active ? 2 : 1;
+      if (n === active) {
+        st.transition = 'none';
+        st.visibility = 'visible';
+        if (cross) {
+          st.opacity = '0';
+          void f.el.offsetWidth; // utgångsläget ritas innan övertoningen börjar
+          st.transition = 'opacity ' + XFADE_MS + 'ms linear';
+        }
+        st.opacity = '1';
+      } else if (!cross) {
+        st.visibility = 'hidden';
+      }
     });
+    if (cross) {
+      this.later('xhide', function () {
+        self.frames.forEach(function (f, n) { if (n !== self.active) f.el.style.visibility = 'hidden'; });
+      }, XFADE_MS + 50);
+    }
   };
 
   /**
@@ -536,6 +558,7 @@
 
   /** Byter till filmen som går under sidan: ramen döljs och filmen börjar om från början */
   Rotator.prototype.cutToFilm = function (index) {
+    var self = this;
     var v = this.filmEl;
     this.cancel('retry');
     this.cancel('skip');
@@ -543,7 +566,13 @@
     this.cancel('leavefilm');
     this.ui.error(false, false);
     try { v.currentTime = 0; } catch (e) { /* börjar där den är */ }
-    this.frames.forEach(function (f) { f.clear(); f.el.style.visibility = 'hidden'; });
+    // Sidan som täcker filmen tonas ut (XFADE_MS) och ramarna töms först sedan
+    var cover = this.frames[this.active].el;
+    cover.style.transition = 'opacity ' + XFADE_MS + 'ms linear';
+    cover.style.opacity = '0';
+    this.later('xhide', function () {
+      self.frames.forEach(function (f) { f.clear(); f.el.style.visibility = 'hidden'; });
+    }, XFADE_MS + 50);
     this.filmPre = null;
     this.filmOn = true;
     this.filmOk = true;
@@ -584,14 +613,19 @@
               self.startFilmUnder(next);
             }, Math.max(0, leadMs - FILM_LEAD_MS));
             self.later('swap', function () {
-              if (!self.running || g !== self.generation) return;
-              if (self.filmUnderReady(next)) return self.cutToFilm(next);
-              // Gick den inte: tona ut, starta om filmen när det är svart och tona in
-              self.fade(true);
-              self.later('swap', function () {
+              var waited = 0;
+              var check = function () {
                 if (!self.running || g !== self.generation) return;
-                self.enterFilm(next, g, false);
-              }, FADE_MS);
+                if (self.filmUnderReady(next)) return self.cutToFilm(next);
+                // Startar filmen långsamt väntas en kort stund på den (sidan visas lite längre) innan en tonad start väljs
+                if (waited < FILM_WAIT_MS) { waited += 100; return self.later('swap', check, 100); }
+                self.fade(true);
+                self.later('swap', function () {
+                  if (!self.running || g !== self.generation) return;
+                  self.enterFilm(next, g, false);
+                }, FADE_MS);
+              };
+              check();
             }, leadMs);
             return;
           }
@@ -626,7 +660,7 @@
     this.active = 1 - this.active;
     this.index = next;
     this.pageSince = Date.now();
-    this.raise();
+    this.raise(true);
     this.settle();
     this.activate(this.frames[this.active]);
     // Den gamla ramen släpps (stoppar skript och film) så att den är tom när den blir nästa förladdningsram
