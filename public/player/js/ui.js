@@ -19,6 +19,11 @@
     $('frames').className = on ? 'hidden' : '';
   }
 
+  /** Tona ut (on) till svart eller in (!on) igen: en övergång mellan två filmer, se #fade i css/player.css */
+  function fade(on) {
+    $('fade').style.opacity = on ? '1' : '0';
+  }
+
   function setMessage(text) {
     $('enroll-msg').textContent = text || '';
   }
@@ -57,5 +62,5 @@
     });
   }
 
-  PP.ui = { init: init, error: error, black: black, showEnroll: showEnroll, hideEnroll: hideEnroll, onSubmit: null };
+  PP.ui = { init: init, error: error, black: black, fade: fade, showEnroll: showEnroll, hideEnroll: hideEnroll, onSubmit: null };
 })(window.PP);

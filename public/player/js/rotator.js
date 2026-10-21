@@ -19,6 +19,9 @@
   var TICK_MS = 20000;           // schemat kontrolleras så ofta
   var PROBE_TIMEOUT_MS = 20000;  // sidovagnens första bild kan ta ~15 s
   var LOAD_TIMEOUT_MS = 30000;   // en sida som inte laddats klart efter så här länge räknas som misslyckad
+  var FADE_SETTLE_MS = 150;      // tid i svart efter att den nya filmen gått, innan bilden tonas in
+  var FILM_LEAD_MS = 1500;       // en film som ska följa på en vanlig sida startas så här lång tid före bytet, under den sidan
+  var FADE_MS = 400;             // film till film: tona ut och in så här länge (samma tid som i css/player.css)
   var BLANK = 'about:blank';
 
   /** Skriver till felsökningsrutan (index.html?debug=1), annars ingenting */
@@ -168,7 +171,7 @@
     return this.failed && !this.ok;
   };
 
-  function Rotator(elA, elB, ui) {
+  function Rotator(elA, elB, ui, filmEl) {
     var self = this;
     this.ui = ui;
     this.frames = [new Frame(elA), new Frame(elB)];
@@ -185,6 +188,11 @@
     this.currentKey = '';
     this.generation = 0;
     this.pageSince = 0;
+    this.filmEl = filmEl || null; // spelarens egen <video id="film">
+    this.filmOn = false;          // spelas en film i den just nu?
+    this.filmOk = false;
+    this.filmPre = null;          // film som startats under en vanlig sida inför ett byte
+    this.filmCache = {};          // url -> filmens adress (text) eller false
     window.addEventListener('online', function () { self.retryNow(); });
   }
 
@@ -215,6 +223,7 @@
   /** Är sidan som visas laddad? null: ingen sida visas (stoppad eller svart skärm) */
   Rotator.prototype.pageLoaded = function () {
     if (!this.running || this.black) return null;
+    if (this.filmOn) return this.filmOk;
     return this.frames[this.active].ok;
   };
 
@@ -238,6 +247,8 @@
   Rotator.prototype.stop = function () {
     this.running = false;
     this.cancelAll();
+    this.fade(false);
+    this.leaveFilm();
     this.frames.forEach(function (f) { f.clear(); });
     this.ui.error(false, false);
     this.ui.black(true);
@@ -276,10 +287,15 @@
     this.cancel('skip');
     this.cancel('single');
     this.cancel('drop'); // annars kunde en gammal släppning tömma ramen som just förladdats
+    this.cancel('fadein');
+    this.cancel('filmstart');
+    this.filmPre = null;
+    this.fade(false);
     var self = this;
     // Svart skärm (schemat säger off, eller listan är tom): sidorna släpps och inget visas
     if (c.black || !shown.length) {
       this.black = true;
+      this.leaveFilm();
       this.frames.forEach(function (f) { f.clear(); });
       this.ui.error(false, false);
       this.ui.black(true);
@@ -291,6 +307,8 @@
     this.list = shown;
     if (direct) {
       this.ui.error(false, false);
+      this.leaveFilm();
+      this.raise();
       this.show(0);
     } else {
       // Byte av lista: börja direkt på första sidan i den nya, förladdad bakom den som visas
@@ -311,15 +329,23 @@
 
   /** Nätet kom tillbaka: försök igen direkt */
   Rotator.prototype.retryNow = function () {
-    if (!this.running || this.black || !this.list.length) return;
+    if (!this.running || this.black || !this.list.length || this.filmOn) return;
     if (this.frames[this.active].hasFailed()) this.frames[this.active].load(this.list[this.index].url, this.cfg.scripts);
   };
 
   Rotator.prototype.show = function (i) {
+    var self = this;
+    var url = this.list[i].url;
+    var g = ++this.generation;
     this.index = i;
     this.pageSince = Date.now();
-    this.frames[this.active].load(this.list[i].url, this.cfg.scripts);
-    this.scheduleNext();
+    // Är sidan en film spelas den i <video id="film">; svaret hinns med en kort stund (annars visas den som vanlig sida)
+    withTimeout(this.learnFilm(url), 400, false).then(function () {
+      if (!self.running || g !== self.generation) return;
+      if (self.isFilm(url)) return self.enterFilm(i, g, true);
+      self.frames[self.active].load(url, self.cfg.scripts);
+      self.scheduleNext();
+    });
   };
 
   /**
@@ -376,10 +402,165 @@
     this.later('swap', function () { self.swapTo(next, 0, g); }, 500);
   };
 
+  /** Tonen över sidorna (finns inte i alla vyer, t.ex. i provet) */
+  Rotator.prototype.fade = function (on) {
+    if (this.ui.fade) this.ui.fade(on);
+  };
+
+  /**
+   * Tar reda på om en sida är en filmsida från sidovagnen (/api/sign/m/<id> med <video src=...>); svaret hamnar i filmCache:
+   * filmens adress (text), annars false. Bara sidovagnens mediasidor kontrolleras, andra sidor hämtas inte i förväg.
+   */
+  Rotator.prototype.learnFilm = function (url) {
+    var cache = this.filmCache || (this.filmCache = {});
+    if (url in cache) return cache[url] && typeof cache[url].then === 'function' ? cache[url] : Promise.resolve(cache[url]);
+    if (!this.filmEl || url.indexOf('/api/sign/m/') < 0) { cache[url] = false; return Promise.resolve(false); }
+    var known = fetch(url, { cache: 'no-store', credentials: 'omit' }).then(function (res) {
+      if (!res.ok) throw new Error('http ' + res.status);
+      return res.text();
+    }).then(function (text) {
+      var m = /<video[^>]*\ssrc=["']([^"']+)["']/i.exec(text);
+      var src = false;
+      if (m) { try { src = new URL(m[1], url).href; } catch (e) { src = false; } }
+      cache[url] = src;
+      return src;
+    }, function () {
+      delete cache[url]; // inget svar: sparas inte (provas igen nästa gång); den här gången visas sidan som vanlig sida
+      return false;
+    });
+    cache[url] = known;
+    return known;
+  };
+
+  /** Spelar den visade sidan en video i en ram? (går bara när ramens sida har samma origin som spelaren; annars false) */
+  Rotator.prototype.framePlaying = function () {
+    try {
+      var doc = this.frames[this.active].el.contentDocument;
+      var v = doc && doc.querySelector('video');
+      return !!v && !v.paused && !v.ended;
+    } catch (e) {
+      return false;
+    }
+  };
+
+  /** Är sidan en film som spelaren själv spelar (adressen är känd)? */
+  Rotator.prototype.isFilm = function (url) {
+    var c = this.filmCache && this.filmCache[url];
+    return typeof c === 'string';
+  };
+
+  /**
+   * Spelar en film i spelarens egen <video id="film">, en enda för alla filmer. Skärmen har en enda filmavkodare: filmer i ramar eller
+   * flera videor samtidigt ger frysning, två kopior och skräp i bilden. Alla ramar töms därför först. Byte av film sker genom att
+   * samma <video> får en ny adress. Bilden är svart en stund när avkodaren byter (ca 0,5 s), så anroparen har tonat ut skärmen;
+   * den tonas in igen här när filmen går. direct: första sidan, ingen ton.
+   */
+  Rotator.prototype.enterFilm = function (index, g, direct) {
+    var self = this;
+    var v = this.filmEl;
+    var url = this.list[index].url;
+    var src = this.filmCache[url];
+    var id = String(src).split('/').pop().split('?')[0];
+    var t0 = Date.now();
+    this.cancel('retry');
+    this.cancel('skip');
+    this.cancel('drop');
+    this.cancel('leavefilm');
+    this.ui.error(false, false);
+    this.frames.forEach(function (f) { f.clear(); f.el.style.visibility = 'hidden'; });
+    v.style.visibility = 'visible';
+    v.muted = true;
+    v.loop = true;
+    try {
+      v.src = src;
+      var pr = v.play();
+      if (pr && pr.catch) pr.catch(function () {});
+    } catch (e) {
+      // går inte att starta: tidsgränsen nedan visar felsidan
+    }
+    var poll = function () {
+      if (!self.running || g !== self.generation) return;
+      var started = !v.paused && v.currentTime > 0.05 && String(v.currentSrc || '').indexOf(id) >= 0;
+      if (!started && !v.error && Date.now() - t0 < MAX_WAIT_MS) return self.later('swap', poll, 100);
+      dbg('film ' + (started ? 'går' : 'startade inte') + ' ' + tail(url));
+      self.filmOn = true;
+      self.filmOk = started;
+      self.index = index;
+      self.pageSince = Date.now();
+      self.cfg.onLoaded(started);
+      if (!started) self.ui.error(true, false);
+      if (!direct) self.later('fadein', function () { self.fade(false); }, FADE_SETTLE_MS);
+      self.scheduleNext();
+    };
+    this.later('swap', poll, 100);
+  };
+
+  /** Släpper filmen (stoppar den och tömmer <video>) */
+  Rotator.prototype.leaveFilm = function () {
+    var v = this.filmEl;
+    this.filmOn = false;
+    this.filmOk = false;
+    if (!v) return;
+    try { v.pause(); } catch (e) { /* ingen film */ }
+    v.removeAttribute('src');
+    try { v.load(); } catch (e) { /* ingen film */ }
+    v.style.visibility = 'hidden';
+  };
+
+  /**
+   * En film som följer på en vanlig sida (bild eller webbsida) startas i <video id="film"> under den sidan en kort stund före bytet.
+   * Sidan är ogenomskinlig och täcker filmen; ingen annan video finns som kan störa avkodaren. Vid bytet döljs ramen och filmen
+   * hoppar till början, utan ton och utan svart bild.
+   */
+  Rotator.prototype.startFilmUnder = function (index) {
+    var v = this.filmEl;
+    var src = this.filmCache[this.list[index].url];
+    this.filmPre = { index: index, src: src, id: String(src).split('/').pop().split('?')[0] };
+    v.muted = true;
+    v.loop = true;
+    v.style.visibility = 'visible';
+    try {
+      v.src = src;
+      var pr = v.play();
+      if (pr && pr.catch) pr.catch(function () {});
+    } catch (e) {
+      // faller tillbaka på tonad start vid bytet
+    }
+  };
+
+  /** Går filmen som startats under sidan (startUnder)? */
+  Rotator.prototype.filmUnderReady = function (index) {
+    var v = this.filmEl, pre = this.filmPre;
+    return !!pre && pre.index === index && !v.paused && v.currentTime > 0.05 && String(v.currentSrc || '').indexOf(pre.id) >= 0;
+  };
+
+  /** Byter till filmen som går under sidan: ramen döljs och filmen börjar om från början */
+  Rotator.prototype.cutToFilm = function (index) {
+    var v = this.filmEl;
+    this.cancel('retry');
+    this.cancel('skip');
+    this.cancel('drop');
+    this.cancel('leavefilm');
+    this.ui.error(false, false);
+    try { v.currentTime = 0; } catch (e) { /* börjar där den är */ }
+    this.frames.forEach(function (f) { f.clear(); f.el.style.visibility = 'hidden'; });
+    this.filmPre = null;
+    this.filmOn = true;
+    this.filmOk = true;
+    this.index = index;
+    this.pageSince = Date.now();
+    dbg('film tas fram under sidan ' + tail(this.list[index].url));
+    this.cfg.onLoaded(true);
+    this.scheduleNext();
+  };
+
   /** Planerar förladdning och byte för sidan som visas nu */
   Rotator.prototype.scheduleNext = function () {
     var self = this;
     this.cancel('preload');
+    this.cancel('filmstart');
+    // En film som startats under en sida men inte tagits fram (planen ändrades) släpps
+    if (!this.filmOn && this.filmPre) { this.filmPre = null; this.leaveFilm(); }
     if (this.list.length < 2) return;
     var p = this.list[this.index];
     var next = (this.index + 1) % this.list.length;
@@ -387,10 +568,47 @@
     var remaining = Math.max(0, p.seconds * 1000 - (Date.now() - this.pageSince));
     var leadMs = Math.min(Math.min(PRELOAD_S, Math.max(1, p.seconds - 2)) * 1000, remaining);
     var g = ++this.generation;
+    this.learnFilm(this.list[next].url);
     this.later('preload', function () {
       if (!self.running || g !== self.generation) return;
-      self.frames[1 - self.active].load(self.list[next].url, self.cfg.scripts);
-      self.later('swap', function () { self.swapTo(next, 0, g); }, leadMs);
+      var nextUrl = self.list[next].url;
+      // Beslutet om nästa sida är en film väntar på svaret (högst en kort stund), i stället för att gissa
+      withTimeout(self.learnFilm(nextUrl), 1500, false).then(function () {
+        if (!self.running || g !== self.generation) return;
+        if (self.isFilm(nextUrl)) {
+          // En film som visas i en ram (gick inte att känna igen) räknas som en film som spelar
+          if (!self.filmOn && !self.framePlaying()) {
+            // Efter en vanlig sida: filmen startas under den en kort stund före bytet och tas fram utan ton, om den går
+            self.later('filmstart', function () {
+              if (!self.running || g !== self.generation) return;
+              self.startFilmUnder(next);
+            }, Math.max(0, leadMs - FILM_LEAD_MS));
+            self.later('swap', function () {
+              if (!self.running || g !== self.generation) return;
+              if (self.filmUnderReady(next)) return self.cutToFilm(next);
+              // Gick den inte: tona ut, starta om filmen när det är svart och tona in
+              self.fade(true);
+              self.later('swap', function () {
+                if (!self.running || g !== self.generation) return;
+                self.enterFilm(next, g, false);
+              }, FADE_MS);
+            }, leadMs);
+            return;
+          }
+          // Efter en film: skärmen har en enda filmavkodare, så filmen byts på plats under en ton (utton, byte, inton)
+          self.later('swap', function () {
+            if (!self.running || g !== self.generation) return;
+            self.fade(true);
+            self.later('swap', function () {
+              if (!self.running || g !== self.generation) return;
+              self.enterFilm(next, g, false);
+            }, FADE_MS);
+          }, Math.max(0, leadMs - FADE_MS));
+          return;
+        }
+        self.frames[1 - self.active].load(nextUrl, self.cfg.scripts);
+        self.later('swap', function () { self.swapTo(next, 0, g); }, leadMs);
+      });
     }, remaining - leadMs);
   };
 
@@ -415,6 +633,8 @@
     this.later('drop', function () {
       if (self.active !== old) self.frames[old].clear();
     }, 1000);
+    // En film som spelats under ramarna släpps när den nya sidan täcker den
+    if (this.filmOn) this.later('leavefilm', function () { self.leaveFilm(); }, 1000);
     this.scheduleNext();
   };
 

@@ -1,7 +1,7 @@
 'use strict';
 // Start och styrning: inskrivning, inställningar, rotation och statusrapporter mot publicomtools.
 (function (PP) {
-  var VERSION = '0.1.17'; // höjs vid varje ändring av spelaren (syns som Spelare i admin); config.xml har samma
+  var VERSION = '0.1.18'; // höjs vid varje ändring av spelaren (syns som Spelare i admin); config.xml har samma
   var CLIENT_VERSION = 1;
   var CONFIG_POLL_MS = PP.configPollMs || 60000; // ändrad spellista slår igenom inom så här lång tid (PP.configPollMs bara för tests/poll.html)
   var CONFIG_RETRY_MS = 30000;
@@ -227,7 +227,7 @@
   function boot() {
     if (window.PP_debug) window.PP_debug('start: version ' + VERSION + ', inskriven=' + client.isEnrolled());
     PP.ui.init();
-    rotator = new PP.Rotator(document.getElementById('frame-a'), document.getElementById('frame-b'), PP.ui);
+    rotator = new PP.Rotator(document.getElementById('frame-a'), document.getElementById('frame-b'), PP.ui, document.getElementById('film'));
     if (!client.isEnrolled()) {
       PP.ui.showEnroll(enroll);
       return;

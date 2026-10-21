@@ -38,10 +38,14 @@
 </head>
 <body>
   <div id="stage">
+    <video id="film" muted loop playsinline preload="auto"></video>
+
     <div id="frames" class="hidden">
       <iframe id="frame-a" src="about:blank" scrolling="no" tabindex="-1"></iframe>
       <iframe id="frame-b" src="about:blank" scrolling="no" tabindex="-1"></iframe>
     </div>
+
+    <div id="fade"></div>
 
     <div id="error" class="overlay hidden">
       <p id="error-sv"></p>

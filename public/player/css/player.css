@@ -133,3 +133,32 @@ html.rot270 #stage {
   margin: 1rem 0 0;
   font-size: 1.1rem;
 }
+
+/* Svart ton över sidorna: film till film byts i två steg (tona ut, byt, tona in). Skärmen har en enda filmavkodare och bilden
+   blir svart en stund vid ett filmbyte; tonen gör det till en övergång. Ligger ovanför ramarna (z-index 1 och 2). */
+#fade {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 5;
+  transition: opacity 400ms linear;
+}
+
+/* Spelarens egen film: en enda <video> för alla filmer (skärmen har en enda filmavkodare). Ligger under ramarna och visas bara
+   när en film spelas; ramarna är då tomma och dolda. */
+#film {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #000;
+  visibility: hidden;
+  z-index: 0;
+}

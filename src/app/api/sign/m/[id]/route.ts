@@ -30,7 +30,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const row = isMediaId(id) ? await db.media.findUnique({ where: { id }, select: { kind: true, name: true } }) : null;
   const fit = new URL(request.url).searchParams.get("fit") === "contain" ? "contain" : "cover";
-  // Filmer med .mp4 i adressen (samma fil): Tizens videospelare hämtade ingenting utan ändelse
+  // Filmer med .mp4 i adressen (samma fil). PubLiPlayer (0.1.18) läser filmens adress ur den här sidan
+  // (<video ... src="…">, relativ till sidan) och spelar den i sitt eget videoelement: ändra inte formatet utan att
+  // stämma av med spelaren
   const src = row?.kind === "video" ? `../f/${id}.mp4` : `../f/${id}`;
   const body = !row
     ? ""
