@@ -12,7 +12,7 @@ const nextConfig: NextConfig = {
   // start` re-reads this config) — see BASE_PATH in docker-compose.yml.
   ...(process.env.BASE_PATH ? { basePath: process.env.BASE_PATH } : {}),
   // PubLiPlayer (Tizen-skärmarnas spelare) i public/player, en tillfällig kopia av publiplayer
-  // (commit 0d76baa) tills repot kth-biblioteket/publiplayer finns; ändra den inte här, kopiera på
+  // (commit 73ee13c) tills repot kth-biblioteket/publiplayer finns; ändra den inte här, kopiera på
   // nytt. Skärmens URL Launcher: <värd>/publicomtools/player/index.html. /player leder dit, så att
   // sidans relativa länkar (css/…, js/…) fungerar, och nya versioner når skärmen utan cache
   async redirects() {
@@ -22,7 +22,7 @@ const nextConfig: NextConfig = {
     return [
       { source: "/player/:path*", headers: [{ key: "Cache-Control", value: "no-cache" }] },
       // Installationsmappen för Samsungs URL Launcher (SSSP): skärmen hämtar sssp_config.xml och
-      // PubLiPlayer.wgt från mappen. Signerat med Samsungs certifikat för skärmen (publiplayer 0.1.16).
+      // PubLiPlayer.wgt från mappen. Signerat med Samsungs certifikat för skärmen (publiplayer 0.1.17).
       {
         source: "/player-install/sssp_config.xml",
         headers: [

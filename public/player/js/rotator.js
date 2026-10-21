@@ -322,10 +322,17 @@
     this.scheduleNext();
   };
 
-  /** Den aktiva ramen överst */
+  /**
+   * Den aktiva ramen överst. Den andra (förladdningen) ritas inte alls: Tizen spelar film på ett eget videoplan bakom webblagret och
+   * gör ett hål i det där filmen ligger, så en synlig ram under skulle lysa igenom hålet (nästa sida syntes de sista 10 s av filmen).
+   * visibility:hidden laddar sidan som vanligt men ritar ingenting.
+   */
   Rotator.prototype.raise = function () {
     var active = this.active;
-    this.frames.forEach(function (f, n) { f.el.style.zIndex = n === active ? 2 : 1; });
+    this.frames.forEach(function (f, n) {
+      f.el.style.zIndex = n === active ? 2 : 1;
+      f.el.style.visibility = n === active ? 'visible' : 'hidden';
+    });
   };
 
   /**
