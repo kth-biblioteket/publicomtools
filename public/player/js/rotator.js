@@ -184,6 +184,7 @@
     this.black = false;
     this.currentKey = '';
     this.generation = 0;
+    this.pageSince = 0;
     window.addEventListener('online', function () { self.retryNow(); });
   }
 
@@ -254,9 +255,13 @@
     }
     if (!first && key === this.currentKey) {
       // Samma sidor: inget byte, men nya visningstider och inställningar gäller (de nya sidobjekten tar över listan)
+      // Tiden schemaläggs bara om för den sida som visas om dess visningstid ändrats; annars startar varje kontroll (var 20:e s)
+      // om förladdning och byte från noll, och sidan visas längre än inställt.
       if (shown && shown.length && this.running && !this.black) {
+        var cur = this.list[this.index];
         this.list = shown;
-        this.scheduleNext();
+        var changed = shown[this.index];
+        if (cur && changed && cur.seconds !== changed.seconds) this.scheduleNext();
       }
       return;
     }
@@ -312,6 +317,7 @@
 
   Rotator.prototype.show = function (i) {
     this.index = i;
+    this.pageSince = Date.now();
     this.frames[this.active].load(this.list[i].url, this.cfg.scripts);
     this.scheduleNext();
   };
@@ -370,13 +376,15 @@
     if (this.list.length < 2) return;
     var p = this.list[this.index];
     var next = (this.index + 1) % this.list.length;
-    var lead = Math.min(PRELOAD_S, Math.max(1, p.seconds - 2));
+    // Tiden räknas från när sidan började visas (pageSince), så en ny planering mitt i visningen ger inte en längre visning
+    var remaining = Math.max(0, p.seconds * 1000 - (Date.now() - this.pageSince));
+    var leadMs = Math.min(Math.min(PRELOAD_S, Math.max(1, p.seconds - 2)) * 1000, remaining);
     var g = ++this.generation;
     this.later('preload', function () {
       if (!self.running || g !== self.generation) return;
       self.frames[1 - self.active].load(self.list[next].url, self.cfg.scripts);
-      self.later('swap', function () { self.swapTo(next, 0, g); }, lead * 1000);
-    }, (p.seconds - lead) * 1000);
+      self.later('swap', function () { self.swapTo(next, 0, g); }, leadMs);
+    }, remaining - leadMs);
   };
 
   /** Byter till den förladdade ramen när nästa sida är klar (eller efter MAX_WAIT_MS) */
@@ -392,6 +400,7 @@
     var old = this.active;
     this.active = 1 - this.active;
     this.index = next;
+    this.pageSince = Date.now();
     this.raise();
     this.settle();
     this.activate(this.frames[this.active]);
