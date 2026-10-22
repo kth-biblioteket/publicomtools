@@ -55,8 +55,10 @@
     <div id="enroll" class="overlay hidden">
       <form id="enroll-form" autocomplete="off">
         <h1>PubLiPlayer</h1>
-        <label for="enroll-url">Adress till publicomtools</label>
-        <input id="enroll-url" type="url" spellcheck="false">
+        <div id="enroll-url-row" class="hidden">
+          <label for="enroll-url">Adress till publicomtools</label>
+          <input id="enroll-url" type="url" spellcheck="false">
+        </div>
         <label for="enroll-code">Inskrivningskod från admin</label>
         <input id="enroll-code" type="text" spellcheck="false" autocapitalize="off">
         <button type="submit">Skriv in</button>

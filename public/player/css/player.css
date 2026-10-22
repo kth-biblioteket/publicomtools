@@ -162,3 +162,8 @@ html.rot270 #stage {
   visibility: hidden;
   z-index: 0;
 }
+
+/* Adressen till publicomtools är redan ifylld (byggd in i paketet, en server per paket) och visas först om anslutningen misslyckas. */
+#enroll-url-row.hidden {
+  display: none;
+}

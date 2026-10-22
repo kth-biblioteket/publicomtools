@@ -30,7 +30,8 @@
 
   /** Inskrivningsvyn. onSubmit(url, code) returnerar ett löfte; vid fel visas meddelandet, vid lyckat anrop tas vyn bort. */
   function showEnroll(onSubmit, message) {
-    $('enroll-url').value = PP.client.baseUrl();
+    $('enroll-url').value = PP.client.baseUrl(); // paketets adress (PUBLICOM_URL vid bygget) eller den sparade
+    $('enroll-url-row').className = 'hidden';
     $('enroll-code').value = '';
     setMessage(message);
     $('enroll').className = 'overlay';
@@ -57,6 +58,7 @@
       }, function (err) {
         submitting = false;
         setMessage(err && err.message ? err.message : 'Något gick fel');
+        if (err && err.status !== 403 && err.status !== 429) $('enroll-url-row').className = ''; // gick det inte att nå servern: adressen kan ändras
         $('enroll-code').focus();
       });
     });
