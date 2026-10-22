@@ -396,6 +396,7 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
           schedule={field(SIGN_SCHEDULE_KEY)}
           pages={field(SIGN_PAGES_KEY)!}
           seconds={field("SIGN_SECONDS")}
+          reload={field("SIGN_RELOAD")}
           js={field("SIGN_JS")}
           resources={field("SIGN_RESOURCES")}
           platform={data.platform}
@@ -617,6 +618,7 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
             schedule={field(SIGN_SCHEDULE_KEY)}
             pages={field(SIGN_PAGES_KEY)!}
             seconds={field("SIGN_SECONDS")}
+          reload={field("SIGN_RELOAD")}
             js={field("SIGN_JS")}
             resources={field("SIGN_RESOURCES")}
             platform={data.platform}

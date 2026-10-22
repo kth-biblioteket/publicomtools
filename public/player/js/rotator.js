@@ -15,7 +15,6 @@
   var PRELOAD_S = 10;            // nästa sida börjar laddas så här många sekunder före bytet
   var SETTLE_MS = 1500;          // tid efter laddning för att skripten ska hinna rita klart
   var MAX_WAIT_MS = 10000;       // väntar högst så här länge på en sida som inte är färdig vid bytet
-  var SINGLE_RELOAD_MS = 600000; // en enda sida laddas om med jämna mellanrum
   var TICK_MS = 20000;           // schemat kontrolleras så ofta
   var PROBE_TIMEOUT_MS = 20000;  // sidovagnens första bild kan ta ~15 s
   var LOAD_TIMEOUT_MS = 30000;   // en sida som inte laddats klart efter så här länge räknas som misslyckad
@@ -275,6 +274,7 @@
         this.list = shown;
         var changed = shown[this.index];
         if (cur && changed && cur.seconds !== changed.seconds) this.scheduleNext();
+        if (this.singleSig !== this.cfg.reloadMs + ':' + shown.length) this.armSingle();
       }
       return;
     }
@@ -318,15 +318,49 @@
       var g = ++this.generation;
       this.later('swap', function () { self.swapTo(0, 0, g); }, 800);
     }
-    // En enda sida laddas om med jämna mellanrum
-    if (this.list.length === 1) {
-      var reload = function () {
-        if (!self.running || self.list.length !== 1) return;
-        self.frames[self.active].load(self.list[0].url, self.cfg.scripts);
-        self.later('single', reload, SINGLE_RELOAD_MS);
-      };
-      this.later('single', reload, SINGLE_RELOAD_MS);
+    this.armSingle();
+  };
+
+  /**
+   * SIGN_RELOAD: en lista med exakt en sida laddas om med jämna mellanrum (cfg.reloadMs, 0 = aldrig). Mjuk omladdning: sidan laddas i
+   * den dolda ramen och byts in när den är klar, som vid vanlig rotation, inte i den synliga ramen.
+   */
+  Rotator.prototype.armSingle = function () {
+    var self = this;
+    var ms = this.cfg.reloadMs;
+    this.cancel('single');
+    this.singleSig = ms + ':' + this.list.length;
+    if (!this.running || this.black || this.list.length !== 1 || !(ms > 0)) return;
+    this.later('single', function () {
+      self.reloadSingle();
+      self.armSingle();
+    }, ms);
+  };
+
+  Rotator.prototype.reloadSingle = function () {
+    var self = this;
+    if (!this.running || this.black || this.list.length !== 1) return;
+    var url = this.list[0].url;
+    if (this.filmOn) {
+      // En ensam film spelas i <video id="film"> och loopar; den behöver ingen omladdning. Bara filmadressen läses om, och har
+      // den ändrats (ny film uppladdad) startas den nya under en ton.
+      if (this.filmCache) delete this.filmCache[url];
+      this.learnFilm(url).then(function (src) {
+        if (!self.running || self.list.length !== 1 || !self.filmOn || typeof src !== 'string') return;
+        var playing = String(self.filmEl.currentSrc || '').split('/').pop().split('?')[0];
+        if (playing === src.split('/').pop().split('?')[0]) return;
+        var g = ++self.generation;
+        self.fade(true);
+        self.later('swap', function () {
+          if (!self.running || g !== self.generation) return;
+          self.enterFilm(0, g, false);
+        }, FADE_MS);
+      });
+      return;
     }
+    var g = ++this.generation;
+    this.frames[1 - this.active].load(url, this.cfg.scripts);
+    this.later('swap', function () { self.swapTo(0, 0, g); }, 500);
   };
 
   /** Nätet kom tillbaka: försök igen direkt */

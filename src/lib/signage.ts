@@ -14,10 +14,12 @@
 export const SIGN_PAGES_KEY = "SIGN_PAGES";
 export const SIGN_SCHEDULE_KEY = "SIGN_SCHEDULE";
 export const SIGN_SECONDS_KEY = "SIGN_SECONDS";
+/** Minutes between soft reloads of a list with a single page (0: never); kiosks 2026-10 */
+export const SIGN_RELOAD_KEY = "SIGN_RELOAD";
 export const SIGN_JS_KEY = "SIGN_JS";
 /** all (default): the pages' scripts, fonts, images and requests from any https address; allowed: only WHITE_LIST */
 export const SIGN_RESOURCES_KEY = "SIGN_RESOURCES";
-export const SIGN_KEYS = [SIGN_SCHEDULE_KEY, SIGN_PAGES_KEY, SIGN_SECONDS_KEY, SIGN_JS_KEY, SIGN_RESOURCES_KEY];
+export const SIGN_KEYS = [SIGN_SCHEDULE_KEY, SIGN_PAGES_KEY, SIGN_SECONDS_KEY, SIGN_RELOAD_KEY, SIGN_JS_KEY, SIGN_RESOURCES_KEY];
 
 /**
  * s: seconds for this page, null = SIGN_SECONDS. media: the file in the media library (admin only).

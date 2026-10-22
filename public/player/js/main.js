@@ -1,7 +1,7 @@
 'use strict';
 // Start och styrning: inskrivning, inställningar, rotation och statusrapporter mot publicomtools.
 (function (PP) {
-  var VERSION = '0.1.19'; // höjs vid varje ändring av spelaren (syns som Spelare i admin); config.xml har samma
+  var VERSION = '0.1.20'; // höjs vid varje ändring av spelaren (syns som Spelare i admin); config.xml har samma
   var CLIENT_VERSION = 1;
   var CONFIG_POLL_MS = PP.configPollMs || 60000; // ändrad spellista slår igenom inom så här lång tid (PP.configPollMs bara för tests/poll.html)
   var CONFIG_RETRY_MS = 30000;
@@ -44,6 +44,7 @@
     applyOrientation(values.ORIENTATION);
     var seconds = intValue(values, 'SIGN_SECONDS', 30, schedule.MIN_S, schedule.MAX_S);
     var scripts = boolValue(values, 'SIGN_JS', true);
+    var reloadMinutes = intValue(values, 'SIGN_RELOAD', 10, 0, 1440); // ensam sida: mjuk omladdning, 0 = aldrig
     var pagesRaw = String(values.SIGN_PAGES || '').trim();
     var scheduleRaw = String(values.SIGN_SCHEDULE || '').trim();
     configVersion = config.version ? String(config.version) : '';
@@ -62,13 +63,14 @@
       startTestVideo(config);
     }
 
-    var sig = JSON.stringify([pagesRaw, scheduleRaw, seconds, scripts]);
+    var sig = JSON.stringify([pagesRaw, scheduleRaw, seconds, scripts, reloadMinutes]);
     if (sig === appliedSignature) return;
     appliedSignature = sig;
     rotator.configure({
       defaultList: schedule.parsePages(pagesRaw, seconds, null),
       schedule: schedule.parseSchedule(scheduleRaw, seconds),
       scripts: scripts,
+      reloadMs: reloadMinutes * 60000,
       onLoaded: pageStateChanged,
     });
     // En ändrad spellista byts in mjukt (den gamla sidan visas tills den nya är laddad); start() tömmer ramarna och visar svart

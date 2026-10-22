@@ -122,6 +122,7 @@ export function SignageEditor({
   schedule,
   pages,
   seconds,
+  reload,
   js,
   resources,
   platform,
@@ -136,6 +137,8 @@ export function SignageEditor({
   schedule?: EditorField;
   pages: EditorField;
   seconds?: EditorField;
+  /** SIGN_RELOAD: minutes between soft reloads when the list shown has a single page */
+  reload?: EditorField;
   js?: EditorField;
   /** SIGN_RESOURCES: where the pages' scripts, fonts, images and requests may come from */
   resources?: EditorField;
@@ -439,6 +442,21 @@ export function SignageEditor({
               <FieldControl {...seconds} invalid={!!seconds.problem} />
               {seconds.problem && <p className="mt-1 text-[12.5px] font-semibold text-bad-ink">{seconds.problem}</p>}
               <div className="mt-1.5">{status?.([seconds.meta.key])}</div>
+            </div>
+          </>
+        )}
+        {reload && (
+          <>
+            <div>
+              <label htmlFor={`f-${reload.meta.key}`} className="text-[15px] font-extrabold">{reload.meta.label}</label>
+              <p className="mt-[3px] text-[13px] text-[#5a6270]">
+                Minuter, bara när listan som visas har en enda sida: den laddas om i bakgrunden och byts in när den är klar, så att en Sida som bild får en ny bild. 0: aldrig.
+              </p>
+            </div>
+            <div className="max-w-[260px]">
+              <FieldControl {...reload} invalid={!!reload.problem} />
+              {reload.problem && <p className="mt-1 text-[12.5px] font-semibold text-bad-ink">{reload.problem}</p>}
+              <div className="mt-1.5">{status?.([reload.meta.key])}</div>
             </div>
           </>
         )}
