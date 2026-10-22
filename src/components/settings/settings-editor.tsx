@@ -290,6 +290,7 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
           </p>
         </div>
         <AppsEditor
+          portrait={shown("ORIENTATION") === "portrait" || ["left", "right"].includes(shown("SCREEN_ROTATION") ?? "")}
           apps={field(k.key)!}
           homeUrl={field("START_URL")}
           appScope={field("APP_SCOPE")}

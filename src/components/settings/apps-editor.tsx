@@ -285,7 +285,10 @@ export function AppsEditor({
   footerPage = {},
   attract = {},
   allowedSites,
+  portrait = false,
 }: {
+  /** The screen stands upright (Android ORIENTATION=portrait, Linux SCREEN_ROTATION left/right): the preview starts so */
+  portrait?: boolean;
   apps: EditorField;
   /**
    * START_URL/APP_SCOPE (Android, older settings): the home app before the first service was home.
@@ -444,6 +447,9 @@ export function AppsEditor({
   // Förhandsvisningen på svenska eller engelska, med appens fallback: tom engelsk text → den svenska →
   // standardtexten på engelska (LauncherScreen.pick)
   const [english, setEnglish] = useState(false);
+  // Förhandsvisningens riktning: skärmens inställning, tills man väljer själv
+  const [orientChoice, setOrientChoice] = useState<boolean | null>(null);
+  const upright = orientChoice ?? portrait;
   const text = (sv: EditorField | undefined, en: EditorField | undefined, svDefault: string, enDefault: string) => {
     const s = sv?.value?.trim() ?? "", e = en?.value?.trim() ?? "";
     return english ? e || s || enDefault : s || svDefault;
@@ -910,8 +916,24 @@ export function AppsEditor({
         <section className="rounded-[10px] border border-line-soft px-4 py-4">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
             <h4 className="text-[15px] font-extrabold">Så ser förstasidan ut</h4>
-            <p className="text-[13px] text-muted">Liggande skärm, förminskad, första sidan. Kortens ordning följer listan ovan.</p>
-            <div className="ml-auto inline-flex gap-0.5 rounded-[9px] bg-[#eceef1] p-[3px]" role="group" aria-label="Språk i förhandsvisningen">
+            <p className="text-[13px] text-muted">
+              {upright ? "Stående" : "Liggande"} skärm{orientChoice === null ? " (som inställt)" : ""}, förminskad, första sidan. Kortens ordning följer listan ovan.
+            </p>
+            <div className="ml-auto flex flex-wrap gap-2">
+            <div className="inline-flex gap-0.5 rounded-[9px] bg-[#eceef1] p-[3px]" role="group" aria-label="Skärmens riktning i förhandsvisningen">
+              {[false, true].map((up) => (
+                <button
+                  key={String(up)}
+                  type="button"
+                  aria-pressed={upright === up}
+                  onClick={() => setOrientChoice(up === portrait ? null : up)}
+                  className={`h-[26px] rounded-[7px] px-2.5 text-[12.5px] font-semibold ${upright === up ? "bg-white text-ink shadow-sm" : "text-[#3d444d]"}`}
+                >
+                  {up ? "Stående" : "Liggande"}
+                </button>
+              ))}
+            </div>
+            <div className="inline-flex gap-0.5 rounded-[9px] bg-[#eceef1] p-[3px]" role="group" aria-label="Språk i förhandsvisningen">
               {[false, true].map((en) => (
                 <button
                   key={String(en)}
@@ -924,8 +946,9 @@ export function AppsEditor({
                 </button>
               ))}
             </div>
+            </div>
           </div>
-          <div className="mt-3 w-full max-w-[640px] overflow-hidden rounded-xl border border-field bg-page" aria-label="Förhandsvisning av förstasidan">
+          <div className={`mt-3 w-full overflow-hidden rounded-xl border border-field bg-page ${upright ? "max-w-[360px]" : "max-w-[640px]"}`} aria-label="Förhandsvisning av förstasidan">
             {/* Som appens huvud: logga till vänster, texten bredvid, English uppe till höger och linjemönstret
                 nere till höger, aldrig bakom text eller logga (KTH:s grafiska manual) */}
             <div className="relative flex items-center gap-3.5 overflow-hidden bg-kth-navy py-4 pl-6 pr-28 text-white">
@@ -952,7 +975,7 @@ export function AppsEditor({
             </div>
             {rows.length > 0 ? (
               <div className="p-3.5">
-              <div className={`grid gap-2.5 ${pageSize <= 4 ? "grid-cols-2" : pageSize <= 6 ? "grid-cols-3" : "grid-cols-4"}`}>
+              <div className="grid gap-2.5" style={{ gridTemplateColumns: `repeat(${previewColumns(Math.min(pageSize, rows.length), upright)}, minmax(0, 1fr))` }}>
                 {rows.slice(0, pageSize).map((r) => (
                   <div key={r.id} className="flex min-w-0 items-center gap-3 rounded-xl border border-line bg-white p-3">
                     <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-kth-light-blue text-kth-blue">
@@ -1069,4 +1092,26 @@ export function AppsEditor({
       {apps.problem && <p className="text-[12.5px] font-semibold text-bad-ink">{apps.problem}</p>}
     </div>
   );
+}
+
+/**
+ * Columns for k cards as the kiosks lay them out (PubLiKiosk LauncherScreen.gridFor): wide cards
+ * (about 2.2:1), few empty slots, and one column for at most four cards on an upright screen. The
+ * area is the card area of a 1280×800 (or 800×1280) screen below the header and above the footer.
+ */
+function previewColumns(k: number, upright: boolean): number {
+  if (k <= 1) return 1;
+  if (upright && k <= 4) return 1;
+  const [w, h] = upright ? [720, 960] : [1180, 500];
+  let best = 1;
+  let bestScore = Infinity;
+  for (let c = 1; c <= Math.min(5, k); c++) {
+    const r = Math.ceil(k / c);
+    const score = Math.abs(Math.log(w / c / (h / r) / 2.2)) + 0.15 * (c * r - k) + 0.12 * Math.abs(c - r);
+    if (score < bestScore - 1e-9) {
+      bestScore = score;
+      best = c;
+    }
+  }
+  return best;
 }
