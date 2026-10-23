@@ -44,7 +44,7 @@ export function StatsFilters({
     "h-[34px] rounded-lg border border-field bg-white px-2.5 text-[13px] font-semibold text-ink focus:outline-2 focus:outline-kth-blue";
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <div role="group" aria-label="Period" className="inline-flex flex-wrap gap-0.5 rounded-[9px] bg-[#eceef1] p-[3px]">
+      <div role="group" aria-label="Period" className="seg">
         {periods.map((p) => {
           const active = !custom && period === p.value;
           return (
@@ -56,9 +56,6 @@ export function StatsFilters({
                 setCustom(false);
                 go({ period: p.value === "30d" ? null : p.value, from: null, to: null });
               }}
-              className={`inline-flex h-[30px] items-center rounded-[7px] px-3 text-[13px] font-semibold ${
-                active ? "bg-white text-ink shadow-sm" : "text-[#3d444d]"
-              }`}
             >
               {p.label}
             </button>
@@ -68,9 +65,6 @@ export function StatsFilters({
           type="button"
           aria-pressed={custom}
           onClick={() => setCustom(true)}
-          className={`inline-flex h-[30px] items-center rounded-[7px] px-3 text-[13px] font-semibold ${
-            custom ? "bg-white text-ink shadow-sm" : "text-[#3d444d]"
-          }`}
         >
           Välj datum
         </button>

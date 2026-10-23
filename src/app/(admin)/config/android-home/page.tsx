@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import { planAndroidHomeMigration } from "@/lib/android-home";
-import { ChevronLeftIcon } from "@/components/ui/icons";
+import { PageHeader } from "@/components/ui/page-header";
 import { MigrateButton } from "./migrate-button";
 
 export const dynamic = "force-dynamic";
@@ -12,18 +11,18 @@ export default async function AndroidHomePage() {
   const plan = await planAndroidHomeMigration();
 
   return (
-    <div className="flex max-w-[900px] flex-col gap-5">
-      <Link href="/config/base/android" className="flex items-center gap-1 text-[13px] font-bold text-kth-blue">
-        <ChevronLeftIcon /> Grundinställningar Android
-      </Link>
-      <div>
-        <h1 className="text-[26px] font-extrabold tracking-tight">Startsidan blir första tjänst</h1>
-        <p className="mt-1 text-sm text-muted">
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        back={{ href: "/config/base/android", label: "Grundinställningar Android" }}
+        title="Startsidan blir första tjänst"
+        lead={
+        <p>
           Från PubLiKiosk 3.20 är första tjänsten i listan hem, som på Linux-kiosken. Här flyttas den gamla startsidan (START_URL, med START_LABEL,
           START_ICON och APP_SCOPE) in som första tjänst på alla nivåer: grundinställningar, profiler och enskilda enheter. Enheterna visar samma
           tjänster efteråt; flytten görs först när alla Android-enheter har 3.20.
         </p>
-      </div>
+        }
+      />
 
       {plan.mismatches.length > 0 && (
         <p className="rounded-[10px] bg-bad-bg px-4 py-3 text-sm font-semibold text-bad-ink">

@@ -24,7 +24,7 @@ export function RenameComputer({ host, name, label, panelName }: { host: string;
   if (!editing)
     return (
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h1 className="text-[26px] font-extrabold tracking-tight">{name}</h1>
+        <h1 className="text-[34px] font-extrabold leading-tight tracking-tight sm:text-[40px]">{name}</h1>
         <button type="button" onClick={() => { setValue(label ?? ""); setEditing(true); }} className="text-[13px] font-semibold text-kth-blue underline underline-offset-2">
           Byt namn i listan
         </button>

@@ -4,18 +4,25 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { BookIcon, ChartIcon, HistoryIcon, ImageIcon, LayersIcon, MenuIcon, MonitorIcon, SlidersIcon, UsersIcon, XIcon } from "@/components/ui/icons";
+import { PAGE_PAD } from "@/components/ui/page-header";
+import kthLogo from "@/components/ui/kth-logo-blue.svg";
 
 type NavItem = { href: string; label: string; icon: React.ReactNode; match: (path: string) => boolean };
 
 const MAIN: NavItem[] = [
-  { href: "/", label: "Datorer", icon: <MonitorIcon />, match: (p) => p === "/" || p.startsWith("/computers") },
+  { href: "/", label: "Enheter", icon: <MonitorIcon />, match: (p) => p === "/" || p.startsWith("/computers") },
   { href: "/stats", label: "Statistik", icon: <ChartIcon />, match: (p) => p.startsWith("/stats") },
   { href: "/config", label: "Profiler", icon: <LayersIcon />, match: (p) => p === "/config" || p.startsWith("/config/profiles") || p.startsWith("/config/history/profile") },
   { href: "/media", label: "Mediebibliotek", icon: <ImageIcon />, match: (p) => p.startsWith("/media") },
   { href: "/log", label: "Ändringslogg", icon: <HistoryIcon />, match: (p) => p.startsWith("/log") },
 ];
 const IT: NavItem[] = [
-  { href: "/config/base", label: "Grundinställningar", icon: <SlidersIcon />, match: (p) => p.startsWith("/config/base") || p === "/config/history/base" },
+  {
+    href: "/config/base",
+    label: "Grundinställningar",
+    icon: <SlidersIcon />,
+    match: (p) => p.startsWith("/config/base") || p.startsWith("/config/history/base") || p.startsWith("/config/android-home"),
+  },
   { href: "/catalog", label: "Inställningskatalog", icon: <BookIcon />, match: (p) => p.startsWith("/catalog") },
   { href: "/guests", label: "Gästsessioner", icon: <UsersIcon />, match: (p) => p.startsWith("/guests") },
 ];
@@ -27,8 +34,8 @@ function NavLink({ item, path, onNavigate }: { item: NavItem; path: string; onNa
       href={item.href}
       onClick={onNavigate}
       aria-current={active ? "page" : undefined}
-      className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold ${
-        active ? "bg-select text-select-ink" : "text-muted hover:bg-page hover:text-ink"
+      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-semibold ${
+        active ? "bg-kth-blue text-white" : "text-kth-navy hover:bg-white/70"
       }`}
     >
       {item.icon}
@@ -37,7 +44,21 @@ function NavLink({ item, path, onNavigate }: { item: NavItem; path: string; onNa
   );
 }
 
-/** Sidebar layout shared with the Formtools admin: brand, main menu, IT section, user. */
+function Brand() {
+  return (
+    <Link href="/" className="flex items-center gap-3.5">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={kthLogo.src} alt="KTH" width={44} height={49} className="h-[49px] w-11 shrink-0" />
+      <span className="flex flex-col border-l border-kth-navy/25 pl-3.5 leading-tight text-kth-navy">
+        <span className="text-[13px] font-semibold text-kth-blue">KTH Biblioteket</span>
+        <span className="text-[17px] font-extrabold">Publika enheter</span>
+        <span className="text-[11.5px] font-semibold text-kth-navy/60">PubLiAdmin</span>
+      </span>
+    </Link>
+  );
+}
+
+/** Light blue menu on the left with KTH's logo: main menu, IT section, user. */
 export function AdminShell({
   userName,
   logout,
@@ -59,33 +80,27 @@ export function AdminShell({
 
   const sidebar = (
     <div className="flex h-full flex-col">
-      <div className="flex h-16 items-center gap-2.5 border-b border-line px-5">
-        <span className="flex size-8 items-center justify-center rounded-lg bg-kth-blue text-white">
-          <MonitorIcon />
-        </span>
-        <span className="flex flex-col leading-tight">
-          <span className="text-sm font-extrabold">KTH Biblioteket</span>
-          <span className="text-xs font-medium text-muted">Publika datorer</span>
-        </span>
+      <div className="px-5 pb-5 pt-6">
+        <Brand />
       </div>
-      <nav className="flex flex-col gap-0.5 p-3" aria-label="Huvudmeny">
+      <nav className="flex flex-col gap-0.5 px-3" aria-label="Huvudmeny">
         {MAIN.map((i) => (
           <NavLink key={i.href} item={i} path={path} onNavigate={() => setOpen(false)} />
         ))}
-        <div className="px-3 pb-1 pt-4 text-[11px] font-bold uppercase tracking-wider text-faint">För IT</div>
+        <div className="px-3 pb-1.5 pt-5 text-[11.5px] font-bold uppercase tracking-wider text-kth-blue">För IT</div>
         {IT.map((i) => (
           <NavLink key={i.href} item={i} path={path} onNavigate={() => setOpen(false)} />
         ))}
       </nav>
       <div className="flex-1" />
-      <div className="flex items-center gap-2.5 border-t border-line px-4 py-3.5">
-        <span className="flex size-8 items-center justify-center rounded-full bg-kth-blue text-xs font-bold text-white">
+      <div className="flex items-center gap-3 border-t border-kth-navy/15 px-5 py-4">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-kth-blue text-xs font-extrabold text-white">
           {initials}
         </span>
-        <span className="flex min-w-0 flex-1 flex-col text-[13px] leading-snug">
+        <span className="flex min-w-0 flex-1 flex-col text-[13.5px] leading-snug text-kth-navy">
           <span className="truncate font-bold">{userName}</span>
           <form action={logout}>
-            <button type="submit" className="text-xs text-muted hover:text-ink hover:underline">
+            <button type="submit" className="font-semibold text-kth-blue hover:underline">
               Logga ut
             </button>
           </form>
@@ -95,18 +110,18 @@ export function AdminShell({
   );
 
   return (
-    <div className="flex min-h-full flex-1 bg-page text-ink">
-      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 border-r border-line bg-white lg:block">{sidebar}</aside>
+    <div className="flex min-h-full flex-1 bg-white text-ink">
+      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 overflow-y-auto bg-kth-light-blue lg:block">{sidebar}</aside>
 
       {open && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <button type="button" aria-label="Stäng menyn" className="absolute inset-0 bg-black/30" onClick={() => setOpen(false)} />
-          <aside className="relative h-full w-72 max-w-[85%] bg-white shadow-xl">
+          <aside className="relative h-full w-72 max-w-[85%] overflow-y-auto bg-kth-light-blue shadow-xl">
             <button
               type="button"
               aria-label="Stäng menyn"
               onClick={() => setOpen(false)}
-              className="absolute right-2 top-3 flex size-11 items-center justify-center text-muted"
+              className="absolute right-2 top-3 flex size-11 items-center justify-center text-kth-navy"
             >
               <XIcon />
             </button>
@@ -116,18 +131,13 @@ export function AdminShell({
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-line bg-white px-2 lg:hidden">
-          <button
-            type="button"
-            aria-label="Meny"
-            onClick={() => setOpen(true)}
-            className="flex size-11 items-center justify-center"
-          >
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-2 bg-kth-light-blue px-4 lg:hidden">
+          <Brand />
+          <button type="button" aria-label="Meny" onClick={() => setOpen(true)} className="flex size-11 items-center justify-center text-kth-navy">
             <MenuIcon className="size-5" />
           </button>
-          <span className="font-extrabold">Publika datorer</span>
         </header>
-        <main className="flex w-full max-w-[1180px] flex-1 flex-col px-4 py-6 sm:px-8 lg:px-10 lg:py-8">{children}</main>
+        <main className={`${PAGE_PAD} flex w-full flex-1 flex-col pb-12`}>{children}</main>
       </div>
     </div>
   );

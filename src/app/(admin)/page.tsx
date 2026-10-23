@@ -4,6 +4,22 @@ import { formatAgo, formatWhen } from "@/lib/status";
 import { ComputerList, type ComputerRow } from "./computer-list";
 import { AddComputer } from "./add-computer";
 import { listProfileSummaries } from "@/lib/profiles";
+import { PageHeader } from "@/components/ui/page-header";
+import { PLATFORMS, type Platform } from "@/lib/platforms";
+
+/** "11 datorer", "2 Android-enheter", "1 Tizen-skärm" */
+const NOUNS: Record<Platform, [string, string]> = {
+  linux: ["dator", "datorer"],
+  android: ["Android-enhet", "Android-enheter"],
+  tizen: ["Tizen-skärm", "Tizen-skärmar"],
+};
+
+function countText(rows: { platform: Platform }[]) {
+  const parts = PLATFORMS.map((p) => [p, rows.filter((r) => r.platform === p).length] as const)
+    .filter(([, n]) => n > 0)
+    .map(([p, n]) => `${n} ${NOUNS[p][n === 1 ? 0 : 1]}`);
+  return parts.length > 1 ? `${parts.slice(0, -1).join(", ")} och ${parts.at(-1)}` : (parts[0] ?? "");
+}
 
 export const dynamic = "force-dynamic";
 
@@ -30,15 +46,11 @@ export default async function ComputersPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-[26px] font-extrabold tracking-tight">Datorer</h1>
-          <p className="mt-1 text-sm text-muted">
-            {rows.length} datorer, skyltar och enheter. De som behöver åtgärdas visas först.
-          </p>
-        </div>
-        <AddComputer profiles={profiles} />
-      </div>
+      <PageHeader
+        title="Enheter"
+        lead={`${rows.length} ${rows.length === 1 ? "enhet" : "enheter"}${rows.length ? `: ${countText(rows)}` : ""}. De som behöver åtgärdas visas först.`}
+        actions={<AddComputer profiles={profiles} />}
+      />
       <ComputerList rows={rows} renderedAt={renderedAt} />
     </div>
   );

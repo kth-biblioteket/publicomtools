@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import { addComputerAction } from "./computer-actions";
 import { enrolls, PLATFORMS, PLATFORM_LABEL, type Platform } from "@/lib/platforms";
 
-/** "Lägg till dator": prepare a computer, Android tablet or Tizen screen in the admin before installing it. */
+/** "Lägg till enhet": prepare a computer, Android tablet or Tizen screen in the admin before installing it. */
 export function AddComputer({ profiles }: { profiles: { name: string; label: string; platform: Platform }[] }) {
   const [open, setOpen] = useState(false);
   const [platform, setPlatform] = useState<Platform>("linux");
@@ -16,14 +16,14 @@ export function AddComputer({ profiles }: { profiles: { name: string; label: str
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-kth-blue px-3.5 text-[13.5px] font-semibold text-white hover:bg-select-ink">
-        <span aria-hidden="true" className="text-lg leading-none">+</span> Lägg till dator
+      <button type="button" onClick={() => setOpen(true)} className="inline-flex h-11 items-center gap-1.5 rounded-lg bg-kth-blue px-5 text-[15px] font-bold text-white hover:bg-kth-navy">
+        <span aria-hidden="true" className="text-lg leading-none">+</span> Lägg till enhet
       </button>
       {open && (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-[rgba(20,24,32,.45)] px-4 pt-[12vh]" onKeyDown={(e) => e.key === "Escape" && setOpen(false)}>
           <form action={action} role="dialog" aria-modal="true" aria-labelledby="add-h" className="flex w-full max-w-[560px] flex-col gap-3.5 rounded-2xl bg-white p-6 shadow-2xl">
             <div>
-              <h2 id="add-h" className="text-xl font-extrabold">Lägg till dator</h2>
+              <h2 id="add-h" className="text-xl font-extrabold">Lägg till enhet</h2>
               <p className="mt-1 text-sm text-muted">
                 {android
                   ? `Förbered enheten här. Sedan skapar du en inskrivningskod, som du anger i ${where}.`

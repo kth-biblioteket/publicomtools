@@ -4,6 +4,7 @@ import { baseTarget, deviceNoun, PLATFORMS, PLATFORM_LABEL, type Platform } from
 import { signageProps } from "@/lib/media";
 import { getSettingsData } from "@/lib/settings";
 import { SettingsEditor } from "@/components/settings/settings-editor";
+import { PageHeader } from "@/components/ui/page-header";
 import { Tabs } from "@/components/ui/tabs";
 
 /** Grundinställningar för en plattform (/config/base = Linux, /config/base/android, /config/base/tizen). */
@@ -19,15 +20,16 @@ export async function BaseView({ platform }: { platform: Platform }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <div>
-        <h1 className="text-[26px] font-extrabold tracking-tight">Grundinställningar</h1>
-        <p className="mt-1 max-w-[640px] text-sm text-muted">
-          Gäller {n === 1 ? "den enda" : `alla ${n}`} {devices}. Profiler och enskilda {platform === "linux" ? "datorer" : "enheter"} kan ändra dem.
-        </p>
-      </div>
-      <Tabs
-        label="Plattform"
-        tabs={PLATFORMS.map((p) => ({ href: p === "linux" ? "/config/base" : `/config/base/${p}`, label: PLATFORM_LABEL[p] }))}
+      <PageHeader
+        title="Grundinställningar"
+        lead={`Gäller ${n === 1 ? "den enda" : `alla ${n}`} ${devices}. Profiler och enskilda ${platform === "linux" ? "datorer" : "enheter"} kan ändra dem.`}
+        tabs={
+          <Tabs
+            band
+            label="Plattform"
+            tabs={PLATFORMS.map((p) => ({ href: p === "linux" ? "/config/base" : `/config/base/${p}`, label: PLATFORM_LABEL[p] }))}
+          />
+        }
       />
       <div className="rounded-[10px] bg-warn-bg px-4 py-2.5 text-sm text-warn-ink">
         Ändringar här påverkar {all}. Granskningen visar exakt vilka som får nya värden.

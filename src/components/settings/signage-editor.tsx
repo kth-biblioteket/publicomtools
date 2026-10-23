@@ -1385,14 +1385,13 @@ function Calendar({
   const first = `${year}-${String(month + 1).padStart(2, "0")}-01`;
   const days = Number(addDays(`${addDays(first, 31).slice(0, 7)}-01`, -1).slice(8));
   const last = `${first.slice(0, 8)}${String(days).padStart(2, "0")}`;
-  const TAB = "inline-flex h-[26px] items-center rounded-[7px] px-2.5 text-[12.5px]";
   return (
     <div className="mt-1.5 flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-3">
         <h5 className="text-[14px] font-extrabold">Kalender</h5>
-        <span className="inline-flex gap-0.5 rounded-[9px] bg-[#eceef1] p-[3px]" role="group" aria-label="Visa">
+        <span className="seg" role="group" aria-label="Visa">
           {(["week", "month"] as const).map((v) => (
-            <button key={v} type="button" aria-pressed={view === v} onClick={() => setView(v)} className={`${TAB} ${view === v ? "bg-white font-bold shadow-[0_1px_2px_rgba(0,0,0,.08)]" : "font-semibold text-[#3d444d]"}`}>
+            <button key={v} type="button" aria-pressed={view === v} onClick={() => setView(v)}>
               {v === "week" ? "Vecka" : "Månad"}
             </button>
           ))}

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser, isAdmin } from "@/lib/auth";
+import { SignInFrame } from "@/components/ui/sign-in-frame";
 
 export default async function ForbiddenPage() {
   const user = await getCurrentUser();
@@ -7,12 +8,12 @@ export default async function ForbiddenPage() {
   if (isAdmin(user)) redirect("/");
 
   return (
-    <div className="mx-auto max-w-lg py-16">
-      <h1 className="text-2xl font-semibold text-kth-navy">Ingen behörighet</h1>
-      <p className="mt-2 text-gray-600">
+    <SignInFrame>
+      <h1 className="text-3xl font-extrabold">Ingen behörighet</h1>
+      <p className="mt-2 text-[15px] text-muted">
         Du är inloggad som {user.email}, men kontot har inte behörighet till statussidan. Kontakta den som
-        förvaltar PubLiCom.
+        förvaltar PubLiAdmin.
       </p>
-    </div>
+    </SignInFrame>
   );
 }

@@ -9,17 +9,18 @@
   --color-kth-sky: #6298d2;
   --color-kth-light-blue: #def0ff;
   --color-kth-sand: #ebe5e0;
+  --color-kth-digital: #0029ed;
 
   /* Admin UI neutrals and states — same as the Formtools admin, so the tools feel related. */
   --color-ink: #1c1f24;
   --color-muted: #5c6470;
   --color-faint: #8a929c;
-  --color-page: #f5f6f7;
-  --color-line: #e6e6e6;
-  --color-line-soft: #eef0f2;
-  --color-field: #c9ced5;
-  --color-select: #eaf1f8;
-  --color-select-ink: #003a75;
+  --color-page: #ffffff;
+  --color-line: #d6dadf;
+  --color-line-soft: #e6e9ec;
+  --color-field: #8a929c;
+  --color-select: #def0ff;
+  --color-select-ink: #000061;
   --color-ok-bg: #c7ebba;
   --color-ok-ink: #0d4a21;
   --color-warn-bg: #fff0b0;
@@ -27,4 +28,63 @@
   --color-bad-bg: #fde2e1;
   --color-bad-ink: #78001a;
   --color-draft: #fffbea;
+
+  /* Soft but calm corners: controls 6 px, cards and boxes 10 px. */
+  --radius-md: 6px;
+  --radius-lg: 6px;
+  --radius-xl: 10px;
+  --radius-2xl: 12px;
+
+  /* Flat cards: the border carries them, not a shadow. */
+  --shadow-sm: none;
+}
+
+@layer base {
+  h1,
+  h2,
+  h3 {
+    color: var(--color-kth-navy);
+  }
+}
+
+@layer components {
+  /* Section heading on a page: navy with a rule above. */
+  .h-section {
+    border-top: 3px solid var(--color-kth-navy);
+    padding-top: 12px;
+    font-size: 21px;
+    font-weight: 800;
+    line-height: 1.25;
+    color: var(--color-kth-navy);
+  }
+  /* Segmented control: a row of links or buttons, the current one filled. */
+  .seg {
+    display: inline-flex;
+    flex-wrap: wrap;
+    overflow: hidden;
+    border: 1px solid var(--color-kth-blue);
+    border-radius: 6px;
+    background: #fff;
+  }
+  .seg > * {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 34px;
+    padding: 0 14px;
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--color-kth-blue);
+  }
+  .seg > * + * {
+    border-left: 1px solid var(--color-kth-blue);
+  }
+  .seg > *:hover {
+    background: var(--color-kth-light-blue);
+  }
+  .seg > [aria-pressed="true"],
+  .seg > [aria-current="page"] {
+    background: var(--color-kth-blue);
+    color: #fff;
+  }
 }

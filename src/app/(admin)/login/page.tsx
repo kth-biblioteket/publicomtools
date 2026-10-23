@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { withBasePath } from "@/lib/base-path";
+import { SignInFrame } from "@/components/ui/sign-in-frame";
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const { error } = await searchParams;
@@ -15,11 +16,11 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const oidcEnabled = Boolean(process.env.KTH_AUTH_JWKS_URL);
 
   return (
-    <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-16">
-      <h1 className="text-2xl font-semibold text-kth-navy">Logga in</h1>
-      <p className="mt-1 text-sm text-gray-600">Statussidan för bibliotekets publika datorer är bara för personal.</p>
+    <SignInFrame>
+      <h1 className="text-3xl font-extrabold">Logga in</h1>
+      <p className="mt-2 text-[15px] text-muted">PubLiAdmin, statussidan för bibliotekets publika enheter, är bara för personal.</p>
       {error && (
-        <p className="mt-4 text-sm text-red-600">
+        <p role="alert" className="mt-4 rounded-lg bg-bad-bg px-3 py-2 text-sm font-semibold text-bad-ink">
           {error === "oidc_state"
             ? "Inloggningen tog för lång tid. Försök igen."
             : "Inloggningen misslyckades. Försök igen."}
@@ -28,13 +29,13 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
       {oidcEnabled ? (
         <a
           href={kthLoginHref}
-          className="mt-6 rounded-md bg-kth-blue px-4 py-2 text-center font-medium text-white hover:bg-kth-navy"
+          className="mt-7 flex h-12 items-center justify-center rounded-lg bg-kth-blue px-5 text-[15px] font-bold text-white hover:bg-kth-navy"
         >
           Logga in med KTH-konto
         </a>
       ) : (
-        <p className="mt-6 text-sm text-gray-600">KTH-inloggning är inte konfigurerad (KTH_AUTH_JWKS_URL).</p>
+        <p className="mt-6 text-sm text-muted">KTH-inloggning är inte konfigurerad (KTH_AUTH_JWKS_URL).</p>
       )}
-    </div>
+    </SignInFrame>
   );
 }

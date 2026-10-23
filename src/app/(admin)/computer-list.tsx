@@ -27,6 +27,9 @@ type Filter = "all" | "action" | "offline" | "warning" | "pending";
 
 const REFRESH_MS = 30_000;
 
+/** The Typ column */
+const TYPE: Record<Platform, string> = { linux: "Dator (Linux)", android: "Android-enhet", tizen: "Tizen-skärm" };
+
 function ConfigChip({ state, platform }: { state: ConfigState; platform: Platform }) {
   if (state === "pending") return <Chip tone="draft" title="Inställningar har ändrats efter att datorn senast startade">Väntar på omstart</Chip>;
   if (state === "new" && enrolls(platform))
@@ -106,18 +109,15 @@ export function ComputerList({ rows, renderedAt }: { rows: ComputerRow[]; render
         </div>
 
         {/* Segmented filter on desktop, "Behöver åtgärd" shortcut on phones */}
-        <div className="hidden gap-0.5 rounded-[9px] bg-[#eceef1] p-[3px] md:inline-flex" role="group" aria-label="Filtrera på status">
+        <div className="seg hidden md:inline-flex" role="group" aria-label="Filtrera på status">
           {filters.map((f) => (
             <button
               key={f.id}
               type="button"
               aria-pressed={filter === f.id}
               onClick={() => setFilter(f.id)}
-              className={`inline-flex h-[30px] items-center gap-1.5 rounded-[7px] px-3 text-[13px] font-semibold ${
-                filter === f.id ? "bg-white text-ink shadow-sm" : "text-[#3d444d]"
-              }`}
             >
-              {f.label} <span className="text-xs font-bold text-muted">{counts[f.id]}</span>
+              {f.label} <span className="text-xs font-bold opacity-75">{counts[f.id]}</span>
             </button>
           ))}
         </div>
@@ -139,14 +139,14 @@ export function ComputerList({ rows, renderedAt }: { rows: ComputerRow[]; render
 
         {platforms.length > 1 && (
           <>
-            <label htmlFor="platform" className="sr-only">Sort</label>
+            <label htmlFor="platform" className="sr-only">Typ</label>
             <select
               id="platform"
               value={platform}
               onChange={(e) => setPlatform(e.target.value as Platform | "")}
               className="h-[38px] rounded-lg border border-field bg-white px-2.5 text-sm"
             >
-              <option value="">Alla sorter</option>
+              <option value="">Alla typer</option>
               {platforms.map((p) => (
                 <option key={p} value={p}>{PLATFORM_LABEL[p]}</option>
               ))}
@@ -204,9 +204,10 @@ export function ComputerList({ rows, renderedAt }: { rows: ComputerRow[]; render
           <div className="hidden overflow-hidden rounded-xl border border-line bg-white shadow-sm md:block">
             <table className="w-full border-collapse text-sm">
               <thead>
-                <tr className="text-left text-xs font-bold uppercase tracking-wide text-muted">
-                  <th className="w-[26%] border-b border-line px-4 py-3">Dator</th>
-                  <th className="w-[16%] border-b border-line px-4 py-3">Status</th>
+                <tr className="text-left text-xs font-extrabold uppercase tracking-wide text-kth-navy">
+                  <th className="w-[26%] border-b border-line px-4 py-3">Enhet</th>
+                  <th className="border-b border-line px-4 py-3">Typ</th>
+                  <th className="w-[14%] border-b border-line px-4 py-3">Status</th>
                   <th className="w-[14%] border-b border-line px-4 py-3">Profil</th>
                   <th className="w-[14%] border-b border-line px-4 py-3">Senast kontakt</th>
                   <th className="border-b border-line px-4 py-3">Att göra</th>
@@ -216,15 +217,15 @@ export function ComputerList({ rows, renderedAt }: { rows: ComputerRow[]; render
                 {shown.map((r) => (
                   <tr key={r.host} className={`border-b border-line-soft last:border-0 ${r.health === "offline" ? "bg-[#fffafa]" : ""}`}>
                     <td className="px-4 py-3">
-                      <Link href={`/computers/${r.host}`} className="font-bold text-ink hover:text-kth-blue hover:underline">
+                      <Link href={`/computers/${r.host}`} className="font-bold text-kth-navy hover:text-kth-blue hover:underline">
                         {r.name}
                       </Link>
-                      {r.platform !== "linux" && <span className="ml-2 align-middle"><Chip>{PLATFORM_SHORT[r.platform]}</Chip></span>}
                       <div className="mt-0.5 font-mono text-[12.5px] text-muted">
                         {r.host}
                         {r.panelName && <span className="font-sans"> · i panelen: {r.panelName}</span>}
                       </div>
                     </td>
+                    <td className="whitespace-nowrap px-4 py-3">{TYPE[r.platform]}</td>
                     <td className="px-4 py-3"><HealthBadge health={r.health} /></td>
                     <td className="px-4 py-3">{r.profile ?? "–"}</td>
                     <td className="px-4 py-3 whitespace-nowrap">{r.seen}</td>

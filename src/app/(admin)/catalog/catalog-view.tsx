@@ -8,6 +8,7 @@ import { Tabs } from "@/components/ui/tabs";
 import { formatValue } from "@/lib/settings-shared";
 import { formatWhen } from "@/lib/status";
 import { Chip } from "@/components/ui/chip";
+import { PageHeader } from "@/components/ui/page-header";
 import { CatalogUpdate } from "./catalog-update";
 
 const TYPE_LABEL = { bool: "Ja/nej", int: "Tal", string: "Text", csv: "Lista", url: "Adress", enum: "Val", apps: "Webbappar" } as const;
@@ -41,16 +42,21 @@ export async function CatalogView({ platform }: { platform: Platform }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <div>
-        <h1 className="text-[26px] font-extrabold tracking-tight">Inställningskatalog</h1>
-        <p className="mt-1 max-w-[680px] text-sm text-muted">
-          Vilka inställningar enheterna förstår. Katalogen skrivs i {repo} (<span className="font-mono">config/catalog.json</span>),
-          bredvid koden som läser nycklarna, och hämtas från samma gren som enheterna kör.
-        </p>
-      </div>
-      <Tabs
-        label="Plattform"
-        tabs={PLATFORMS.map((p) => ({ href: p === "linux" ? "/catalog" : `/catalog/${p}`, label: PLATFORM_LABEL[p] }))}
+      <PageHeader
+        title="Inställningskatalog"
+        lead={
+          <>
+            Vilka inställningar enheterna förstår. Katalogen skrivs i {repo} (<span className="font-mono">config/catalog.json</span>),
+            bredvid koden som läser nycklarna, och hämtas från samma gren som enheterna kör.
+          </>
+        }
+        tabs={
+          <Tabs
+            band
+            label="Plattform"
+            tabs={PLATFORMS.map((p) => ({ href: p === "linux" ? "/catalog" : `/catalog/${p}`, label: PLATFORM_LABEL[p] }))}
+          />
+        }
       />
       <div className="flex flex-wrap gap-x-7 gap-y-1 text-[13.5px] text-muted">
         <span>Källa: <span className="font-mono text-[12.5px] text-ink">{meta?.source ?? "ingen hämtad än"}</span></span>
@@ -70,7 +76,7 @@ export async function CatalogView({ platform }: { platform: Platform }) {
         if (!keys.length) return null;
         return (
           <section key={g.id}>
-            <h2 className="mb-2 text-[15px] font-extrabold">{g.label}</h2>
+            <h2 className="h-section mb-3">{g.label}</h2>
             <div className="overflow-x-auto rounded-xl border border-line bg-white shadow-sm">
               <table className="w-full min-w-[720px] border-collapse text-[13.5px]">
                 <thead>

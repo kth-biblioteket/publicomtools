@@ -920,27 +920,25 @@ export function AppsEditor({
               {upright ? "Stående" : "Liggande"} skärm{orientChoice === null ? " (som inställt)" : ""}, förminskad, första sidan. Kortens ordning följer listan ovan.
             </p>
             <div className="ml-auto flex flex-wrap gap-2">
-            <div className="inline-flex gap-0.5 rounded-[9px] bg-[#eceef1] p-[3px]" role="group" aria-label="Skärmens riktning i förhandsvisningen">
+            <div className="seg" role="group" aria-label="Skärmens riktning i förhandsvisningen">
               {[false, true].map((up) => (
                 <button
                   key={String(up)}
                   type="button"
                   aria-pressed={upright === up}
                   onClick={() => setOrientChoice(up === portrait ? null : up)}
-                  className={`h-[26px] rounded-[7px] px-2.5 text-[12.5px] font-semibold ${upright === up ? "bg-white text-ink shadow-sm" : "text-[#3d444d]"}`}
                 >
                   {up ? "Stående" : "Liggande"}
                 </button>
               ))}
             </div>
-            <div className="inline-flex gap-0.5 rounded-[9px] bg-[#eceef1] p-[3px]" role="group" aria-label="Språk i förhandsvisningen">
+            <div className="seg" role="group" aria-label="Språk i förhandsvisningen">
               {[false, true].map((en) => (
                 <button
                   key={String(en)}
                   type="button"
                   aria-pressed={english === en}
                   onClick={() => setEnglish(en)}
-                  className={`h-[26px] rounded-[7px] px-2.5 text-[12.5px] font-semibold ${english === en ? "bg-white text-ink shadow-sm" : "text-[#3d444d]"}`}
                 >
                   {en ? "English" : "Svenska"}
                 </button>

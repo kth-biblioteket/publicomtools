@@ -7,7 +7,7 @@ import { signageProps } from "@/lib/media";
 import { getSettingsData } from "@/lib/settings";
 import { ProfileMeta } from "@/components/profiles/profile-meta";
 import { SettingsEditor } from "@/components/settings/settings-editor";
-import { ChevronLeftIcon } from "@/components/ui/icons";
+import { PageHeader } from "@/components/ui/page-header";
 import { Tabs } from "@/components/ui/tabs";
 
 export const dynamic = "force-dynamic";
@@ -23,37 +23,40 @@ export default async function ProfileSettingsPage({ params }: PageProps<"/config
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-2">
-        <Link href="/config" className="inline-flex w-fit items-center gap-1 text-[13.5px] font-semibold text-kth-blue">
-          <ChevronLeftIcon />
-          Profiler
-        </Link>
-        <h1 className="flex flex-wrap items-baseline gap-3 text-[26px] font-extrabold tracking-tight">
+      <PageHeader
+        back={{ href: "/config", label: "Profiler" }}
+        heading={
+        <h1 className="flex flex-wrap items-baseline gap-3 text-[34px] font-extrabold leading-tight tracking-tight sm:text-[40px]">
           {label}
-          <span className="inline-flex h-6 items-center self-center rounded-md bg-[#eceef1] px-[9px] text-[12.5px] font-bold text-[#3d444d]">{PLATFORM_SHORT[asPlatform(data.platform)]}</span>
-          <span className="font-mono text-sm font-medium text-faint">{name}</span>
+          <span className="inline-flex h-6 items-center self-center rounded-md bg-white px-[9px] text-[12.5px] font-bold text-kth-navy">{PLATFORM_SHORT[asPlatform(data.platform)]}</span>
+          <span className="font-mono text-sm font-medium text-muted">{name}</span>
         </h1>
-        {layer?.description && <p className="text-sm text-muted">{layer.description}</p>}
-        <div className="flex flex-wrap items-center gap-2 text-sm text-muted">
+        }
+        lead={layer?.description}
+        tabs={
+          <Tabs
+            band
+            label="Profil"
+            tabs={[
+              { href: `/config/profiles/${name}`, label: "Inställningar" },
+              { href: `/config/history/profile:${name}`, label: "Historik" },
+            ]}
+          />
+        }
+      >
+        <div className="flex flex-wrap items-center gap-2 text-sm text-[#3d4450]">
           <span>
             Används av {users.length} {users.length === 1 ? "dator" : "datorer"}
             {users.length ? ":" : "."}
           </span>
           {users.map((c) => (
-            <Link key={c.host} href={`/computers/${c.host}`} className="inline-flex h-[26px] items-center rounded-md bg-[#eceef1] px-2.5 text-[13px] font-semibold text-[#3d444d] hover:bg-select">
+            <Link key={c.host} href={`/computers/${c.host}`} className="inline-flex h-[26px] items-center rounded-md bg-white px-2.5 text-[13px] font-semibold text-kth-navy hover:bg-select">
               {c.name}
             </Link>
           ))}
         </div>
-      </div>
-      <ProfileMeta name={name} label={label} description={layer?.description ?? null} used={users.length} />
-      <Tabs
-        label="Profil"
-        tabs={[
-          { href: `/config/profiles/${name}`, label: "Inställningar" },
-          { href: `/config/history/profile:${name}`, label: "Historik" },
-        ]}
-      />
+        <ProfileMeta name={name} label={label} description={layer?.description ?? null} used={users.length} />
+      </PageHeader>
       <SettingsEditor key={JSON.stringify(data.own)} data={data} title={`Profil ${label}`} signage={await signageProps(data.catalog)} />
     </div>
   );

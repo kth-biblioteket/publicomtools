@@ -5,8 +5,8 @@ import { getComputerView } from "@/lib/computers";
 import { formatWithin, heartbeatInterval, waitingText } from "@/lib/status";
 import { HealthBadge } from "@/components/health-badge";
 import { Chip } from "@/components/ui/chip";
-import { ChevronLeftIcon } from "@/components/ui/icons";
 import { Tabs } from "@/components/ui/tabs";
+import { PageHeader } from "@/components/ui/page-header";
 import { RenameComputer } from "./rename-computer";
 import { ReloadButton } from "./reload-button";
 import { RebootButton } from "./reboot-button";
@@ -25,13 +25,24 @@ export default async function ComputerLayout({ params, children }: LayoutProps<"
   const base = `/computers/${host}`;
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-2">
-        <Link href="/" className="inline-flex w-fit items-center gap-1 text-[13.5px] font-semibold text-kth-blue">
-          <ChevronLeftIcon />
-          Datorer
-        </Link>
-        <RenameComputer host={c.host} name={c.name} label={c.label} panelName={c.computerName} />
-        <div className="flex flex-wrap items-center gap-3 text-sm text-muted">
+      <PageHeader
+        back={{ href: "/", label: "Enheter" }}
+        heading={<RenameComputer host={c.host} name={c.name} label={c.label} panelName={c.computerName} />}
+        tabs={
+          <Tabs
+            band
+            label="Dator"
+            tabs={[
+              { href: base, label: "Översikt" },
+              { href: `${base}/settings`, label: "Inställningar" },
+              { href: `${base}/usage`, label: "Användning" },
+              { href: `${base}/history`, label: "Historik" },
+              { href: `${base}/tech`, label: "Teknik" },
+            ]}
+          />
+        }
+      >
+        <div className="flex flex-wrap items-center gap-3 text-sm text-[#3d4450]">
           <span className="font-mono text-[13px]">{c.host}</span>
           {c.label && c.computerName && c.computerName !== c.label && <span>I panelen: {c.computerName}</span>}
           <HealthBadge health={c.evaluation.health} />
@@ -68,17 +79,7 @@ export default async function ComputerLayout({ params, children }: LayoutProps<"
           {c.configState === "legacy" && <Chip>Gamla configfiler</Chip>}
           {c.configState === "new" && <Chip tone="draft">{c.platform !== "linux" ? "Väntar på inskrivning" : "Väntar på installation"}</Chip>}
         </div>
-      </div>
-      <Tabs
-        label="Dator"
-        tabs={[
-          { href: base, label: "Översikt" },
-          { href: `${base}/settings`, label: "Inställningar" },
-          { href: `${base}/usage`, label: "Användning" },
-          { href: `${base}/history`, label: "Historik" },
-          { href: `${base}/tech`, label: "Teknik" },
-        ]}
-      />
+      </PageHeader>
       {children}
     </div>
   );

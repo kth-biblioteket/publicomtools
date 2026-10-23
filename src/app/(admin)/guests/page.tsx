@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { formatDuration } from "@/lib/status";
+import { PageHeader } from "@/components/ui/page-header";
 import { displayName } from "@/lib/names";
 
 export const dynamic = "force-dynamic";
@@ -36,20 +37,20 @@ export default async function GuestsPage({ searchParams }: PageProps<"/guests">)
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-[26px] font-extrabold tracking-tight">Gästsessioner</h1>
-          <p className="mt-1 text-sm text-muted">Inloggningar på gästdatorerna med webbinloggningen. Inga personuppgifter visas.</p>
-        </div>
-        <nav aria-label="Period" className="inline-flex gap-0.5 rounded-[9px] bg-[#eceef1] p-[3px]">
+      <PageHeader
+        title="Gästsessioner"
+        lead="Inloggningar på gästdatorerna med webbinloggningen. Inga personuppgifter visas."
+        actions={
+        <nav aria-label="Period" className="seg">
           {[["1", "Idag"], ["7", "Senaste 7 dagarna"]].map(([v, l]) => (
             <Link key={v} href={v === "1" ? "/guests" : "/guests?d=7"} aria-current={String(days) === v ? "page" : undefined}
-              className={`inline-flex h-[30px] items-center rounded-[7px] px-3 text-[13px] font-semibold ${String(days) === v ? "bg-white text-ink shadow-sm" : "text-[#3d444d]"}`}>
+              >
               {l}
             </Link>
           ))}
         </nav>
-      </div>
+        }
+      />
 
       {logins.length === 0 ? (
         <div className="rounded-xl border border-line bg-white p-5 text-sm text-muted">Inga gästsessioner {days === 1 ? "idag" : "de senaste 7 dagarna"}.</div>

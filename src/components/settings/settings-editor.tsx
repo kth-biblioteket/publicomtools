@@ -718,14 +718,13 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
         ) : (
           <PasteImport catalog={data.catalog} platform={data.platform} current={shown} onApply={(entries) => entries.forEach((e) => setValue(e.key, e.value))} />
         )}
-        <div className="inline-flex gap-0.5 rounded-[9px] bg-[#eceef1] p-[3px]" role="group" aria-label="Visning">
+        <div className="seg" role="group" aria-label="Visning">
           {(["form", "text"] as const).map((m) => (
             <button
               key={m}
               type="button"
               aria-pressed={mode === m}
               onClick={() => setMode(m)}
-              className={`h-[30px] rounded-[7px] px-3 text-[13px] font-semibold ${mode === m ? "bg-white text-ink shadow-sm" : "text-[#3d444d]"}`}
             >
               {m === "form" ? "Formulär" : "Textläge"}
             </button>
