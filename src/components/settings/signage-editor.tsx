@@ -685,13 +685,60 @@ function ListHeader({
   );
 }
 
-/** Mon–Sun with the weekly times as blocks (07–22, wider if a time is outside); date rows in the legend */
-function WeekView({ schedule, color, heading = true }: { schedule: Schedule; color: (n: string) => { bg: string; fg: string }; heading?: boolean }) {
+type WeekBlock = { list: string; from: number; to: number; key: string };
+
+/** What the sign shows on a date, as blocks: activeAt between the day's bounds, neighbours with the same list merged */
+function dayBlocks(schedule: Schedule, bounds: number[], date: string): WeekBlock[] {
+  const out: WeekBlock[] = [];
+  bounds.forEach((from, k) => {
+    const to = bounds[k + 1] ?? 1440;
+    const a = activeAt(schedule, { day: weekday(date), min: from, date });
+    if (a.kind !== "list") return;
+    const prev = out[out.length - 1];
+    if (prev && prev.list === a.name && prev.to === from) prev.to = to;
+    else out.push({ list: a.name, from, to, key: `${a.name}-${from}` });
+  });
+  return out;
+}
+
+const hh = (min: number) => String(Math.floor(min / 60)).padStart(2, "0");
+
+/**
+ * Mon–Sun as blocks (07–22, wider if a time is outside). With `monday`: that real week, with date rows,
+ * list periods and page dates as the sign shows them. Without: the weekly times only.
+ */
+function WeekView({
+  schedule,
+  color,
+  heading = true,
+  monday,
+  today,
+}: {
+  schedule: Schedule;
+  color: (n: string) => { bg: string; fg: string };
+  heading?: boolean;
+  monday?: string;
+  today?: string;
+}) {
+  const bounds = useMemo(() => dayBounds(schedule), [schedule]);
   const usable = schedule.slots.map((s, i) => ({ s, i })).filter(({ s }) => !slotProblem(s, schedule.lists));
   const weekly = usable.filter(({ s }) => !s.dates);
   const dated = usable.filter(({ s }) => s.dates);
-  const start = Math.min(7, ...weekly.map(({ s }) => Math.floor(toMin(s.from, 0) / 60)));
-  const end = Math.max(22, ...weekly.map(({ s }) => Math.ceil(toMin(s.to, 1440) / 60)));
+  const columns = DAY_NAMES.map((name, j) => {
+    const day = j + 1;
+    const date = monday ? addDays(monday, j) : null;
+    const blocks: WeekBlock[] = date
+      ? dayBlocks(schedule, bounds, date)
+      : // Den övre raden i schemat vinner där tider krockar: rita den sist så att den hamnar överst
+        weekly
+          .filter(({ s }) => !s.days || s.days.includes(day))
+          .reverse()
+          .map(({ s, i }) => ({ list: s.list, from: toMin(s.from, 0), to: toMin(s.to, 1440), key: String(i) }));
+    return { name, date, blocks };
+  });
+  const all = columns.flatMap((c) => c.blocks);
+  const start = Math.min(7, ...all.map((b) => Math.floor(b.from / 60)));
+  const end = Math.max(22, ...all.map((b) => Math.ceil(b.to / 60)));
   const y = (min: number) => (min / 60 - start) * HOUR_PX + 6;
   const height = (end - start) * HOUR_PX + 12;
   const hours: number[] = [];
@@ -705,46 +752,51 @@ function WeekView({ schedule, color, heading = true }: { schedule: Schedule; col
             <span className="size-3 rounded-[3px] border border-[#d0d5db]" style={{ background: HATCH }} aria-hidden="true" />
             {schedule.off ? "Svart skärm" : "Standardlistan"}
           </span>
-          {dated.map(({ s, i }) => (
-            <span key={i}>
-              Datum: {s.list} {shortDate(s.dates![0])}
-              {s.dates![1] !== s.dates![0] ? `–${shortDate(s.dates![1])}` : ""} går före veckan
-            </span>
-          ))}
+          {!monday &&
+            dated.map(({ s, i }) => (
+              <span key={i}>
+                Datum: {s.list} {shortDate(s.dates![0])}
+                {s.dates![1] !== s.dates![0] ? `–${shortDate(s.dates![1])}` : ""} går före veckan
+              </span>
+            ))}
         </span>
       </div>
       <div className="grid grid-cols-[44px_repeat(7,minmax(0,1fr))] gap-1">
         <span />
-        {DAY_NAMES.map((d) => <span key={d} className="text-center text-[12px] font-bold text-[#3d444d]">{d}</span>)}
+        {columns.map((c) => (
+          <span key={c.name} className={`text-center text-[12px] font-bold ${c.date && c.date === today ? "text-[#a1271d]" : "text-[#3d444d]"}`}>
+            {c.name}
+            {c.date && <span className="font-semibold"> {Number(c.date.slice(8))}/{Number(c.date.slice(5, 7))}</span>}
+          </span>
+        ))}
         <div className="relative" style={{ height }}>
           {hours.map((h) => (
             <span key={h} className="absolute right-1.5 font-mono text-[10.5px] text-[#6b7380]" style={{ top: y(h * 60) - 6 }}>{String(h).padStart(2, "0")}</span>
           ))}
         </div>
-        {DAY_NAMES.map((name, j) => {
-          const day = j + 1;
-          // Den övre raden i schemat vinner där tider krockar: rita den sist så att den hamnar överst
-          const blocks = weekly.filter(({ s }) => !s.days || s.days.includes(day)).reverse();
-          return (
-            <div key={name} className="relative overflow-hidden rounded-lg border border-[#e0e4e9]" style={{ height, background: HATCH }} aria-label={name}>
-              {blocks.map(({ s, i }) => {
-                const from = toMin(s.from, 0), to = toMin(s.to, 1440);
-                const c = color(s.list);
-                return (
-                  <div
-                    key={i}
-                    className="absolute inset-x-[3px] overflow-hidden rounded-md px-[7px] py-[5px] text-[12px] font-bold leading-tight"
-                    style={{ top: y(from), height: Math.max(((to - from) / 60) * HOUR_PX, 14), background: c.bg, color: c.fg }}
-                  >
-                    {s.list}
-                    <br />
-                    <span className="text-[11px] font-medium">{`${(s.from ?? "00:00").slice(0, 2)}–${(s.to ?? "24:00").slice(0, 2)}`}</span>
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })}
+        {columns.map((col) => (
+          <div
+            key={col.name}
+            className={`relative overflow-hidden rounded-lg ${col.date && col.date === today ? "border-2 border-[#a1271d]" : "border border-[#e0e4e9]"}`}
+            style={{ height, background: HATCH }}
+            aria-label={col.date ? `${col.name} ${col.date}` : col.name}
+          >
+            {col.blocks.map((b) => {
+              const c = color(b.list);
+              return (
+                <div
+                  key={b.key}
+                  className="absolute inset-x-[3px] overflow-hidden rounded-md px-[7px] py-[5px] text-[12px] font-bold leading-tight"
+                  style={{ top: y(b.from), height: Math.max(((b.to - b.from) / 60) * HOUR_PX, 14), background: c.bg, color: c.fg }}
+                >
+                  {b.list}
+                  <br />
+                  <span className="text-[11px] font-medium">{`${hh(b.from)}–${hh(b.to)}`}</span>
+                </div>
+              );
+            })}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -1380,6 +1432,9 @@ function Calendar({
 }) {
   const [view, setView] = useState<"week" | "month">(schedule.slots.length ? "week" : "month");
   const [offset, setOffset] = useState(0);
+  const [weekOffset, setWeekOffset] = useState(0);
+  const monday = addDays(today, 1 - weekday(today) + 7 * weekOffset);
+  const sunday = addDays(monday, 6);
   const y0 = Number(today.slice(0, 4)), m0 = Number(today.slice(5, 7)) - 1 + offset;
   const year = y0 + Math.floor(m0 / 12), month = ((m0 % 12) + 12) % 12;
   const first = `${year}-${String(month + 1).padStart(2, "0")}-01`;
@@ -1397,6 +1452,15 @@ function Calendar({
           ))}
         </span>
         <span className="flex-1" />
+        {view === "week" && (
+          <span className="flex items-center gap-2">
+            <button type="button" aria-label="Föregående vecka" onClick={() => setWeekOffset((o) => o - 1)} className="size-8 rounded-lg border border-[#c4cad2] bg-white text-[15px]">‹</button>
+            <button type="button" onClick={() => setWeekOffset(0)} title="Den här veckan" className="min-w-[150px] text-center text-[15px] font-extrabold">
+              {shortDate(monday)}–{shortDate(sunday)}
+            </button>
+            <button type="button" aria-label="Nästa vecka" onClick={() => setWeekOffset((o) => o + 1)} className="size-8 rounded-lg border border-[#c4cad2] bg-white text-[15px]">›</button>
+          </span>
+        )}
         {view === "month" && (
           <span className="flex items-center gap-2">
             <button type="button" aria-label="Föregående månad" onClick={() => setOffset((o) => o - 1)} className="size-8 rounded-lg border border-[#c4cad2] bg-white text-[15px]">‹</button>
@@ -1406,7 +1470,7 @@ function Calendar({
         )}
       </div>
       {view === "week" ? (
-        <WeekView schedule={schedule} color={color} heading={false} />
+        <WeekView schedule={schedule} color={color} heading={false} monday={monday} today={today} />
       ) : (
         <>
           <MonthGrid schedule={schedule} std={std} first={first} days={days} today={today} color={color} nameOf={nameOf} />
