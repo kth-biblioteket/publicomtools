@@ -57,6 +57,12 @@ export const heartbeatSchema = z.object({
   kioskLocked: z.boolean().optional(),
   /** The latest event in the settings menu, e.g. "PIN bytt 2026-10-05 21:03" or "upplåst från publicomtools …" */
   menuEvent: z.string().max(120).optional(),
+  /**
+   * PubLiKiosk 3.29: the latest events on the device, oldest first, "yyyy-MM-dd HH:mm:ss text" in the
+   * device's time (start, activity stopped, memory pressure, focus, left kiosk mode, crash …), to find
+   * out why a kiosk went away. Shown under Teknik.
+   */
+  events: z.array(z.string().max(300)).max(50).optional(),
 
   /**
    * Visits that ended since the last acknowledged heartbeat (epoch seconds). The device keeps them

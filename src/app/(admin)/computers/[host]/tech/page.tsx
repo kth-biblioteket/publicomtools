@@ -148,6 +148,16 @@ export default async function ComputerTechPage({ params }: PageProps<"/computers
         </section>
       </div>
 
+      {s?.events && s.events.length > 0 && (
+        <section className={CARD}>
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-base font-extrabold">Händelser på enheten</h2>
+            <span className="text-[13px] text-muted">De senaste {s.events.length}, äldst först, i enhetens tid · från rapporten {formatTime(c.lastSeenAt)}</span>
+          </div>
+          <pre className="mt-3 overflow-x-auto rounded-lg border border-line bg-[#f8f9fa] px-4 py-3.5 font-mono text-xs leading-6">{s.events.join("\n")}</pre>
+        </section>
+      )}
+
       <section className={CARD}>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-base font-extrabold">Det datorn får vid start</h2>
