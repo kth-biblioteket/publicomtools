@@ -278,6 +278,7 @@ export function AppsEditor({
   message,
   messageEn,
   messageUrl,
+  messagePolopoly,
   messageStyle,
   messageIcon,
   refresh,
@@ -317,6 +318,8 @@ export function AppsEditor({
   message?: EditorField;
   messageEn?: EditorField;
   messageUrl?: EditorField;
+  /** LAUNCHER_POLOPOLY_ID (Linux-kiosken): the message from a block on kth.se, with the block's colour; before the address */
+  messagePolopoly?: EditorField;
   messageStyle?: EditorField;
   /** LAUNCHER_MESSAGE_ICON: the icon before the message ("none" = no icon; missing key = info) */
   messageIcon?: EditorField;
@@ -463,15 +466,23 @@ export function AppsEditor({
   const shownFields = fields.map((f) => parseInfoField(f.value)).filter((f) => f.type && !infoFieldProblem(f));
   const pageUrl = footerPage.url?.value?.trim() ?? "";
   const pageHeight = Math.min(400, Math.max(40, Number(footerPage.height?.value ?? footerPage.height?.meta.defaultValue ?? 100) || 100));
-  const messageText = text(message, messageEn, "", "") || (messageUrl?.value?.trim() ? (english ? "(text from the address)" : "(text från adressen)") : "");
-  // info = blå (information), warning = gul (varning), alert = röd (störning)
+  // Ett giltigt block-id från kth.se tar adressens plats (skalet: id på formen 1.1505584, annars ignoreras det)
+  const polopolyId = /^\d+\.\d+$/.test(messagePolopoly?.value?.trim() ?? "");
+  const messageText =
+    text(message, messageEn, "", "") ||
+    (polopolyId
+      ? english ? "(text from kth.se)" : "(text från kth.se)"
+      : messageUrl?.value?.trim() ? (english ? "(text from the address)" : "(text från adressen)") : "");
+  // info = blå (information), warning = gul (varning), success = grön (klart), alert = röd (störning)
   const messageLevel = messageStyle?.value ?? messageStyle?.meta.defaultValue ?? "warning";
   const messageColors =
     messageLevel === "alert"
       ? "bg-[#b3261e] text-white"
       : messageLevel === "info"
         ? "border-t-2 border-kth-blue bg-kth-light-blue text-kth-navy"
-        : "border-t-2 border-[#e0a82e] bg-[#fff3d6] text-[#4a3200]";
+        : messageLevel === "success"
+          ? "border-t-2 border-[#2e7d32] bg-[#e6f4ea] text-[#0d3b12]"
+          : "border-t-2 border-[#e0a82e] bg-[#fff3d6] text-[#4a3200]";
   const messageIconName = messageIcon ? (messageIcon.value ?? messageIcon.meta.defaultValue ?? "info") : "info";
   const allowed = [
     ...(allowedSites?.value ?? "").split(/[\s,]+/).filter(Boolean),
@@ -527,7 +538,7 @@ export function AppsEditor({
       )}
 
       {/* Informationsfält och meddelande (förstasidan) */}
-      {launcher && (fields.length > 0 || message || messageUrl || footerPage.url) && (
+      {launcher && (fields.length > 0 || message || messageUrl || messagePolopoly || footerPage.url) && (
         <section className="rounded-[10px] border border-line-soft px-4 py-4">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
             <h4 className="text-[15px] font-extrabold">Informationsfält och meddelande</h4>
@@ -569,10 +580,13 @@ export function AppsEditor({
               ))}
             </div>
           )}
-          {(message || messageUrl) && (
+          {(message || messageUrl || messagePolopoly) && (
             <div className="mt-4 grid gap-4 @xl:grid-cols-2">
               {message && <LiveText field={message} label="Meddelanderad" placeholder="Tom: ingen rad" />}
               {messageEn && <LiveText field={messageEn} label="Meddelanderad (English)" placeholder="Tomt: den svenska raden" />}
+              {messagePolopoly && (
+                <LiveText field={messagePolopoly} label="Meddelande från kth.se (block-id, valfri)" placeholder="t.ex. 1.1505584" />
+              )}
               {messageUrl && (
                 <div className="flex min-w-0 flex-col gap-1.5">
                   <LiveText field={messageUrl} label="Meddelande från adress (valfri)" placeholder="https://" />
@@ -584,6 +598,7 @@ export function AppsEditor({
                   <div className="flex min-w-0 flex-col gap-1.5">
                     <label htmlFor={`f-${messageStyle.meta.key}`} className={LABEL}>Färg</label>
                     <FieldControl {...messageStyle} invalid={!!messageStyle.problem} />
+                    {polopolyId && <p className="text-[12.5px] leading-snug text-muted">Blocket från kth.se har sin egen färg.</p>}
                   </div>
                 )}
                 {messageIcon && (

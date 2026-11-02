@@ -41,6 +41,7 @@ const HOME_KEYS = [
   "LAUNCHER_MESSAGE",
   "LAUNCHER_MESSAGE_EN",
   "LAUNCHER_MESSAGE_URL",
+  "LAUNCHER_POLOPOLY_ID",
   "LAUNCHER_MESSAGE_STYLE",
   "LAUNCHER_MESSAGE_ICON",
   "LAUNCHER_REFRESH",
@@ -309,6 +310,7 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
           message={field("LAUNCHER_MESSAGE")}
           messageEn={field("LAUNCHER_MESSAGE_EN")}
           messageUrl={field("LAUNCHER_MESSAGE_URL")}
+          messagePolopoly={field("LAUNCHER_POLOPOLY_ID")}
           messageStyle={field("LAUNCHER_MESSAGE_STYLE")}
           messageIcon={field("LAUNCHER_MESSAGE_ICON")}
           refresh={field("LAUNCHER_REFRESH")}
