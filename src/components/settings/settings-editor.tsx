@@ -269,6 +269,8 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
       meta: m,
       value,
       inherited: ownNow(key) === null && value !== null,
+      own: ownNow(key) !== null,
+      inheritedFrom: inherited[key] ? sourceText(inherited[key].source) : undefined,
       problem: issues[key],
       onChange: (v) => setValue(key, v),
       onClear: () => reset(key),

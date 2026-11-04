@@ -33,6 +33,10 @@ export type EditorField = {
   /** Own, drafted or inherited; null when nothing is set anywhere */
   value: string | null;
   inherited: boolean;
+  /** Set (or drafted) on this level, so it can be removed */
+  own?: boolean;
+  /** Where the value below comes from when this level's is removed ("profilen X", "grundinställningarna") */
+  inheritedFrom?: string;
   problem?: string;
   onChange: (value: string) => void;
   onClear: () => void;
@@ -152,6 +156,15 @@ function InfoFieldRow({ field, n, hostWarning }: { field: EditorField; n: number
         </div>
       </div>
       {problem && <p className="text-[12.5px] font-semibold text-bad-ink">{problem} Enheten visar inte fältet.</p>}
+      {field.own && (
+        <button
+          type="button"
+          onClick={field.onClear}
+          className="w-fit text-[12.5px] font-semibold text-kth-blue underline underline-offset-2 hover:text-select-ink"
+        >
+          {field.inheritedFrom ? `Använd ärvt värde (från ${field.inheritedFrom})` : "Ta bort fältet här"}
+        </button>
+      )}
       {warn && <p className="rounded-md bg-warn-bg px-2.5 py-1.5 text-[12.5px] font-semibold text-warn-ink">{warn}</p>}
     </div>
   );
