@@ -27,7 +27,7 @@ const LINK = "text-[12.5px] font-semibold text-kth-blue underline underline-offs
  * first page's texts, and the home app's address, name and icon
  */
 /** PubLiKiosk 3.17.0: a web page in the first page's bottom row, and the attract loop */
-const FOOTER_PAGE_KEYS = ["LAUNCHER_HTML_URL", "LAUNCHER_HTML_HEIGHT", "LAUNCHER_HTML_JS", "LAUNCHER_HTML_TOUCH"];
+const FOOTER_PAGE_KEYS = ["LAUNCHER_HTML_URL", "LAUNCHER_HTML_URL_EN", "LAUNCHER_HTML_HEIGHT", "LAUNCHER_HTML_JS", "LAUNCHER_HTML_TOUCH"];
 const ATTRACT_KEYS = ["ATTRACT_URL", "ATTRACT_AFTER", "ATTRACT_REFRESH", "ATTRACT_JS"];
 const HOME_KEYS = [
   "HOME_MODE",
@@ -319,6 +319,7 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
           perPage={field("LAUNCHER_PER_PAGE")}
           footerPage={{
             url: field("LAUNCHER_HTML_URL"),
+            urlEn: field("LAUNCHER_HTML_URL_EN"),
             height: field("LAUNCHER_HTML_HEIGHT"),
             js: field("LAUNCHER_HTML_JS"),
             touch: field("LAUNCHER_HTML_TOUCH"),

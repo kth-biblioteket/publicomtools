@@ -340,8 +340,8 @@ export function AppsEditor({
   refresh?: EditorField;
   /** LAUNCHER_PER_PAGE (Linux-kiosken): services per page on the first page, more become pages */
   perPage?: EditorField;
-  /** LAUNCHER_HTML_URL, _HEIGHT, _JS, _TOUCH: a whole web page in the bottom row instead of the fields */
-  footerPage?: { url?: EditorField; height?: EditorField; js?: EditorField; touch?: EditorField };
+  /** LAUNCHER_HTML_URL (_EN when English is chosen), _HEIGHT, _JS, _TOUCH: a whole web page in the bottom row instead of the fields */
+  footerPage?: { url?: EditorField; urlEn?: EditorField; height?: EditorField; js?: EditorField; touch?: EditorField };
   /** ATTRACT_URL, _AFTER, _REFRESH, _JS: a full-screen page while the first page is untouched */
   attract?: { url?: EditorField; after?: EditorField; refresh?: EditorField; js?: EditorField };
   /**
@@ -478,6 +478,9 @@ export function AppsEditor({
   const fields = infoFields.filter((f): f is EditorField => !!f);
   const shownFields = fields.map((f) => parseInfoField(f.value)).filter((f) => f.type && !infoFieldProblem(f));
   const pageUrl = footerPage.url?.value?.trim() ?? "";
+  // Engelska sidan när besökaren valt English; saknas den visas den vanliga på båda språken
+  const pageUrlEn = footerPage.urlEn?.value?.trim() ?? "";
+  const shownPageUrl = english && pageUrlEn ? pageUrlEn : pageUrl;
   const pageHeight = Math.min(400, Math.max(40, Number(footerPage.height?.value ?? footerPage.height?.meta.defaultValue ?? 100) || 100));
   // Ett giltigt block-id från kth.se tar adressens plats (skalet: id på formen 1.1505584, annars ignoreras det)
   const polopolyId = /^\d+\.\d+$/.test(messagePolopoly?.value?.trim() ?? "");
@@ -564,6 +567,12 @@ export function AppsEditor({
               <div className="flex min-w-0 flex-col gap-1.5">
                 <LiveText field={footerPage.url} label="Fotrad som webbsida (valfri)" placeholder="Tomt: informationsfälten nedan" />
                 <UrlNote field={footerPage.url} hostWarning={hostWarning} />
+                {pageUrl && footerPage.urlEn && (
+                  <>
+                    <LiveText field={footerPage.urlEn} label="Fotrad som webbsida (English, valfri)" placeholder="Tomt: samma sida på båda språken" />
+                    <UrlNote field={footerPage.urlEn} hostWarning={hostWarning} />
+                  </>
+                )}
                 <p className="text-[12.5px] leading-snug text-muted">
                   En hel webbsida längst ner i stället för informationsfälten. Sidan ritas för 1280 punkter bred (800 stående). Fälten visas bara om sidan inte går att ladda.
                 </p>
@@ -1043,7 +1052,7 @@ export function AppsEditor({
                 className="flex items-center justify-center border-t border-dashed border-field bg-white px-6 text-center text-xs text-muted"
                 style={{ aspectRatio: `1280 / ${pageHeight}` }}
               >
-                <span className="truncate">Webbsida: {pageUrl.replace(/^https:\/\//, "")}</span>
+                <span className="truncate">Webbsida: {shownPageUrl.replace(/^https:\/\//, "")}</span>
               </div>
             ) : shownFields.length > 0 ? (
               <div className="flex items-center gap-4 bg-kth-light-blue px-6 py-2.5 text-kth-navy">
