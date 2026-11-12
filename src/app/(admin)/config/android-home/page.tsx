@@ -1,4 +1,4 @@
-import { requireAdmin } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { planAndroidHomeMigration } from "@/lib/android-home";
 import { PageHeader } from "@/components/ui/page-header";
 import { MigrateButton } from "./migrate-button";
@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 /** One-time move of START_URL into APPS on all Android levels (PubLiKiosk 3.20: the first service is home). */
 export default async function AndroidHomePage() {
-  await requireAdmin();
+  await requireRole("it");
   const plan = await planAndroidHomeMigration();
 
   return (

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireAdmin } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { formatDuration } from "@/lib/status";
 import { PageHeader } from "@/components/ui/page-header";
@@ -20,7 +20,7 @@ const time = (d: Date | null) =>
 
 /** Guest logins (GuestLogin). No personal data is shown. */
 export default async function GuestsPage({ searchParams }: PageProps<"/guests">) {
-  await requireAdmin();
+  await requireRole("it");
   const { d } = await searchParams;
   const days = d === "7" ? 7 : 1;
   const today = new Date();

@@ -5,7 +5,8 @@ import { useState, useTransition } from "react";
 import { renameComputerAction } from "./actions";
 
 /** Heading with "Byt namn i listan". The panel name on the computer is COMPUTER_NAME under Inställningar. */
-export function RenameComputer({ host, name, label, panelName }: { host: string; name: string; label: string | null; panelName: string | null }) {
+/** canRename: the role Redaktör or higher; otherwise just the heading */
+export function RenameComputer({ host, name, label, panelName, canRename = true }: { host: string; name: string; label: string | null; panelName: string | null; canRename?: boolean }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(label ?? "");
@@ -25,9 +26,9 @@ export function RenameComputer({ host, name, label, panelName }: { host: string;
     return (
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h1 className="text-[34px] font-extrabold leading-tight tracking-tight sm:text-[40px]">{name}</h1>
-        <button type="button" onClick={() => { setValue(label ?? ""); setEditing(true); }} className="text-[13px] font-semibold text-kth-blue underline underline-offset-2">
+        {canRename && <button type="button" onClick={() => { setValue(label ?? ""); setEditing(true); }} className="text-[13px] font-semibold text-kth-blue underline underline-offset-2">
           Byt namn i listan
-        </button>
+        </button>}
       </div>
     );
 

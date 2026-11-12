@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
+import { atLeast } from "@/lib/roles";
 import { db } from "@/lib/db";
 import { asPlatform, PLATFORM_SHORT } from "@/lib/platforms";
 import { signageProps } from "@/lib/media";
@@ -13,7 +14,7 @@ import { Tabs } from "@/components/ui/tabs";
 export const dynamic = "force-dynamic";
 
 export default async function ProfileSettingsPage({ params }: PageProps<"/config/profiles/[name]">) {
-  await requireAdmin();
+  const { role } = await requireAdmin();
   const { name } = await params;
   const data = await getSettingsData(`profile:${name}`);
   if (!data) notFound();
@@ -55,9 +56,9 @@ export default async function ProfileSettingsPage({ params }: PageProps<"/config
             </Link>
           ))}
         </div>
-        <ProfileMeta name={name} label={label} description={layer?.description ?? null} used={users.length} />
+        {atLeast(role, "redaktor") && <ProfileMeta name={name} label={label} description={layer?.description ?? null} used={users.length} />}
       </PageHeader>
-      <SettingsEditor key={JSON.stringify(data.own)} data={data} title={`Profil ${label}`} signage={await signageProps(data.catalog)} />
+      <SettingsEditor key={JSON.stringify(data.own)} data={data} title={`Profil ${label}`} signage={await signageProps(data.catalog)} role={role} />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { requireAdmin } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { baseTarget, deviceNoun, PLATFORMS, PLATFORM_LABEL, type Platform } from "@/lib/platforms";
 import { signageProps } from "@/lib/media";
 import { getSettingsData } from "@/lib/settings";
@@ -9,7 +9,7 @@ import { Tabs } from "@/components/ui/tabs";
 
 /** Grundinställningar för en plattform (/config/base = Linux, /config/base/android, /config/base/tizen). */
 export async function BaseView({ platform }: { platform: Platform }) {
-  await requireAdmin();
+  await requireRole("it");
   const target = baseTarget(platform);
   const data = await getSettingsData(target);
   if (!data) notFound();

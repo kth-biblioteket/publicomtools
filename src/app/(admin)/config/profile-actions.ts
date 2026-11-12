@@ -2,14 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireAdmin } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { createProfile, deleteProfile, updateProfileMeta } from "@/lib/profiles";
 import { asPlatform } from "@/lib/platforms";
 
 export type ProfileFormState = { error?: string } | undefined;
 
 export async function createProfileAction(_prev: ProfileFormState, form: FormData): Promise<ProfileFormState> {
-  const user = await requireAdmin();
+  const user = await requireRole("redaktor");
   const label = String(form.get("label") ?? "").trim().slice(0, 80);
   const copyFrom = String(form.get("copyFrom") ?? "") || null;
   const description = String(form.get("description") ?? "").trim().slice(0, 200) || null;
@@ -21,7 +21,7 @@ export async function createProfileAction(_prev: ProfileFormState, form: FormDat
 }
 
 export async function updateProfileAction(name: string, _prev: ProfileFormState, form: FormData): Promise<ProfileFormState> {
-  await requireAdmin();
+  await requireRole("redaktor");
   const res = await updateProfileMeta(name, String(form.get("label") ?? "").slice(0, 80), String(form.get("description") ?? "").slice(0, 200));
   if (!res.ok) return { error: res.error };
   revalidatePath("/", "layout");
@@ -29,7 +29,7 @@ export async function updateProfileAction(name: string, _prev: ProfileFormState,
 }
 
 export async function deleteProfileAction(name: string): Promise<ProfileFormState> {
-  await requireAdmin();
+  await requireRole("redaktor");
   const res = await deleteProfile(name);
   if (!res.ok) return { error: res.error };
   revalidatePath("/", "layout");

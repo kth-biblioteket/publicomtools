@@ -1,14 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { asPlatform, enrolls } from "@/lib/platforms";
 import { newEnrollCode } from "@/lib/enroll";
 
 /** The name in the admin list. Admin only; never sent to the computer. Empty = use the computer's own name. */
 export async function renameComputerAction(host: string, label: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAdmin();
+  await requireRole("redaktor");
   const value = label.trim().slice(0, 80) || null;
   const updated = await db.computer.updateMany({ where: { host }, data: { label: value } });
   if (!updated.count) return { ok: false, error: "Datorn finns inte längre." };
@@ -18,7 +18,7 @@ export async function renameComputerAction(host: string, label: string): Promise
 
 /** "Hämta nya inställningar nu": the computer's next heartbeat tells it to fetch its config. */
 export async function requestReloadAction(host: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  const user = await requireAdmin();
+  const user = await requireRole("innehall");
   const updated = await db.computer.updateMany({
     where: { host },
     data: { reloadRequestedAt: new Date(), reloadRequestedBy: user.email },
@@ -30,7 +30,7 @@ export async function requestReloadAction(host: string): Promise<{ ok: true } | 
 
 /** "Starta om datorn": the computer's next heartbeat tells it to reboot when nobody is using it. */
 export async function requestRebootAction(host: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  const user = await requireAdmin();
+  const user = await requireRole("redaktor");
   const updated = await db.computer.updateMany({
     where: { host },
     data: { rebootRequestedAt: new Date(), rebootRequestedBy: user.email },
@@ -45,7 +45,7 @@ export async function requestRebootAction(host: string): Promise<{ ok: true } | 
  * current token, so the device has to be enrolled again with the code.
  */
 export async function newEnrollCodeAction(host: string): Promise<{ ok: true; code: string; expiresAt: string } | { ok: false; error: string }> {
-  await requireAdmin();
+  await requireRole("it");
   const c = await db.computer.findUnique({ where: { host }, select: { platform: true } });
   if (!c) return { ok: false, error: "Enheten finns inte längre." };
   if (!enrolls(asPlatform(c.platform))) return { ok: false, error: "Linux-datorer skrivs inte in med kod." };
@@ -56,7 +56,7 @@ export async function newEnrollCodeAction(host: string): Promise<{ ok: true; cod
 
 /** Android: "Ta skärmdump". The tablet sends one with its next heartbeat. */
 export async function requestScreenshotAction(host: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  const user = await requireAdmin();
+  const user = await requireRole("innehall");
   const updated = await db.computer.updateMany({
     where: { host, platform: "android" },
     data: { screenshotRequestedAt: new Date(), screenshotRequestedBy: user.email },
@@ -68,7 +68,7 @@ export async function requestScreenshotAction(host: string): Promise<{ ok: true 
 
 /** Android: "Lås upp menyn" after too many wrong PINs. Sent once with the next heartbeat. */
 export async function requestPinUnlockAction(host: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  const user = await requireAdmin();
+  const user = await requireRole("it");
   const updated = await db.computer.updateMany({
     where: { host, platform: "android" },
     data: { pinUnlockRequestedAt: new Date(), pinUnlockRequestedBy: user.email },

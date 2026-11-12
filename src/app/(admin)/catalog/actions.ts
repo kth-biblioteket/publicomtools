@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { previewCatalogUpdate, updateCatalog, uploadedSource, type CatalogPreview } from "@/lib/catalog";
 import { isPlatform, type Platform } from "@/lib/platforms";
 
@@ -21,7 +21,7 @@ function message(e: unknown, fallback: string) {
 }
 
 export async function previewCatalogAction(platform: Platform, upload?: Upload): Promise<{ ok: true; preview: CatalogPreview } | { ok: false; error: string }> {
-  await requireAdmin();
+  await requireRole("it");
   if (!isPlatform(platform)) return { ok: false, error: "Okänd plattform." };
   try {
     return { ok: true, preview: await previewCatalogUpdate(platform, source(upload)) };
@@ -31,7 +31,7 @@ export async function previewCatalogAction(platform: Platform, upload?: Upload):
 }
 
 export async function updateCatalogAction(platform: Platform, version: string, upload?: Upload): Promise<{ ok: true; keys: number } | { ok: false; error: string }> {
-  const user = await requireAdmin();
+  const user = await requireRole("it");
   if (!isPlatform(platform)) return { ok: false, error: "Okänd plattform." };
   try {
     const res = await updateCatalog(platform, user.email, version, source(upload));

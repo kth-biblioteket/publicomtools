@@ -8,10 +8,10 @@ export const dynamic = "force-dynamic";
 
 export default async function ComputerSettingsPage({ params }: PageProps<"/computers/[host]/settings">) {
   // Every page checks itself: the [host] layout is not re-rendered on client-side navigation.
-  await requireAdmin();
+  const { role } = await requireAdmin();
   const { host } = await params;
   const data = await getSettingsData(`host:${host}`);
   if (!data) notFound();
   const name = data.computers.find((c) => c.host === host)?.name ?? host;
-  return <SettingsEditor key={JSON.stringify([data.own, data.profile])} data={data} title={name} signage={await signageProps(data.catalog)} />;
+  return <SettingsEditor key={JSON.stringify([data.own, data.profile])} data={data} title={name} signage={await signageProps(data.catalog)} role={role} />;
 }

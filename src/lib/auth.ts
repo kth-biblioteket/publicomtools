@@ -2,11 +2,12 @@ import "server-only";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SignJWT, jwtVerify } from "jose";
+import { atLeast, isRole, type Role } from "@/lib/roles";
 
 /**
  * Staff log in with KTH via librarytools-auth (see src/proxy.ts). This app
  * keeps no user table: the session is a signed cookie holding the identity
- * claims, and access is decided by ADMIN_EMAILS on every request.
+ * claims, and the role (roles.ts) is decided by the e-mail lists on every request.
  */
 
 export const SESSION_COOKIE = "publicomtools_session";
@@ -61,21 +62,47 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   }
 }
 
-export function isAdmin(user: SessionUser) {
-  if (devBypassEnabled()) return true;
-  const admins = (process.env.ADMIN_EMAILS ?? "")
+function emailList(name: string) {
+  return (process.env[name] ?? "")
     .split(",")
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
-  return admins.includes(user.email.toLowerCase());
 }
 
-/** For pages: logged-out visitors go to /login, non-admins to /forbidden. */
-export async function requireAdmin(): Promise<SessionUser> {
+/**
+ * The user's role (see roles.ts), or null for no access. From the lists IT_EMAILS (and the older
+ * ADMIN_EMAILS, which gives IT), EDITOR_EMAILS and CONTENT_EMAILS; the highest one counts.
+ * DEV_ROLE picks the role with the development login bypass.
+ */
+export function roleOf(user: SessionUser): Role | null {
+  if (devBypassEnabled()) return isRole(process.env.DEV_ROLE) ? process.env.DEV_ROLE : "it";
+  const email = user.email.toLowerCase();
+  if (emailList("IT_EMAILS").includes(email) || emailList("ADMIN_EMAILS").includes(email)) return "it";
+  if (emailList("EDITOR_EMAILS").includes(email)) return "redaktor";
+  if (emailList("CONTENT_EMAILS").includes(email)) return "innehall";
+  return null;
+}
+
+/**
+ * For pages and server actions: logged-out visitors go to /login, those without the role to
+ * /forbidden. Returns the user with their role.
+ */
+export async function requireRole(min: Role = "innehall"): Promise<SessionUser & { role: Role }> {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (!isAdmin(user)) redirect("/forbidden");
-  return user;
+  const role = roleOf(user);
+  if (!atLeast(role, min)) redirect("/forbidden");
+  return { ...user, role: role! };
+}
+
+/** Any access at all (a role); for routes that answer 403 instead of redirecting. */
+export function isAdmin(user: SessionUser) {
+  return roleOf(user) !== null;
+}
+
+/** Any access at all (the role Innehåll or higher). */
+export async function requireAdmin() {
+  return requireRole("innehall");
 }
 
 export async function destroySession() {

@@ -1,4 +1,5 @@
 import { requireAdmin } from "@/lib/auth";
+import { atLeast } from "@/lib/roles";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { getComputerView } from "@/lib/computers";
@@ -23,7 +24,7 @@ const SOURCE_LABEL: Record<ConfigSource, (profile: string | null) => string> = {
 
 export default async function ComputerTechPage({ params }: PageProps<"/computers/[host]/tech">) {
   // Every page checks itself: the [host] layout is not re-rendered on client-side navigation.
-  await requireAdmin();
+  const { role } = await requireAdmin();
   const { host } = await params;
   const [c, row, layers] = await Promise.all([
     getComputerView(host),
@@ -83,7 +84,7 @@ export default async function ComputerTechPage({ params }: PageProps<"/computers
 
   return (
     <div className="flex flex-col gap-5">
-      {c.platform !== "linux" && (
+      {c.platform !== "linux" && atLeast(role, "it") && (
         <Enrollment
           host={c.host}
           enrolledAt={c.enrolledAt?.toISOString() ?? null}
@@ -177,7 +178,7 @@ export default async function ComputerTechPage({ params }: PageProps<"/computers
         </pre>
       </section>
 
-      <DeleteComputer host={c.host} name={c.name} />
+      {atLeast(role, "it") && <DeleteComputer host={c.host} name={c.name} />}
     </div>
   );
 }

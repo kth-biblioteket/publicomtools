@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
+import { atLeast } from "@/lib/roles";
 import { getComputerView } from "@/lib/computers";
 import { formatWithin, heartbeatInterval, waitingText } from "@/lib/status";
 import { HealthBadge } from "@/components/health-badge";
@@ -17,7 +18,7 @@ function clock(d: Date) {
 }
 
 export default async function ComputerLayout({ params, children }: LayoutProps<"/computers/[host]">) {
-  await requireAdmin();
+  const { role } = await requireAdmin();
   const { host } = await params;
   const c = await getComputerView(host);
   if (!c) notFound();
@@ -27,7 +28,7 @@ export default async function ComputerLayout({ params, children }: LayoutProps<"
     <div className="flex flex-col gap-5">
       <PageHeader
         back={{ href: "/", label: "Enheter" }}
-        heading={<RenameComputer host={c.host} name={c.name} label={c.label} panelName={c.computerName} />}
+        heading={<RenameComputer host={c.host} name={c.name} label={c.label} panelName={c.computerName} canRename={atLeast(role, "redaktor")} />}
         tabs={
           <Tabs
             band
@@ -67,7 +68,7 @@ export default async function ComputerLayout({ params, children }: LayoutProps<"
           )}
           {/* Datorer med gamla configfiler, eller som inte är installerade, kör inte koden som kan starta om.
               En Tizen-skärm kan inte startas om utifrån (det kräver Samsungs partnercertifikat). */}
-          {(c.configState === "current" || c.configState === "pending") && !c.reloadRequestedAt && c.platform !== "tizen" && (
+          {atLeast(role, "redaktor") && (c.configState === "current" || c.configState === "pending") && !c.reloadRequestedAt && c.platform !== "tizen" && (
             <RebootButton
               host={c.host}
               name={c.name}

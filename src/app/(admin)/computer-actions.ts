@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireAdmin } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Prisma } from "@/generated/prisma/client";
 import { PROFILE_KEY } from "@/lib/settings-shared";
@@ -18,7 +18,7 @@ const HOST = /^[a-z0-9][a-z0-9-]{0,62}$/;
  * It shows as "Väntar på installation" until it fetches its config.
  */
 export async function addComputerAction(_prev: AddComputerState, form: FormData): Promise<AddComputerState> {
-  const user = await requireAdmin();
+  const user = await requireRole("it");
   const host = String(form.get("host") ?? "").trim().toLowerCase();
   const profile = String(form.get("profile") ?? "") || null;
   const label = String(form.get("label") ?? "").trim().slice(0, 80) || null;

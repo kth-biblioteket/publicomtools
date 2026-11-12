@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getCurrentUser, isAdmin } from "@/lib/auth";
+import { getCurrentUser, roleOf } from "@/lib/auth";
 import { logout } from "@/app/actions";
 import { AdminShell } from "@/components/admin-shell";
 
@@ -12,11 +12,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const user = await getCurrentUser();
 
   // Login and "ingen behörighet" render without the menu.
-  if (!user || !isAdmin(user)) {
+  const role = user ? roleOf(user) : null;
+  if (!user || !role) {
     return <div className="flex min-h-full flex-1 flex-col text-ink">{children}</div>;
   }
   return (
-    <AdminShell userName={user.name} logout={logout}>
+    <AdminShell userName={user.name} role={role} logout={logout}>
       {children}
     </AdminShell>
   );

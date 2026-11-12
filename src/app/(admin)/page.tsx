@@ -1,4 +1,5 @@
 import { requireAdmin } from "@/lib/auth";
+import { atLeast } from "@/lib/roles";
 import { listComputers } from "@/lib/computers";
 import { formatAgo, formatWhen } from "@/lib/status";
 import { ComputerList, type ComputerRow } from "./computer-list";
@@ -24,7 +25,7 @@ function countText(rows: { platform: Platform }[]) {
 export const dynamic = "force-dynamic";
 
 export default async function ComputersPage() {
-  await requireAdmin();
+  const { role } = await requireAdmin();
   const now = new Date();
   const [computers, summaries] = await Promise.all([listComputers(), listProfileSummaries()]);
   const profiles = summaries.map((p) => ({ name: p.name, label: p.label, platform: p.platform }));
@@ -49,7 +50,7 @@ export default async function ComputersPage() {
       <PageHeader
         title="Enheter"
         lead={`${rows.length} ${rows.length === 1 ? "enhet" : "enheter"}${rows.length ? `: ${countText(rows)}` : ""}. De som behöver åtgärdas visas först.`}
-        actions={<AddComputer profiles={profiles} />}
+        actions={atLeast(role, "it") && <AddComputer profiles={profiles} />}
       />
       <ComputerList rows={rows} renderedAt={renderedAt} />
     </div>

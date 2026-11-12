@@ -6,6 +6,7 @@ import { useState } from "react";
 import { BookIcon, ChartIcon, HistoryIcon, ImageIcon, LayersIcon, MenuIcon, MonitorIcon, SlidersIcon, UsersIcon, XIcon } from "@/components/ui/icons";
 import { PAGE_PAD } from "@/components/ui/page-header";
 import kthLogo from "@/components/ui/kth-logo-blue.svg";
+import { ROLE_LABEL, type Role } from "@/lib/roles";
 
 type NavItem = { href: string; label: string; icon: React.ReactNode; match: (path: string) => boolean };
 
@@ -61,10 +62,12 @@ function Brand() {
 /** Light blue menu on the left with KTH's logo: main menu, IT section, user. */
 export function AdminShell({
   userName,
+  role,
   logout,
   children,
 }: {
   userName: string;
+  role: Role;
   logout: () => Promise<void>;
   children: React.ReactNode;
 }) {
@@ -87,10 +90,14 @@ export function AdminShell({
         {MAIN.map((i) => (
           <NavLink key={i.href} item={i} path={path} onNavigate={() => setOpen(false)} />
         ))}
-        <div className="px-3 pb-1.5 pt-5 text-[11.5px] font-bold uppercase tracking-wider text-kth-blue">För IT</div>
-        {IT.map((i) => (
-          <NavLink key={i.href} item={i} path={path} onNavigate={() => setOpen(false)} />
-        ))}
+        {role === "it" && (
+          <>
+            <div className="px-3 pb-1.5 pt-5 text-[11.5px] font-bold uppercase tracking-wider text-kth-blue">För IT</div>
+            {IT.map((i) => (
+              <NavLink key={i.href} item={i} path={path} onNavigate={() => setOpen(false)} />
+            ))}
+          </>
+        )}
       </nav>
       <div className="flex-1" />
       <div className="flex items-center gap-3 border-t border-kth-navy/15 px-5 py-4">
@@ -99,6 +106,7 @@ export function AdminShell({
         </span>
         <span className="flex min-w-0 flex-1 flex-col text-[13.5px] leading-snug text-kth-navy">
           <span className="truncate font-bold">{userName}</span>
+          <span className="text-[12px] font-semibold text-kth-navy/60">{ROLE_LABEL[role]}</span>
           <form action={logout}>
             <button type="submit" className="font-semibold text-kth-blue hover:underline">
               Logga ut

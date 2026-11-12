@@ -6,7 +6,7 @@ Körs på `https://apps.lib.kth.se/publicomtools`.
 - **Heartbeat** (`POST /publicomtools/api/heartbeat`): varje dator skickar sin status var 5:e minut
   (`heartbeat.sh` och `heartbeat.timer` i publicom).
 - **Statussida** (`/publicomtools`): alla datorer med status grön/gul/röd, uppdateras var 30:e sekund.
-  Detaljsida per dator med de senaste rapporterna. Kräver KTH-inloggning och att e-postadressen finns i `ADMIN_EMAILS`.
+  Detaljsida per dator med de senaste rapporterna. Kräver KTH-inloggning och att e-postadressen finns i någon av rollernas listor (se nedan).
 - **Inloggningsskärm för gästdatorerna** (`/publicomtools/guest`): ersätter Electron-appen på datorer med
   `LOGIN_UI=web` (se publicoms README). Kontrollerar kontot mot almatools, bokar datorn i bookingsystem-api
   och avslutar bokningen vid utloggning.
@@ -42,7 +42,8 @@ biljett för samma dator gör den förra ogiltig. Raderna tas bort efter 30 daga
 ## Lokal utveckling
 Kopiera `.env.example` till `.env` och `publicomtools.env.example` till `publicomtools.env`, och fyll i.
 Sätt `DEV_AUTH_BYPASS=true` i `publicomtools.env` för att slippa KTH-inloggning lokalt
-(fungerar bara med `NODE_ENV=development`, aldrig i produktionsimagen).
+(fungerar bara med `NODE_ENV=development`, aldrig i produktionsimagen). `DEV_ROLE=redaktor` eller
+`innehall` provar en lägre roll (standard är `it`).
 
 ```bash
 docker compose -f docker-compose-dev.yml up -d
@@ -76,7 +77,10 @@ Första gången, på servern:
    - `KTH_AUTH_JWKS_URL=http://librarytools-auth:3000/mrbs/.well-known/jwks.json`
    - `PUBLICOM_DEVICE_TOKEN` och `SESSION_SECRET`: `openssl rand -hex 32`
    - `BOOKING_API_KEY`: skrivnyckeln till bookingsystem-api (samma som datorerna har i `.secrets` i dag)
-   - `ADMIN_EMAILS`: de som ska se statussidan
+   - Rollerna, kommaseparerade e-postadresser (den högsta rollen gäller):
+     - `IT_EMAILS`: allt, också grundinställningar, katalog, gästsessioner och att lägga till eller ta bort enheter. Den äldre `ADMIN_EMAILS` ger också IT.
+     - `EDITOR_EMAILS` (Redaktör): alla inställningar på profiler och enheter, profiler, omstart och namnbyte.
+     - `CONTENT_EMAILS` (Innehåll): skylten, meddelanderaden, förstasidans texter och fält, mediebiblioteket, ladda om och skärmbild.
 4. `docker compose up -d`
 
 Slå sedan på heartbeat på datorerna genom att lägga in samma `PUBLICOM_DEVICE_TOKEN` i deras

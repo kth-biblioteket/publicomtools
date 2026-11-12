@@ -10,6 +10,7 @@ import { SearchIcon } from "@/components/ui/icons";
 import { SIGN_KEYS, SIGN_PAGES_KEY, SIGN_SCHEDULE_KEY } from "@/lib/signage";
 import { SignageEditor, type SignageProps } from "./signage-editor";
 import { TypeBlock } from "./type-block";
+import { atLeast, canEditKey, type Role } from "@/lib/roles";
 import { AppsEditor, type EditorField } from "./apps-editor";
 import { FieldControl } from "./field-control";
 import { KeyPicker } from "./key-picker";
@@ -62,7 +63,8 @@ function kindOf(target: string): Kind {
 /** The key whose value is the "type" the catalog's types refer to, per platform */
 const TYPE_KEY: Record<string, string> = { linux: "COMPUTER_TYPE", android: "HOME_MODE" };
 
-export function SettingsEditor({ data, title, signage }: { data: SettingsData; title: string; signage?: SignageProps }) {
+/** role: what the user may change (roles.ts); what they may not is shown locked */
+export function SettingsEditor({ data, title, signage, role = "it" }: { data: SettingsData; title: string; signage?: SignageProps; role?: Role }) {
   const router = useRouter();
   const kind = kindOf(data.target);
   const meta = useMemo(() => new Map(data.catalog.map((k) => [k.key, k])), [data.catalog]);
@@ -126,7 +128,12 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
       return next;
     });
 
+  /** Not the user's to change (the role Innehåll: only content); the server checks it too */
+  const locked = (key: string) => !canEditKey(role, data.target, key);
+  const contentOnly = !atLeast(role, "redaktor");
+
   const setValue = (key: string, value: string) =>
+    !locked(key) &&
     update((d) => {
       const saved = data.own[key] ?? null;
       if (saved === value || (saved === null && inherited[key]?.value === value)) delete d[key];
@@ -134,6 +141,7 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
     });
   /** Stop setting it here: inherit again (or fall back to the program's default in base). */
   const reset = (key: string) =>
+    !locked(key) &&
     update((d) => {
       if (key in data.own) d[key] = null;
       else delete d[key];
@@ -293,6 +301,7 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
           </p>
         </div>
         <AppsEditor
+          locked={locked}
           portrait={shown("ORIENTATION") === "portrait" || ["left", "right"].includes(shown("SCREEN_ROTATION") ?? "")}
           apps={field(k.key)!}
           homeUrl={field("START_URL")}
@@ -344,9 +353,11 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
           {own !== null ? (
             <>
               <Chip tone="own">{kind === "base" ? "Appar satta" : kind === "profile" ? "Appar satta i profilen" : "Appar satta här"}</Chip>
-              <button type="button" className={LINK} onClick={() => reset(k.key)}>
-                {inh ? `Använd ärvda appar (${formatValue(k, inh.value)})` : "Ta bort alla appar"}
-              </button>
+              {!locked(k.key) && (
+                <button type="button" className={LINK} onClick={() => reset(k.key)}>
+                  {inh ? `Använd ärvda appar (${formatValue(k, inh.value)})` : "Ta bort alla appar"}
+                </button>
+              )}
             </>
           ) : inh ? (
             <Chip>Appar från {sourceText(inh.source)}</Chip>
@@ -402,8 +413,8 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
           pages={field(SIGN_PAGES_KEY)!}
           seconds={field("SIGN_SECONDS")}
           reload={field("SIGN_RELOAD")}
-          js={field("SIGN_JS")}
-          resources={field("SIGN_RESOURCES")}
+          js={locked("SIGN_JS") ? undefined : field("SIGN_JS")}
+          resources={locked("SIGN_RESOURCES") ? undefined : field("SIGN_RESOURCES")}
           platform={data.platform}
           signage={signage!}
           heading={false}
@@ -444,7 +455,7 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
           <span className="ml-1.5 font-mono text-[11px] text-faint">{k.key}</span>
           {k.help && <p className="mt-0.5 text-[13px] leading-snug text-muted">{k.help}</p>}
         </div>
-        <div className="flex min-w-0 flex-col gap-1.5">
+        <fieldset disabled={locked(k.key)} className="flex min-w-0 flex-col gap-1.5">
           <FieldControl
             meta={k}
             value={value}
@@ -483,8 +494,9 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
                 Ångra
               </button>
             )}
+            {locked(k.key) && <Chip tone="gray">Ändras av redaktör</Chip>}
           </div>
-        </div>
+        </fieldset>
       </div>
     );
   };
@@ -592,12 +604,13 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
           <label htmlFor="profile" className="sr-only">Profil</label>
           <select
             id="profile"
+            disabled={locked(PROFILE_KEY)}
             value={profileName ?? ""}
             onChange={(e) => {
               const v = e.target.value || null;
               switchProfile(v === data.profile ? undefined : v);
             }}
-            className="h-[38px] w-56 rounded-lg border border-field bg-white px-2.5 text-sm"
+            className="h-[38px] w-56 rounded-lg border border-field bg-white px-2.5 text-sm disabled:bg-page disabled:text-muted"
           >
             <option value="">Ingen profil</option>
             {Object.keys(data.profiles)
@@ -609,12 +622,20 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
         </section>
       )}
 
+      {contentOnly && kind !== "base" && (
+        <p className="rounded-xl border border-line bg-white px-5 py-3.5 text-[13.5px] text-muted">
+          Du kan ändra innehållet: skylten, meddelanderaden och förstasidans texter och fält. Övriga inställningar visas låsta och ändras av en redaktör eller IT.
+        </p>
+      )}
+
       {typeMeta && field(typeMeta.key) && (
+        <fieldset disabled={locked(typeMeta.key)} className="contents">
         <TypeBlock
           field={field(typeMeta.key)!}
           footer={keyStatus([typeMeta.key])}
           filter={kind === "base" ? { value: baseFilter, onPick: setBaseFilter } : undefined}
         />
+        </fieldset>
       )}
 
       {signageTop && (
@@ -624,8 +645,8 @@ export function SettingsEditor({ data, title, signage }: { data: SettingsData; t
             pages={field(SIGN_PAGES_KEY)!}
             seconds={field("SIGN_SECONDS")}
           reload={field("SIGN_RELOAD")}
-            js={field("SIGN_JS")}
-            resources={field("SIGN_RESOURCES")}
+            js={locked("SIGN_JS") ? undefined : field("SIGN_JS")}
+            resources={locked("SIGN_RESOURCES") ? undefined : field("SIGN_RESOURCES")}
             platform={data.platform}
             signage={signage!}
             status={keyStatus}

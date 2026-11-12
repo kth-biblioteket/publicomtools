@@ -1,13 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { applyAndroidHomeMigration } from "@/lib/android-home";
 
 export type MigrationState = { ok: boolean; message: string } | undefined;
 
 export async function migrateAndroidHomeAction(_prev: MigrationState): Promise<MigrationState> {
-  const user = await requireAdmin();
+  const user = await requireRole("it");
   const res = await applyAndroidHomeMigration(user.email);
   revalidatePath("/", "layout");
   return res.ok

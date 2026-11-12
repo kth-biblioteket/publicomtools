@@ -1,4 +1,4 @@
-import { requireAdmin } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getCatalogMeta } from "@/lib/catalog";
 import { CATALOG_SOURCES, catalogRefLabel } from "@/lib/catalog-core";
@@ -15,7 +15,7 @@ const TYPE_LABEL = { bool: "Ja/nej", int: "Tal", string: "Text", csv: "Lista", u
 
 /** Inställningskatalogen för en plattform (/catalog = Linux, /catalog/android). */
 export async function CatalogView({ platform }: { platform: Platform }) {
-  await requireAdmin();
+  await requireRole("it");
   const [{ catalog, groups }, meta, layers, computers] = await Promise.all([
     getCatalog(platform),
     getCatalogMeta(platform),

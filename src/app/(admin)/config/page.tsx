@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
+import { atLeast } from "@/lib/roles";
 import { listProfileSummaries } from "@/lib/profiles";
 import { NewProfile } from "@/components/profiles/new-profile";
 import { PageHeader } from "@/components/ui/page-header";
@@ -8,7 +9,7 @@ import { PLATFORMS, PLATFORM_LABEL } from "@/lib/platforms";
 export const dynamic = "force-dynamic";
 
 export default async function ProfilesPage() {
-  await requireAdmin();
+  const { role } = await requireAdmin();
   const profiles = await listProfileSummaries();
 
   return (
@@ -16,7 +17,7 @@ export default async function ProfilesPage() {
       <PageHeader
         title="Profiler"
         lead="En profil samlar inställningar för en sorts dator. Alla datorer med profilen får dem, om datorn inte har ett eget värde."
-        actions={<NewProfile profiles={profiles.map((p) => ({ name: p.name, label: p.label, platform: p.platform }))} />}
+        actions={atLeast(role, "redaktor") && <NewProfile profiles={profiles.map((p) => ({ name: p.name, label: p.label, platform: p.platform }))} />}
       />
       {PLATFORMS.map((platform) => {
         const list = profiles.filter((p) => p.platform === platform);

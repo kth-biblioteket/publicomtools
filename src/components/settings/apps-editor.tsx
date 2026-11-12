@@ -298,6 +298,7 @@ export function AppsEditor({
   perPage,
   footerPage = {},
   attract = {},
+  locked = () => false,
   allowedSites,
   portrait = false,
 }: {
@@ -349,6 +350,8 @@ export function AppsEditor({
    * is fetched only if its host is a service, the start page or one of these
    */
   allowedSites?: { label: string; key: string; value: string | null };
+  /** Settings the user may not change (roles.ts): their parts are shown disabled */
+  locked?: (key: string) => boolean;
 }) {
   const mode = homeMode?.value ?? homeMode?.meta.defaultValue ?? "app";
   const launcher = mode === "launcher";
@@ -408,7 +411,7 @@ export function AppsEditor({
   // --- dragging ---
   const topOf = (hs: number[], k: number) => hs.slice(0, k).reduce((a, b) => a + b, 0) + GAP * k;
   const onDown = (e: React.PointerEvent<HTMLButtonElement>, id: number) => {
-    if (e.button !== 0 || !listRef.current) return;
+    if (e.button !== 0 || !listRef.current || locked(apps.meta.key)) return;
     const cards = Array.from(listRef.current.querySelectorAll<HTMLElement>("[data-app-card]"));
     const hs = cards.map((c) => c.getBoundingClientRect().height);
     const cur = rows.findIndex((r) => r.id === id);
@@ -516,6 +519,7 @@ export function AppsEditor({
   const clockNow = minute ? minute.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" }) : "";
   const homeName = homeLabel?.value?.trim() || "Hem";
   const homeIconName = homeIcon?.value ?? homeIcon?.meta.defaultValue ?? "house";
+  const lk = (f?: EditorField) => !!f && locked(f.meta.key);
 
   return (
     // @container: rutnäten följer redigerarens och kortens bredd, inte fönstrets (med sidomenyn
@@ -543,11 +547,11 @@ export function AppsEditor({
             )}
             {launcherFooterEn && <LiveText field={launcherFooterEn} label="Text längst ner (English)" placeholder="Tomt: den svenska texten" />}
             {perPage && (
-              <div className="flex min-w-0 flex-col gap-1.5">
+              <fieldset disabled={lk(perPage)} className="flex min-w-0 flex-col gap-1.5">
                 <label htmlFor={`f-${perPage.meta.key}`} className={LABEL}>Tjänster per sida</label>
                 <FieldControl {...perPage} invalid={!!perPage.problem} />
                 <p className="text-[12.5px] leading-snug text-muted">Fler tjänster blir flera sidor, som besökaren bläddrar mellan med svep och prickar.</p>
-              </div>
+              </fieldset>
             )}
           </div>
         </section>
@@ -563,7 +567,7 @@ export function AppsEditor({
             </p>
           </div>
           {footerPage.url && (
-            <div className="mt-3 flex flex-col gap-3 rounded-lg bg-page p-3">
+            <fieldset disabled={lk(footerPage.url)} className="mt-3 flex min-w-0 flex-col gap-3 rounded-lg bg-page p-3">
               <div className="flex min-w-0 flex-col gap-1.5">
                 <LiveText field={footerPage.url} label="Fotrad som webbsida (valfri)" placeholder="Tomt: informationsfälten nedan" />
                 <UrlNote field={footerPage.url} hostWarning={hostWarning} />
@@ -592,7 +596,7 @@ export function AppsEditor({
                   {footerPage.touch && <SwitchField field={footerPage.touch} label="Tar emot tryck" />}
                 </div>
               )}
-            </div>
+            </fieldset>
           )}
           {fields.length > 0 && (
             <div className="mt-3 flex flex-col gap-2.5">
@@ -644,10 +648,10 @@ export function AppsEditor({
                   </div>
                 )}
                 {refresh && (
-                  <div className="flex min-w-0 flex-col gap-1.5">
+                  <fieldset disabled={lk(refresh)} className="flex min-w-0 flex-col gap-1.5">
                     <label htmlFor={`f-${refresh.meta.key}`} className={LABEL}>Hämta från adresser var</label>
                     <FieldControl {...refresh} invalid={!!refresh.problem} />
-                  </div>
+                  </fieldset>
                 )}
               </div>
             </div>
@@ -657,6 +661,7 @@ export function AppsEditor({
 
       {/* Attract loop (förstasidan, PubLiKiosk 3.17.0) */}
       {launcher && attract.url && (
+        <fieldset disabled={lk(attract.url)} className="contents">
         <section className="rounded-[10px] border border-line-soft px-4 py-4">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
             <h4 className="text-[15px] font-extrabold">Attract loop</h4>
@@ -692,6 +697,7 @@ export function AppsEditor({
             )}
           </div>
         </section>
+        </fieldset>
       )}
 
       {/* Startknappen: tillbaka till början. Med flera tjänster som flikar är första fliken hem i stället */}
@@ -701,6 +707,7 @@ export function AppsEditor({
         </p>
       )}
       {(homeLabel || homeIcon) && (launcher || homeTabs.length <= 1) && (
+        <fieldset disabled={lk(homeLabel ?? homeIcon)} className="contents">
         <section className="rounded-[10px] border border-line-soft px-4 py-4">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
             <h4 className="text-[15px] font-extrabold">Startknappen</h4>
@@ -727,9 +734,11 @@ export function AppsEditor({
             )}
           </div>
         </section>
+        </fieldset>
       )}
 
       {/* Tjänster / Fler webbappar */}
+      <fieldset disabled={lk(apps)} className="contents">
       <section className="rounded-[10px] border border-line-soft px-4 py-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-baseline gap-x-3">
@@ -947,6 +956,7 @@ export function AppsEditor({
           </div>
         )}
       </section>
+      </fieldset>
 
       {/* Förhandsvisning: förstasidan */}
       {launcher && (
