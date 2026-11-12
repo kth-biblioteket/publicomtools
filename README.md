@@ -81,6 +81,10 @@ Första gången, på servern:
      - `IT_EMAILS`: allt, också grundinställningar, katalog, gästsessioner och att lägga till eller ta bort enheter. Den äldre `ADMIN_EMAILS` ger också IT.
      - `EDITOR_EMAILS` (Redaktör): alla inställningar på profiler och enheter, profiler, omstart och namnbyte.
      - `CONTENT_EMAILS` (Innehåll): skylten, meddelanderaden, förstasidans texter och fält, mediebiblioteket, ladda om och skärmbild.
+     - Samma roller från KTH-grupper: `IT_GROUPS`, `EDITOR_GROUPS` och `CONTENT_GROUPS`. librarytools-auth slår upp
+       personens grupper i ldap-api vid inloggningen och skickar dem i identitetstoken (`groups`).
+       Organisationsgrupper (`pa.anstallda.T.TR` = hela biblioteket) gäller med undernivåer, UG-grupper exakt.
+       En ändring i någons grupper gäller från nästa inloggning.
 4. `docker compose up -d`
 
 Slå sedan på heartbeat på datorerna genom att lägga in samma `PUBLICOM_DEVICE_TOKEN` i deras

@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SignJWT, jwtVerify } from "jose";
 import { atLeast, isRole, type Role } from "@/lib/roles";
+import { groupMatches, roleGroups, type GroupsVar } from "@/lib/role-groups";
 
 /**
  * Staff log in with KTH via librarytools-auth (see src/proxy.ts). This app
@@ -13,7 +14,8 @@ import { atLeast, isRole, type Role } from "@/lib/roles";
 export const SESSION_COOKIE = "publicomtools_session";
 export const SESSION_TTL_SECONDS = 60 * 60 * 12;
 
-export type SessionUser = { sub: string; email: string; name: string };
+/** groups: the person's KTH groups that some role names (role-groups.ts), from the login */
+export type SessionUser = { sub: string; email: string; name: string; groups?: string[] };
 
 function sessionKey() {
   const secret = process.env.SESSION_SECRET;
@@ -26,7 +28,7 @@ function devBypassEnabled() {
 }
 
 export async function createSessionToken(user: SessionUser) {
-  return new SignJWT({ email: user.email, name: user.name })
+  return new SignJWT({ email: user.email, name: user.name, groups: user.groups ?? [] })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(user.sub)
     .setIssuedAt()
@@ -56,6 +58,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
       sub: String(payload.sub),
       email: String(payload.email),
       name: String(payload.name),
+      groups: Array.isArray(payload.groups) ? payload.groups.map(String) : [],
     };
   } catch {
     return null;
@@ -71,15 +74,19 @@ function emailList(name: string) {
 
 /**
  * The user's role (see roles.ts), or null for no access. From the lists IT_EMAILS (and the older
- * ADMIN_EMAILS, which gives IT), EDITOR_EMAILS and CONTENT_EMAILS; the highest one counts.
+ * ADMIN_EMAILS, which gives IT), EDITOR_EMAILS and CONTENT_EMAILS, and the KTH groups in
+ * IT_GROUPS, EDITOR_GROUPS and CONTENT_GROUPS (from the login); the highest one counts.
  * DEV_ROLE picks the role with the development login bypass.
  */
 export function roleOf(user: SessionUser): Role | null {
   if (devBypassEnabled()) return isRole(process.env.DEV_ROLE) ? process.env.DEV_ROLE : "it";
   const email = user.email.toLowerCase();
-  if (emailList("IT_EMAILS").includes(email) || emailList("ADMIN_EMAILS").includes(email)) return "it";
-  if (emailList("EDITOR_EMAILS").includes(email)) return "redaktor";
-  if (emailList("CONTENT_EMAILS").includes(email)) return "innehall";
+  const groups = user.groups ?? [];
+  const has = (emails: string, groupsVar: GroupsVar) =>
+    emailList(emails).includes(email) || roleGroups(groupsVar).some((g) => groupMatches(g, groups));
+  if (has("IT_EMAILS", "IT_GROUPS") || emailList("ADMIN_EMAILS").includes(email)) return "it";
+  if (has("EDITOR_EMAILS", "EDITOR_GROUPS")) return "redaktor";
+  if (has("CONTENT_EMAILS", "CONTENT_GROUPS")) return "innehall";
   return null;
 }
 

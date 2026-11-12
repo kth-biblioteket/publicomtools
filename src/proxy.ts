@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify, createRemoteJWKSet } from "jose";
 import { createSessionToken, sessionCookieOptions, SESSION_COOKIE } from "@/lib/auth";
+import { relevantGroups } from "@/lib/role-groups";
 
 /**
  * Turns the short-lived identity token librarytools-auth sets after a KTH
@@ -46,7 +47,7 @@ function deleteIdentityCookie(request: NextRequest, response: NextResponse) {
   response.cookies.set(IDENTITY_COOKIE, "", { path: "/", maxAge: 0, ...(host && { domain: host }) });
 }
 
-type IdentityClaims = { sub: string; email: string; name: string };
+type IdentityClaims = { sub: string; email: string; name: string; groups?: unknown };
 
 export async function proxy(request: NextRequest) {
   const token = request.cookies.get(IDENTITY_COOKIE)?.value;
@@ -58,7 +59,9 @@ export async function proxy(request: NextRequest) {
       issuer: publicUrl(request).origin,
     });
     const claims = payload as unknown as IdentityClaims;
-    const session = await createSessionToken({ sub: claims.sub, email: claims.email, name: claims.name });
+    // The person's KTH groups (librarytools-auth looks them up in ldap-api); only those a role names
+    const groups = relevantGroups(claims.groups);
+    const session = await createSessionToken({ sub: claims.sub, email: claims.email, name: claims.name, groups });
 
     // Redirect to the same URL so the page renders with the new cookie.
     const response = NextResponse.redirect(publicUrl(request));
