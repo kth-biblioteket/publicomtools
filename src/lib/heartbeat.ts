@@ -63,6 +63,15 @@ export const heartbeatSchema = z.object({
    * out why a kiosk went away. Shown under Teknik.
    */
   events: z.array(z.string().max(300)).max(50).optional(),
+  /**
+   * PubLiKiosk 3.32: memory on the device in MB. memTotalMb = RAM, memAvailMb = available now,
+   * memLow = the system considers itself low on memory, appPssMb = the app's own process (the
+   * WebView renderer is a separate process and not included). Shown under Teknik.
+   */
+  memTotalMb: z.number().int().min(0).max(1_000_000).optional(),
+  memAvailMb: z.number().int().min(0).max(1_000_000).optional(),
+  memLow: z.boolean().optional(),
+  appPssMb: z.number().int().min(0).max(1_000_000).optional(),
 
   /**
    * Visits that ended since the last acknowledged heartbeat (epoch seconds). The device keeps them

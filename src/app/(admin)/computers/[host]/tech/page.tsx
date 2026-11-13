@@ -37,7 +37,17 @@ export default async function ComputerTechPage({ params }: PageProps<"/computers
   if (!c || !row || !layers) notFound();
 
   const s = c.status;
-  const history = await db.heartbeat.findMany({ where: { host }, orderBy: { receivedAt: "desc" }, take: HISTORY_LIMIT });
+  const history = (await db.heartbeat.findMany({ where: { host }, orderBy: { receivedAt: "desc" }, take: HISTORY_LIMIT })).map((h) => {
+    const hs = heartbeatSchema.safeParse(h.status);
+    return { id: h.id, receivedAt: h.receivedAt, data: hs.success ? hs.data : null };
+  });
+  // PubLiKiosk 3.32 rapporterar minnet: kolumn i tabellen och en trend över rapporterna
+  const hasMemory = history.some((h) => h.data?.memAvailMb !== undefined);
+  const memoryPoints = history
+    .filter((h) => h.data?.memAvailMb !== undefined)
+    .map((h) => ({ at: h.receivedAt.getTime(), avail: h.data!.memAvailMb!, app: h.data!.appPssMb, low: h.data!.memLow === true }))
+    .reverse();
+  const cols = 3 + (c.platform === "linux" ? 1 : 0) + (hasMemory ? 1 : 0);
   const effective = mergeLayers(layers);
   const keys = Object.keys(effective).sort();
   const keyWidth = Math.max(...keys.map((k) => k.length + (effective[k].value.length + 3)), 0);
@@ -67,6 +77,9 @@ export default async function ComputerTechPage({ params }: PageProps<"/computers
           ["guest.service", s ? `${s.guestService ?? "–"}${s.guestRestarts !== undefined ? `, ${s.guestRestarts} sessioner sedan start` : ""}` : "–"],
         ] as [string, React.ReactNode][])),
     ...(c.platform === "linux" ? ([["Kraschade tjänster", s && s.failedUnits.length ? s.failedUnits.join(", ") : "–"]] as [string, React.ReactNode][]) : []),
+    ...(s?.memTotalMb !== undefined || s?.memAvailMb !== undefined
+      ? ([["Minne", memoryText(s)]] as [string, React.ReactNode][])
+      : []),
     ...(c.platform === "linux" || s?.diskFreePercent !== undefined
       ? ([["Ledig disk", s?.diskFreePercent !== undefined ? `${s.diskFreePercent} %` : "–"]] as [string, React.ReactNode][])
       : []),
@@ -117,28 +130,32 @@ export default async function ComputerTechPage({ params }: PageProps<"/computers
                   <th className="border-b border-line px-3 py-2">Igång</th>
                   <th className="border-b border-line px-3 py-2">{c.platform === "tizen" ? "Sidan" : c.platform === "android" ? "Startsidan" : "Gästprogram"}</th>
                   {c.platform === "linux" && <th className="border-b border-line px-3 py-2">Fel</th>}
+                  {hasMemory && <th className="border-b border-line px-3 py-2">Ledigt / appen</th>}
                 </tr>
               </thead>
               <tbody>
                 {history.length === 0 && (
-                  <tr><td colSpan={c.platform === "linux" ? 4 : 3} className="px-3 py-3 text-muted">Inga rapporter än.</td></tr>
+                  <tr><td colSpan={cols} className="px-3 py-3 text-muted">Inga rapporter än.</td></tr>
                 )}
                 {history.map((h) => {
-                  const hs = heartbeatSchema.safeParse(h.status);
+                  const d = h.data;
                   const bad =
-                    hs.success &&
-                    ((hs.data.guestService !== undefined && hs.data.guestService !== "active") ||
-                      hs.data.pageLoaded === false ||
-                      hs.data.failedUnits.length > 0);
+                    d !== null &&
+                    ((d.guestService !== undefined && d.guestService !== "active") || d.pageLoaded === false || d.failedUnits.length > 0);
                   return (
                     <tr key={h.id.toString()} className={bad ? "bg-[#fff5f5] font-semibold text-bad-ink" : ""}>
                       <td className="whitespace-nowrap border-b border-line-soft px-3 py-2">{formatTime(h.receivedAt)}</td>
-                      <td className="whitespace-nowrap border-b border-line-soft px-3 py-2">{hs.success ? formatDuration(hs.data.uptimeSeconds) : "–"}</td>
+                      <td className="whitespace-nowrap border-b border-line-soft px-3 py-2">{d ? formatDuration(d.uptimeSeconds) : "–"}</td>
                       <td className="border-b border-line-soft px-3 py-2">
-                        {!hs.success ? "–" : hs.data.guestService ?? (hs.data.pageLoaded === undefined ? "–" : hs.data.pageLoaded ? "laddad" : "inte laddad")}
+                        {!d ? "–" : d.guestService ?? (d.pageLoaded === undefined ? "–" : d.pageLoaded ? "laddad" : "inte laddad")}
                       </td>
                       {c.platform === "linux" && (
-                        <td className="border-b border-line-soft px-3 py-2">{hs.success && hs.data.failedUnits.length ? hs.data.failedUnits.join(", ") : "–"}</td>
+                        <td className="border-b border-line-soft px-3 py-2">{d && d.failedUnits.length ? d.failedUnits.join(", ") : "–"}</td>
+                      )}
+                      {hasMemory && (
+                        <td className={`whitespace-nowrap border-b border-line-soft px-3 py-2 ${d?.memLow ? "font-semibold text-bad-ink" : ""}`}>
+                          {d?.memAvailMb === undefined ? "–" : `${d.memAvailMb} / ${d.appPssMb ?? "–"} MB${d.memLow ? " (lågt)" : ""}`}
+                        </td>
                       )}
                     </tr>
                   );
@@ -148,6 +165,8 @@ export default async function ComputerTechPage({ params }: PageProps<"/computers
           </div>
         </section>
       </div>
+
+      {memoryPoints.length > 1 && <MemoryTrend points={memoryPoints} totalMb={s?.memTotalMb} />}
 
       {s?.events && s.events.length > 0 && (
         <section className={CARD}>
@@ -180,5 +199,62 @@ export default async function ComputerTechPage({ params }: PageProps<"/computers
 
       {atLeast(role, "it") && <DeleteComputer host={c.host} name={c.name} />}
     </div>
+  );
+}
+
+type HeartbeatData = NonNullable<ReturnType<typeof heartbeatSchema.safeParse>["data"]>;
+
+/** "ledigt 739 av 2000 MB, appen 210 MB, lågt minne: nej" (PubLiKiosk 3.32) */
+function memoryText(s: HeartbeatData): string {
+  const parts = [
+    `ledigt ${s.memAvailMb ?? "–"} av ${s.memTotalMb ?? "–"} MB`,
+    ...(s.appPssMb !== undefined ? [`appen ${s.appPssMb} MB`] : []),
+    ...(s.memLow !== undefined ? [`lågt minne: ${s.memLow ? "ja" : "nej"}`] : []),
+  ];
+  return parts.join(", ");
+}
+
+type MemoryPoint = { at: number; avail: number; app?: number; low: boolean };
+
+/** Ledigt minne och appens minne över de senaste rapporterna, som två linjer (äldst till vänster). */
+function MemoryTrend({ points, totalMb }: { points: MemoryPoint[]; totalMb?: number }) {
+  const W = 600;
+  const H = 120;
+  const PAD = 4;
+  const first = points[0].at;
+  const span = Math.max(points[points.length - 1].at - first, 1);
+  const top = Math.max(totalMb ?? 0, ...points.map((p) => Math.max(p.avail, p.app ?? 0)), 1);
+  const x = (at: number) => PAD + ((at - first) / span) * (W - 2 * PAD);
+  const y = (mb: number) => H - PAD - (mb / top) * (H - 2 * PAD);
+  const line = (pts: { at: number; mb: number }[]) => pts.map((p, i) => `${i ? "L" : "M"}${x(p.at).toFixed(1)},${y(p.mb).toFixed(1)}`).join(" ");
+  const avail = points.map((p) => p.avail);
+  const apps = points.filter((p) => p.app !== undefined).map((p) => p.app!);
+  const range = (v: number[]) => (v.length ? `${Math.min(...v)}–${Math.max(...v)} MB` : "–");
+  const lowCount = points.filter((p) => p.low).length;
+
+  return (
+    <section className={CARD}>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-base font-extrabold">Minne</h2>
+        <span className="text-[13px] text-muted">
+          {points.length} rapporter, {formatTime(new Date(first))} – {formatTime(new Date(points[points.length - 1].at))}
+          {totalMb !== undefined && ` · ${totalMb} MB totalt`}
+        </span>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="mt-3 h-32 w-full rounded-lg border border-line bg-[#f8f9fa]" role="img" aria-label="Ledigt minne och appens minne över tid">
+        {points.filter((p) => p.low).map((p) => (
+          <line key={p.at} x1={x(p.at)} x2={x(p.at)} y1={0} y2={H} stroke="#e5484d" strokeOpacity={0.25} strokeWidth={3} vectorEffect="non-scaling-stroke" />
+        ))}
+        <path d={line(points.map((p) => ({ at: p.at, mb: p.avail })))} fill="none" stroke="#1954a6" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+        {apps.length > 1 && (
+          <path d={line(points.filter((p) => p.app !== undefined).map((p) => ({ at: p.at, mb: p.app! })))} fill="none" stroke="#d85497" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+        )}
+      </svg>
+      <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[13px]">
+        <span className="flex items-center gap-1.5"><span className="inline-block h-0.5 w-4 bg-[#1954a6]" />Ledigt {range(avail)}</span>
+        <span className="flex items-center gap-1.5"><span className="inline-block h-0.5 w-4 bg-[#d85497]" />Appen {range(apps)}</span>
+        <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-1 bg-[#e5484d]/40" />Lågt minne i {lowCount} av {points.length}</span>
+      </div>
+    </section>
   );
 }
