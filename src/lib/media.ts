@@ -276,6 +276,7 @@ export async function signageProps(catalog: { key: string }[]) {
     snapImageBase: `${base}/s/`,
     viewBase: `${origin}${base}/m/`,
     fileBase: `${base}/f/`,
+    screensaverBase: `${origin}${base}/f/`,
     uploadUrl: withBasePath("/media/upload"),
   };
 }

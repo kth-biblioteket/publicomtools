@@ -248,6 +248,13 @@ export function appProblems(a: AppEntry): Partial<Record<keyof AppEntry, string>
  * the same files the computers fetch fallback images from. stable = what the fleet runs.
  */
 export const PREVIEW_BRANCH = "stable";
+
+/** The csv key whose list may also hold pictures from the media library, as <origin>/api/sign/f/<id>?format=jpeg */
+export const SCREENSAVER_KEY = "SCREENSAVER_FILES";
+/** The library file an item points at, or null for a file name from the catalog (or any other value) */
+export function screensaverMediaId(item: string): string | null {
+  return /^https:\/\/[^\s/?]+\/(?:[^\s?]*\/)?api\/sign\/f\/([0-9a-f]{64})\?format=jpeg$/.exec(item)?.[1] ?? null;
+}
 export function previewUrl(path: string): string {
   return `https://raw.githubusercontent.com/kth-biblioteket/publicom/${PREVIEW_BRANCH}/${path.replace(/^\/+/, "")}`;
 }
@@ -322,7 +329,7 @@ export function formatValue(meta: CatalogEntry | undefined, value: string | null
     case "int":
       return meta.unit ? `${value} ${meta.unit}` : value;
     case "csv": {
-      const items = splitList(value, meta.separator).map((v) => meta.options.find((o) => o.value === v)?.label ?? v);
+      const items = splitList(value, meta.separator).map((v) => meta.options.find((o) => o.value === v)?.label ?? (meta.key === SCREENSAVER_KEY && screensaverMediaId(v) ? "bild från mediebiblioteket" : v));
       return items.length ? items.join(", ") : "tom lista";
     }
     case "apps": {
@@ -391,7 +398,9 @@ export function settingWarnings(
   // outside them is kept, but the computer can only show it if the file exists there.
   for (const k of catalog.values()) {
     if (k.type !== "csv" || !k.options.length) continue;
-    const unknown = splitList(value(k.key) ?? "", k.separator).filter((v) => !k.options.some((o) => o.value === v));
+    const unknown = splitList(value(k.key) ?? "", k.separator).filter(
+      (v) => !k.options.some((o) => o.value === v) && !(k.key === SCREENSAVER_KEY && screensaverMediaId(v)),
+    );
     if (unknown.length)
       warnings.push({
         key: k.key,

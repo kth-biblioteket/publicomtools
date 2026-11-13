@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import type { SettingsData } from "@/lib/settings";
 import { saveSettingsAction } from "@/app/(admin)/settings-actions";
-import { formatValue, INFO_FIELD_KEYS, PROFILE_KEY, settingWarnings, validateValue, type CatalogEntry } from "@/lib/settings-shared";
+import { formatValue, INFO_FIELD_KEYS, PROFILE_KEY, SCREENSAVER_KEY, settingWarnings, validateValue, type CatalogEntry } from "@/lib/settings-shared";
 import { Chip } from "@/components/ui/chip";
 import { SearchIcon } from "@/components/ui/icons";
 import { SIGN_KEYS, SIGN_PAGES_KEY, SIGN_SCHEDULE_KEY } from "@/lib/signage";
@@ -463,6 +463,7 @@ export function SettingsEditor({ data, title, signage, role = "it" }: { data: Se
             invalid={!!problem}
             onChange={(v) => setValue(k.key, v)}
             onClear={() => reset(k.key)}
+            signage={k.key === SCREENSAVER_KEY ? signage : undefined}
           />
           {problem && <p className="text-[12.5px] font-semibold text-bad-ink">{problem}</p>}
           {!problem && warningFor(k.key) && (

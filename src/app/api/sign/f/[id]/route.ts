@@ -1,4 +1,5 @@
 import { createReadStream } from "node:fs";
+import sharp from "sharp";
 import { stat } from "node:fs/promises";
 import { Readable } from "node:stream";
 import { db } from "@/lib/db";
@@ -39,6 +40,21 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     "X-Content-Type-Options": "nosniff",
     "Accept-Ranges": "bytes",
   };
+  // ?format=jpeg: en JPEG av bilden, för skärmsläckaren på Linuxdatorerna (xscreensaver läser inte WebP, som
+  // biblioteket lagrar bilder som). Svart bakgrund bakom genomskinliga delar. Filmer har ingen bild att visa.
+  if (new URL(request.url).searchParams.get("format") === "jpeg") {
+    if (row.mime.startsWith("video/")) return new Response("Filmer har ingen JPEG.", { status: 400 });
+    const etag = `"${id}-jpeg"`;
+    const jpegHeaders = { ...headers, "Content-Type": "image/jpeg", ETag: etag };
+    delete (jpegHeaders as Record<string, string>)["Accept-Ranges"];
+    if (request.headers.get("if-none-match") === etag) return new Response(null, { status: 304, headers: jpegHeaders });
+    try {
+      const jpeg = await sharp(path).flatten({ background: "#000000" }).jpeg({ quality: 92, chromaSubsampling: "4:4:4", mozjpeg: true }).toBuffer();
+      return new Response(request.method === "HEAD" ? null : new Uint8Array(jpeg), { headers: { ...jpegHeaders, "Content-Length": String(jpeg.length) } });
+    } catch {
+      return new Response("Bilden går inte att läsa.", { status: 500 });
+    }
+  }
   if (request.headers.get("if-none-match") === `"${id}"`) return new Response(null, { status: 304, headers });
 
   const range = /^bytes=(\d*)-(\d*)$/.exec(request.headers.get("range") ?? "");

@@ -56,6 +56,8 @@ export type SignageProps = {
   viewBase: string;
   /** The files themselves, for thumbnails in admin */
   fileBase: string;
+  /** Absolute address of the files: <screensaverBase><id>?format=jpeg is what a computer fetches as a screensaver image */
+  screensaverBase: string;
   uploadUrl: string;
 };
 
