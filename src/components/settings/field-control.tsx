@@ -222,6 +222,8 @@ function ImageList({ id, meta, value, inherited, onChange, signage }: Props & { 
   const [library, setLibrary] = useState<SignMedia[]>(signage?.media.filter((m) => m.kind === "image") ?? []);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Mediebiblioteket visas först när man ber om det, så att fältet inte blir ett helt bildgalleri
+  const [showLibrary, setShowLibrary] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const urlOf = (m: { id: string }) => `${signage!.screensaverBase}${m.id}?format=jpeg`;
   const left = meta.options.filter((o) => !items.includes(o.value));
@@ -313,7 +315,14 @@ function ImageList({ id, meta, value, inherited, onChange, signage }: Props & { 
       {signage && (
         <div>
           <div className="mb-1 flex flex-wrap items-center gap-2">
-            <p className="text-[12.5px] font-semibold text-muted">Från mediebiblioteket</p>
+            <button
+              type="button"
+              aria-expanded={showLibrary}
+              onClick={() => setShowLibrary((v) => !v)}
+              className="h-8 rounded-lg border border-line bg-white px-3 text-[12.5px] font-bold text-kth-blue hover:bg-select"
+            >
+              {showLibrary ? "Dölj mediebiblioteket" : `Välj från mediebiblioteket${leftMedia.length ? ` (${leftMedia.length})` : ""}…`}
+            </button>
             <button
               type="button"
               disabled={!!busy}
@@ -335,7 +344,7 @@ function ImageList({ id, meta, value, inherited, onChange, signage }: Props & { 
             />
           </div>
           {error && <p className="mb-1 text-[12.5px] font-semibold text-bad-ink">{error}</p>}
-          {leftMedia.length > 0 ? (
+          {!showLibrary ? null : leftMedia.length > 0 ? (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-2">
               {leftMedia.map((m) => (
                 <button
@@ -356,7 +365,7 @@ function ImageList({ id, meta, value, inherited, onChange, signage }: Props & { 
           ) : (
             <p className="text-[12.5px] text-muted">Inga fler bilder i mediebiblioteket. Ladda upp en, så läggs den till i listan.</p>
           )}
-          <p className="mt-1 text-[12px] text-muted">Bilden hämtas av datorn vid start som JPEG. Bäst är 16:9, till exempel 1920 × 1080.</p>
+          {showLibrary && <p className="mt-1 text-[12px] text-muted">Bilden hämtas av datorn vid start som JPEG. Bäst är 16:9, till exempel 1920 × 1080.</p>}
         </div>
       )}
     </div>
