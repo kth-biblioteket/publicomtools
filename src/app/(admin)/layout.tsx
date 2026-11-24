@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getCurrentUser, roleOf } from "@/lib/auth";
 import { logout } from "@/app/actions";
 import { AdminShell } from "@/components/admin-shell";
+import { webLoginInUse } from "@/lib/guest-login";
 
 export const metadata: Metadata = {
   title: "PubLiAdmin – Publika enheter, KTH Biblioteket",
@@ -16,8 +17,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!user || !role) {
     return <div className="flex min-h-full flex-1 flex-col text-ink">{children}</div>;
   }
+  // Gästsessioner finns bara med webbinloggningen; menyvalet visas för IT när den används
+  const showGuests = role === "it" && (await webLoginInUse().catch(() => true));
   return (
-    <AdminShell userName={user.name} role={role} logout={logout}>
+    <AdminShell userName={user.name} role={role} logout={logout} showGuests={showGuests}>
       {children}
     </AdminShell>
   );

@@ -63,11 +63,14 @@ function Brand() {
 export function AdminShell({
   userName,
   role,
+  showGuests = true,
   logout,
   children,
 }: {
   userName: string;
   role: Role;
+  /** Gästsessioner: only when some computer uses the web login (otherwise the page is always empty) */
+  showGuests?: boolean;
   logout: () => Promise<void>;
   children: React.ReactNode;
 }) {
@@ -93,7 +96,7 @@ export function AdminShell({
         {role === "it" && (
           <>
             <div className="px-3 pb-1.5 pt-5 text-[11.5px] font-bold uppercase tracking-wider text-kth-blue">För IT</div>
-            {IT.map((i) => (
+            {IT.filter((i) => showGuests || i.href !== "/guests").map((i) => (
               <NavLink key={i.href} item={i} path={path} onNavigate={() => setOpen(false)} />
             ))}
           </>

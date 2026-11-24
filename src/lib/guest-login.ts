@@ -184,3 +184,17 @@ export async function endSession(host: string, bookingId: string) {
   if (!result.valid) console.error(`ending booking ${bookingId} on ${host}:`, result.message ?? "not updated");
   return true;
 }
+
+/**
+ * Is the web login in use? True when a profile, the base settings or a computer sets LOGIN_UI=web, or when
+ * there were web logins the last 7 days (so the page stays reachable for a while after switching back).
+ * With the Electron app (the default) the computer logs in and books by itself and nothing reaches the server,
+ * so the "Gästsessioner" page would only ever be empty; the menu hides it then.
+ */
+export async function webLoginInUse(): Promise<boolean> {
+  const [row] = await db.$queryRaw<{ n: bigint }[]>`
+    SELECT (SELECT count(*) FROM "ConfigLayer" WHERE "values"->>'LOGIN_UI' = 'web')
+         + (SELECT count(*) FROM "Computer" WHERE "overrides"->>'LOGIN_UI' = 'web')
+         + (SELECT count(*) FROM "GuestLogin" WHERE "createdAt" > now() - interval '7 days') AS n`;
+  return Number(row?.n ?? 0) > 0;
+}

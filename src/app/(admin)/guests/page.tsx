@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { formatDuration } from "@/lib/status";
 import { PageHeader } from "@/components/ui/page-header";
 import { displayName } from "@/lib/names";
+import { webLoginInUse } from "@/lib/guest-login";
 
 export const dynamic = "force-dynamic";
 
@@ -28,9 +29,10 @@ export default async function GuestsPage({ searchParams }: PageProps<"/guests">)
   if (days === 1) since.setHours(0, 0, 0, 0);
   else since.setDate(since.getDate() - 7);
 
-  const [logins, computers] = await Promise.all([
+  const [logins, computers, inUse] = await Promise.all([
     db.guestLogin.findMany({ where: { createdAt: { gte: since } }, orderBy: { createdAt: "desc" }, take: 300 }),
     db.computer.findMany({ select: { host: true, computerName: true, label: true } }),
+    webLoginInUse(),
   ]);
   const names = new Map(computers.map((c) => [c.host, displayName(c)]));
   const now = today.getTime();
@@ -53,7 +55,16 @@ export default async function GuestsPage({ searchParams }: PageProps<"/guests">)
       />
 
       {logins.length === 0 ? (
-        <div className="rounded-xl border border-line bg-white p-5 text-sm text-muted">Inga gästsessioner {days === 1 ? "idag" : "de senaste 7 dagarna"}.</div>
+        <div className="rounded-xl border border-line bg-white p-5 text-sm text-muted">
+          Inga gästsessioner {days === 1 ? "idag" : "de senaste 7 dagarna"}.
+          {!inUse && (
+            <p className="mt-2">
+              Sidan fylls bara när gästdatorerna har <span className="font-semibold text-ink">Inloggningsskärm: Webbversion</span> (
+              <span className="font-mono text-xs">LOGIN_UI=web</span>). Ingen profil eller dator har det nu: med programversionen
+              (Electron, standard) loggar datorn in och bokar själv, och inget av det når PubLiAdmin.
+            </p>
+          )}
+        </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-line bg-white shadow-sm">
           <table className="w-full min-w-[720px] border-collapse text-sm tabular-nums">
